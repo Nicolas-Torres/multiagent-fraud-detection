@@ -7,7 +7,12 @@ authors = [
     { name = "Nicolas Torres", email = "ntorresv.dev@gmail.com" }
 ]
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "alembic>=1.18.5",
+    "psycopg[binary]>=3.3.4",
+    "pydantic-settings>=2.14.2",
+    "sqlalchemy>=2.0.51",
+]
 
 [project.scripts]
 multiagent-fraud-detection = "multiagent_fraud_detection:main"
