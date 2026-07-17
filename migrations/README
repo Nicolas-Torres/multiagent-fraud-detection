@@ -1,0 +1,10 @@
+Generic single-database configuration.
+
+```
+alembic.ini              # config en la raíz (script_location, logging, y un sqlalchemy.url placeholder)
+migrations/
+├── env.py               # el script que Alembic ejecuta en cada migración ← este lo cableamos
+├── script.py.mako       # plantilla de los archivos de migración generados
+├── README
+└── versions/            # aquí caen las migraciones (vacío por ahora)
+```
