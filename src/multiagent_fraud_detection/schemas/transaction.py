@@ -1,14 +1,20 @@
-from decimal import Decimal
-from pydantic import AwareDatetime, BaseModel, Field
+from typing import Annotated
+
+from pydantic import AwareDatetime, BaseModel, Field, StringConstraints
+
 from multiagent_fraud_detection.enums import Channel
+from multiagent_fraud_detection.schemas.types import CountryCode, Money
 
 class TransactionIn(BaseModel):
-    transaction_id: str
-    customer_id: str
-    amount: Decimal = Field(gt=0)
-    currency: str = Field(min_length=3, max_length=3)
-    country: str = Field(min_length=2, max_length=2)
+    """Entrada canónica de una transacción a evaluar."""
+    transaction_id: str = Field(min_length=1)
+    customer_id: str = Field(min_length=1)
+    amount: Money
+    currency: Annotated[
+        str, StringConstraints(min_length=3, max_length=3, to_upper=True)
+    ]
+    country: CountryCode
     channel: Channel
-    device_id: str
+    device_id: str = Field(min_length=1)
     timestamp: AwareDatetime
-    merchant_id: str
+    merchant_id: str = Field(min_length=1)
