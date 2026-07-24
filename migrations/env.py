@@ -7,6 +7,8 @@ from alembic import context
 
 from multiagent_fraud_detection.config.settings import settings
 from multiagent_fraud_detection.db.base import Base
+# Con esto, target_metadata = Base.metadata ya "ve" Transaction.
+from multiagent_fraud_detection.db import models            # noqa: F401 (registra los modelos en Base.metadata)
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
