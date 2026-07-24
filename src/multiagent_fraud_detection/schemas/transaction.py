@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from pydantic import AwareDatetime, BaseModel, Field, StringConstraints
+from pydantic import AwareDatetime, BaseModel, Field, StringConstraints, ConfigDict
 
 from multiagent_fraud_detection.enums import Channel
 from multiagent_fraud_detection.schemas.types import CountryCode, Money
@@ -18,3 +18,6 @@ class TransactionIn(BaseModel):
     device_id: str = Field(min_length=1)
     timestamp: AwareDatetime
     merchant_id: str = Field(min_length=1)
+
+class TransactionRead(TransactionIn):
+    model_config = ConfigDict(from_attributes=True)

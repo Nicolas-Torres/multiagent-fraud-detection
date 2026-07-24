@@ -10,3 +10,5 @@ CountryCode = Annotated[
 ]
 
 Money = Annotated[Decimal, Field(gt=0, max_digits=12, decimal_places=2)]
+
+Confidence = Annotated[float, Field(ge=0.0, le=1.0)]

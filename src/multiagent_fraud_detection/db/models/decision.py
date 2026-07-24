@@ -56,3 +56,11 @@ class Decision(Base):
         lazy="selectin",
         order_by="Signal.id",
     )
+
+    @property
+    def debate(self) -> dict[str, str]:
+        """Recompone el objeto valor que el contrato expone como `debate`."""
+        return {
+            "pro_fraud_argument": self.debate_pro_fraud,
+            "pro_customer_argument": self.debate_pro_customer,
+        }

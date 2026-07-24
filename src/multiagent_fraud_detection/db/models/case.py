@@ -59,3 +59,8 @@ class Case(Base):
     )
 
     __table_args__ = (Index("ix_cases_status_created_at", "status", "created_at"),)
+
+    @property
+    def customer(self) -> dict[str, Any] | None:
+        """El contrato lo llama `customer`; en BD es el snapshot congelado."""
+        return self.customer_snapshot

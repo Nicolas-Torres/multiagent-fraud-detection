@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 from multiagent_fraud_detection.schemas.types import CountryCode, Money
 
@@ -10,3 +10,6 @@ class CustomerBehaviorIn(BaseModel):
     usual_hour_end: int = Field(ge=0, le=23)
     usual_countries: list[CountryCode]
     usual_devices: list[str]
+
+class CustomerBehaviorRead(CustomerBehaviorIn):
+    model_config = ConfigDict(from_attributes=True)
