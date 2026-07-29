@@ -64,7 +64,7 @@ class DiscardedSource(BaseModel):
 
 
 class GraphInput(TypedDict):
-    """Se usa como `input=` al compilar: fija que el grafo solo recibe esto."""
+    """Se usa como `input_schema=` al compilar: fija que el grafo solo recibe esto."""
 
     case_id: UUID
     transaction: TransactionIn
