@@ -6,8 +6,11 @@ vivo tiene siempre la versión vigente; su encabezado dice cuál es.
 Para recuperar el texto completo de una versión anterior:
 
 ```bash
-git show contrato-v0.2:docs/contrato_de_interfaz.md
+git show contrato-v0.3:docs/contrato_de_interfaz.md
 ```
+
+> Las versiones 0.1 y 0.2 son anteriores a que el contrato entrara a control de
+> versiones: solo sobreviven como entradas de este changelog.
 
 ---
 
