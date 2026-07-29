@@ -1,0 +1,220 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="Página-1" id="FAtJ0Ftnc7a5jKOr1-Fc">
+    <mxGraphModel dx="2470" dy="1503" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="900" math="0" shadow="0" adaptiveColors="auto">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" parent="1" style="text;html=1;fontSize=20;fontStyle=1;align=left;verticalAlign=middle;" value="Modelo de datos — etapa domain-models (head Alembic: ac3bc6c8573d)" vertex="1">
+          <mxGeometry height="30" width="900" x="-131" y="-21" as="geometry" />
+        </mxCell>
+        <mxCell id="subtitle" parent="1" style="text;html=1;fontSize=12;fontStyle=2;align=left;verticalAlign=middle;" value="Seis tablas verificadas en Postgres 17 + pgvector. Los tres hijos de cases llevan ON DELETE CASCADE." vertex="1">
+          <mxGeometry height="24" width="900" x="-131" y="9" as="geometry" />
+        </mxCell>
+        <mxCell id="t_tx" parent="1" style="swimlane;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=0;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;html=1;fontStyle=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="transactions" vertex="1">
+          <mxGeometry height="246" width="260" x="-131" y="74" as="geometry" />
+        </mxCell>
+        <mxCell id="tx1" parent="t_tx" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;html=1;fontSize=11;fontStyle=1;" value="PK  transaction_id : varchar" vertex="1">
+          <mxGeometry height="24" width="260" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="tx2" parent="t_tx" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;html=1;fontSize=11;" value="IDX customer_id : varchar" vertex="1">
+          <mxGeometry height="24" width="260" y="54" as="geometry" />
+        </mxCell>
+        <mxCell id="tx3" parent="t_tx" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;html=1;fontSize=11;" value="amount : numeric(12,2)" vertex="1">
+          <mxGeometry height="24" width="260" y="78" as="geometry" />
+        </mxCell>
+        <mxCell id="tx4" parent="t_tx" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;html=1;fontSize=11;" value="currency : varchar(3)" vertex="1">
+          <mxGeometry height="24" width="260" y="102" as="geometry" />
+        </mxCell>
+        <mxCell id="tx5" parent="t_tx" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;html=1;fontSize=11;" value="country : varchar(2)" vertex="1">
+          <mxGeometry height="24" width="260" y="126" as="geometry" />
+        </mxCell>
+        <mxCell id="tx6" parent="t_tx" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;html=1;fontSize=11;" value="channel : varchar  (enum, sin CHECK)" vertex="1">
+          <mxGeometry height="24" width="260" y="150" as="geometry" />
+        </mxCell>
+        <mxCell id="tx7" parent="t_tx" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;html=1;fontSize=11;" value="device_id : varchar" vertex="1">
+          <mxGeometry height="24" width="260" y="174" as="geometry" />
+        </mxCell>
+        <mxCell id="tx8" parent="t_tx" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;html=1;fontSize=11;" value="timestamp : timestamptz" vertex="1">
+          <mxGeometry height="24" width="260" y="198" as="geometry" />
+        </mxCell>
+        <mxCell id="tx9" parent="t_tx" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;html=1;fontSize=11;" value="merchant_id : varchar" vertex="1">
+          <mxGeometry height="24" width="260" y="222" as="geometry" />
+        </mxCell>
+        <mxCell id="t_case" parent="1" style="swimlane;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=0;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;html=1;fontStyle=1;fillColor=#d5e8d4;strokeColor=#82b366;" value="cases" vertex="1">
+          <mxGeometry height="174" width="280" x="400" y="110" as="geometry" />
+        </mxCell>
+        <mxCell id="cs1" parent="t_case" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;html=1;fontSize=11;fontStyle=1;" value="PK  case_id : uuid" vertex="1">
+          <mxGeometry height="24" width="280" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="cs2" parent="t_case" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;html=1;fontSize=11;fontStyle=1;" value="FK UQ  transaction_id : varchar" vertex="1">
+          <mxGeometry height="24" width="280" y="54" as="geometry" />
+        </mxCell>
+        <mxCell id="cs3" parent="t_case" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;html=1;fontSize=11;" value="IDX status : varchar(13)  (enum)" vertex="1">
+          <mxGeometry height="24" width="280" y="78" as="geometry" />
+        </mxCell>
+        <mxCell id="cs4" parent="t_case" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;html=1;fontSize=11;fontColor=#B85450;" value="customer_snapshot : jsonb  NULL" vertex="1">
+          <mxGeometry height="24" width="280" y="102" as="geometry" />
+        </mxCell>
+        <mxCell id="cs5" parent="t_case" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;html=1;fontSize=11;" value="IDX created_at : timestamptz" vertex="1">
+          <mxGeometry height="24" width="280" y="126" as="geometry" />
+        </mxCell>
+        <mxCell id="cs6" parent="t_case" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;html=1;fontSize=11;" value="updated_at : timestamptz" vertex="1">
+          <mxGeometry height="24" width="280" y="150" as="geometry" />
+        </mxCell>
+        <mxCell id="idx_note" parent="1" style="text;html=1;fontSize=10;fontStyle=2;align=center;fillColor=#f5f5f5;strokeColor=#b3b3b3;dashed=1;" value="índice compuesto (status, created_at) = la consulta de la cola HITL" vertex="1">
+          <mxGeometry height="30" width="330" x="375" y="296" as="geometry" />
+        </mxCell>
+        <mxCell id="t_dec" parent="1" style="swimlane;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=0;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;html=1;fontStyle=1;fillColor=#ffe6cc;strokeColor=#d79b00;" value="decisions" vertex="1">
+          <mxGeometry height="294" width="300" x="884" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="dc1" parent="t_dec" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;html=1;fontSize=11;fontStyle=1;" value="PK FK  case_id : uuid" vertex="1">
+          <mxGeometry height="24" width="300" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="dc2" parent="t_dec" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;html=1;fontSize=11;" value="decision : varchar(17)  (enum)" vertex="1">
+          <mxGeometry height="24" width="300" y="54" as="geometry" />
+        </mxCell>
+        <mxCell id="dc3" parent="t_dec" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;html=1;fontSize=11;" value="confidence : double precision" vertex="1">
+          <mxGeometry height="24" width="300" y="78" as="geometry" />
+        </mxCell>
+        <mxCell id="dc4" parent="t_dec" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;html=1;fontSize=11;fontColor=#9673A6;" value="citations_internal : jsonb" vertex="1">
+          <mxGeometry height="24" width="300" y="102" as="geometry" />
+        </mxCell>
+        <mxCell id="dc5" parent="t_dec" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;html=1;fontSize=11;fontColor=#9673A6;" value="citations_external : jsonb" vertex="1">
+          <mxGeometry height="24" width="300" y="126" as="geometry" />
+        </mxCell>
+        <mxCell id="dc6" parent="t_dec" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;html=1;fontSize=11;" value="debate_pro_fraud : text" vertex="1">
+          <mxGeometry height="24" width="300" y="150" as="geometry" />
+        </mxCell>
+        <mxCell id="dc7" parent="t_dec" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;html=1;fontSize=11;" value="debate_pro_customer : text" vertex="1">
+          <mxGeometry height="24" width="300" y="174" as="geometry" />
+        </mxCell>
+        <mxCell id="dc8" parent="t_dec" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;html=1;fontSize=11;fontColor=#2D7600;" value="agent_route : varchar[]" vertex="1">
+          <mxGeometry height="24" width="300" y="198" as="geometry" />
+        </mxCell>
+        <mxCell id="dc9" parent="t_dec" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;html=1;fontSize=11;" value="explanation_customer : text" vertex="1">
+          <mxGeometry height="24" width="300" y="222" as="geometry" />
+        </mxCell>
+        <mxCell id="dc10" parent="t_dec" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;html=1;fontSize=11;" value="explanation_audit : text" vertex="1">
+          <mxGeometry height="24" width="300" y="246" as="geometry" />
+        </mxCell>
+        <mxCell id="dc11" parent="t_dec" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;html=1;fontSize=11;" value="decided_at : timestamptz" vertex="1">
+          <mxGeometry height="24" width="300" y="270" as="geometry" />
+        </mxCell>
+        <mxCell id="t_sig" parent="1" style="swimlane;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=0;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;html=1;fontStyle=1;fillColor=#ffe6cc;strokeColor=#d79b00;" value="signals" vertex="1">
+          <mxGeometry height="150" width="280" x="1324" y="122" as="geometry" />
+        </mxCell>
+        <mxCell id="sg1" parent="t_sig" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;html=1;fontSize=11;fontStyle=1;" value="PK  id : bigserial" vertex="1">
+          <mxGeometry height="24" width="280" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="sg2" parent="t_sig" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;html=1;fontSize=11;fontStyle=1;" value="FK IDX  case_id : uuid" vertex="1">
+          <mxGeometry height="24" width="280" y="54" as="geometry" />
+        </mxCell>
+        <mxCell id="sg3" parent="t_sig" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;html=1;fontSize=11;" value="IDX code : varchar(64)" vertex="1">
+          <mxGeometry height="24" width="280" y="78" as="geometry" />
+        </mxCell>
+        <mxCell id="sg4" parent="t_sig" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;html=1;fontSize=11;" value="description : text" vertex="1">
+          <mxGeometry height="24" width="280" y="102" as="geometry" />
+        </mxCell>
+        <mxCell id="sg5" parent="t_sig" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;html=1;fontSize=11;" value="severity : varchar(6)  (enum)" vertex="1">
+          <mxGeometry height="24" width="280" y="126" as="geometry" />
+        </mxCell>
+        <mxCell id="sig_note" parent="1" style="text;html=1;fontSize=10;fontStyle=2;align=center;fillColor=#fff2cc;strokeColor=#d6b656;" value="tabla, no JSONB: las señales son la UNIDAD DE EVALUACIÓN.&#xa;El índice en code alimenta el harness (entregable 7)&#xa;y el monitoreo de drift (entregable 6)." vertex="1">
+          <mxGeometry height="60" width="280" x="1324" y="288" as="geometry" />
+        </mxCell>
+        <mxCell id="t_hr" parent="1" style="swimlane;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=0;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;html=1;fontStyle=1;fillColor=#e1d5e7;strokeColor=#9673a6;" value="human_resolutions" vertex="1">
+          <mxGeometry height="150" width="300" x="884" y="463" as="geometry" />
+        </mxCell>
+        <mxCell id="hr1" parent="t_hr" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;html=1;fontSize=11;fontStyle=1;" value="PK FK  case_id : uuid" vertex="1">
+          <mxGeometry height="24" width="300" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="hr2" parent="t_hr" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;html=1;fontSize=11;" value="action : varchar(7)  (enum)" vertex="1">
+          <mxGeometry height="24" width="300" y="54" as="geometry" />
+        </mxCell>
+        <mxCell id="hr3" parent="t_hr" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;html=1;fontSize=11;" value="analyst_id : varchar" vertex="1">
+          <mxGeometry height="24" width="300" y="78" as="geometry" />
+        </mxCell>
+        <mxCell id="hr4" parent="t_hr" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;html=1;fontSize=11;fontColor=#B85450;" value="notes : text  NULL" vertex="1">
+          <mxGeometry height="24" width="300" y="102" as="geometry" />
+        </mxCell>
+        <mxCell id="hr5" parent="t_hr" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;html=1;fontSize=11;" value="resolved_at : timestamptz" vertex="1">
+          <mxGeometry height="24" width="300" y="126" as="geometry" />
+        </mxCell>
+        <mxCell id="t_cb" parent="1" style="swimlane;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=0;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;html=1;fontStyle=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="customer_behaviors" vertex="1">
+          <mxGeometry height="174" width="280" x="-141" y="426" as="geometry" />
+        </mxCell>
+        <mxCell id="cb1" parent="t_cb" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;html=1;fontSize=11;fontStyle=1;" value="PK  customer_id : varchar" vertex="1">
+          <mxGeometry height="24" width="280" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="cb2" parent="t_cb" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;html=1;fontSize=11;" value="usual_amount_avg : numeric(12,2)" vertex="1">
+          <mxGeometry height="24" width="280" y="54" as="geometry" />
+        </mxCell>
+        <mxCell id="cb3" parent="t_cb" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;html=1;fontSize=11;" value="usual_hour_start : smallint" vertex="1">
+          <mxGeometry height="24" width="280" y="78" as="geometry" />
+        </mxCell>
+        <mxCell id="cb4" parent="t_cb" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;html=1;fontSize=11;" value="usual_hour_end : smallint" vertex="1">
+          <mxGeometry height="24" width="280" y="102" as="geometry" />
+        </mxCell>
+        <mxCell id="cb5" parent="t_cb" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;html=1;fontSize=11;fontColor=#2D7600;" value="usual_countries : varchar(2)[]" vertex="1">
+          <mxGeometry height="24" width="280" y="126" as="geometry" />
+        </mxCell>
+        <mxCell id="cb6" parent="t_cb" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;html=1;fontSize=11;fontColor=#2D7600;" value="usual_devices : varchar[]" vertex="1">
+          <mxGeometry height="24" width="280" y="150" as="geometry" />
+        </mxCell>
+        <mxCell id="cb_note" parent="1" style="text;html=1;fontSize=10;fontStyle=2;align=center;fillColor=#f5f5f5;strokeColor=#b3b3b3;dashed=1;" value="ESTADO ACTUAL, sin versionado.&#xa;La historia la guarda el caso." vertex="1">
+          <mxGeometry height="44" width="280" x="-141" y="625" as="geometry" />
+        </mxCell>
+        <mxCell id="e_tx_case" edge="1" parent="1" source="t_tx" style="fontSize=10;strokeWidth=2;strokeColor=#6c8ebf;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="t_case" value="1:1 · FK + UNIQUE&#xa;(idempotencia)">
+          <mxGeometry relative="1" x="-0.0111" y="19" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_case_dec" edge="1" parent="1" source="t_case" style="fontSize=10;strokeWidth=2;strokeColor=#82b366;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="t_dec" value="1:1 · PK compartida">
+          <mxGeometry relative="1" x="0.1569" y="23" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_dec_sig" edge="1" parent="1" source="t_dec" style="fontSize=10;strokeWidth=2;strokeColor=#d79b00;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="t_sig" value="1:N">
+          <mxGeometry relative="1" x="0.0286" y="18" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_case_hr" edge="1" parent="1" source="t_case" style="fontSize=10;strokeWidth=2;strokeColor=#9673a6;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="t_hr" value="1:1 · PK compartida">
+          <mxGeometry relative="1" x="0.0752" y="-54" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="807" y="197" />
+              <mxPoint x="807" y="538" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_cb_case" edge="1" parent="1" source="t_cb" style="fontSize=10;dashed=1;strokeWidth=2;strokeColor=#B85450;endArrow=open;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="cs4" value="SIN FK — se copia congelado&#xa;a customer_snapshot (jsonb)">
+          <mxGeometry relative="1" x="-0.0036" y="-77" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="257" y="513" />
+              <mxPoint x="257" y="224" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="legend" parent="1" style="swimlane;startSize=28;html=1;fontStyle=1;fontSize=12;fillColor=#f5f5f5;strokeColor=#666666;" value="Criterio de forma aplicado" vertex="1">
+          <mxGeometry height="188" width="330" x="400" y="470" as="geometry" />
+        </mxCell>
+        <mxCell id="lg1" parent="legend" style="text;html=1;fontSize=10;align=left;spacingLeft=6;fontColor=#2D7600;" value="varchar[]  →  escalar homogéneo, se lee entero,&#xa;no existe sin su dueño, el orden importa" vertex="1">
+          <mxGeometry height="34" width="314" x="8" y="34" as="geometry" />
+        </mxCell>
+        <mxCell id="lg2" parent="legend" style="text;html=1;fontSize=10;align=left;spacingLeft=6;fontColor=#9673A6;" value="jsonb  →  el sistema lo PRODUCE Y ARCHIVA;&#xa;su schema vive en Pydantic, no en el DDL" vertex="1">
+          <mxGeometry height="34" width="314" x="8" y="72" as="geometry" />
+        </mxCell>
+        <mxCell id="lg3" parent="legend" style="text;html=1;fontSize=10;align=left;spacingLeft=6;fontColor=#D79B00;" value="tabla  →  el sistema lo MIDE, o tiene identidad&#xa;y ciclo de vida propios" vertex="1">
+          <mxGeometry height="34" width="314" x="8" y="110" as="geometry" />
+        </mxCell>
+        <mxCell id="lg4" parent="legend" style="text;html=1;fontSize=11;align=left;spacingLeft=6;fontStyle=1;fontColor=#B85450;" value="Congela lo mutable, referencia lo inmutable." vertex="1">
+          <mxGeometry height="26" width="314" x="8" y="150" as="geometry" />
+        </mxCell>
+        <mxCell id="pending" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;align=left;spacingLeft=10;dashed=1;fillColor=none;strokeColor=#999999;fontColor=#666666;verticalAlign=middle;" value="PENDIENTE DE MODELAR&#xa;· web_search_allowlist (§4 del contrato)&#xa;· tablas del checkpointer (las crea LangGraph)&#xa;· embeddings de políticas para RAG (pgvector ya habilitado)" vertex="1">
+          <mxGeometry height="90" width="330" x="1284" y="463" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

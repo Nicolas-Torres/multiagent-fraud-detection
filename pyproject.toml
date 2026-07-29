@@ -1,7 +1,7 @@
 [project]
 name = "multiagent-fraud-detection"
 version = "0.1.0"
-description = "Add your description here"
+description = "Analiza transacciones financieras con señales ambiguas (montos inusuales, horarios atípicos, dispositivos desconocidos) y produce una decisión trazable: APPROVE, CHALLENGE, BLOCK o ESCALATE_TO_HUMAN."
 readme = "README.md"
 authors = [
     { name = "Nicolas Torres", email = "ntorresv.dev@gmail.com" }

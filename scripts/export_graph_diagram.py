@@ -1,29 +1,41 @@
-"""Exporta la topologia del grafo como diagrama Mermaid.
+"""Exporta la topologia del grafo como PNG para el README.
 
-El diagrama se deriva del grafo compilado, no se dibuja a mano: no puede
-desincronizarse del codigo. Muestra nodos y aristas; la agrupacion en
-supersteps no es visible aqui y la afirma `scripts/smoke_graph.py`.
+El diagrama se deriva del grafo compilado, no se dibuja a mano. El README lo
+referencia por una ruta fija, asi que regenerar el archivo actualiza el README
+sin tocarlo.
 
-    uv run python scripts/export_graph_diagram.py                  # a stdout
-    uv run python scripts/export_graph_diagram.py docs/diagramas/graph.mmd
+El PNG lleva fondo blanco horneado, por lo que se lee igual en modo claro y
+oscuro de GitHub.
+
+Requiere conexion: `draw_mermaid_png()` no renderiza en local, hace un POST a
+la API de mermaid.ink.
+
+    uv run python scripts/export_graph_diagram.py
 """
 
 from pathlib import Path
 
 from multiagent_fraud_detection.graph.builder import build_graph
 
-GRAPH_MMD_PATH = "docs/diagram/graph.png"
+# Independiente del directorio desde el que se ejecute el script.
+PNG_PATH = (
+    Path(__file__).resolve().parents[1] / "docs" / "diagrams" / "graph_topology.png"
+)
+
 
 def main() -> None:
-    destino = Path(GRAPH_MMD_PATH)
-    destino.parent.mkdir(parents=True, exist_ok=True)
+    png = build_graph().get_graph().draw_mermaid_png(background_color="white")
 
-    mermaid_png = build_graph().get_graph().draw_mermaid_png()
+    # Sin este corte, cada corrida deja un blob binario nuevo en git aunque la
+    # topologia no haya cambiado.
+    if PNG_PATH.exists() and PNG_PATH.read_bytes() == png:
+        print(f"sin cambios: {PNG_PATH.name}")
+        return
 
-    with open(destino, "wb") as f:
-        f.write(mermaid_png)
+    PNG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    PNG_PATH.write_bytes(png)
+    print(f"escrito: {PNG_PATH.name} ({len(png):,} bytes)")
 
-    print(f"escrito: {destino} ({len(mermaid_png.splitlines())} lineas)")
 
 if __name__ == "__main__":
     main()

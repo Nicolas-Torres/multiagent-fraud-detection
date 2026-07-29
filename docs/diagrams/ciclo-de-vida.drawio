@@ -1,0 +1,125 @@
+<mxfile host="65bd71144e">
+    <diagram name="Página-1" id="rvPKFVEbgNazWMBQKbLG">
+        <mxGraphModel dx="2935" dy="573" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="800" math="0" shadow="0" adaptiveColors="auto">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="title" value="Ciclo de vida del caso — vista dinámica" style="text;html=1;fontSize=20;fontStyle=1;align=left;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="-80" y="28" width="800" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="subtitle" value="status (etapa del pipeline) ≠ decision (veredicto). Cada transición anota qué tabla se escribe." style="text;html=1;fontSize=12;fontStyle=2;align=left;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="-80" y="56" width="800" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="start" value="" style="ellipse;html=1;fillColor=#000000;strokeColor=#000000;" parent="1" vertex="1">
+                    <mxGeometry x="-80" y="250" width="36" height="36" as="geometry"/>
+                </mxCell>
+                <mxCell id="s_rec" value="RECEIVED" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;fontStyle=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="1" vertex="1">
+                    <mxGeometry x="134" y="238" width="150" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="s_ana" value="ANALYZING" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;fontStyle=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="1" vertex="1">
+                    <mxGeometry x="450" y="238" width="150" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="s_dec" value="DECIDED" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;fontStyle=1;fillColor=#d5e8d4;strokeColor=#82b366;" parent="1" vertex="1">
+                    <mxGeometry x="849" y="90" width="150" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="s_ph" value="PENDING_HUMAN" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;fontStyle=1;fillColor=#e1d5e7;strokeColor=#9673a6;" parent="1" vertex="1">
+                    <mxGeometry x="849" y="238" width="150" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="s_fail" value="FAILED" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;fontStyle=1;fillColor=#f8cecc;strokeColor=#b85450;" parent="1" vertex="1">
+                    <mxGeometry x="849" y="400" width="150" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="s_res" value="RESOLVED" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;fontStyle=1;fillColor=#d5e8d4;strokeColor=#82b366;" parent="1" vertex="1">
+                    <mxGeometry x="1244" y="238" width="150" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="fin" value="" style="ellipse;html=1;fillColor=none;strokeColor=#000000;strokeWidth=3;" parent="1" vertex="1">
+                    <mxGeometry x="1484" y="250" width="36" height="36" as="geometry"/>
+                </mxCell>
+                <mxCell id="e1" value="POST /cases → 202&#xa;INSERT transactions + cases" style="fontSize=10;strokeWidth=2;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="start" target="s_rec" edge="1">
+                    <mxGeometry x="0.0051" y="22" relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                        <Array as="points"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e2" value="arranca el grafo&#xa;en segundo plano" style="fontSize=10;strokeWidth=2;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="s_rec" target="s_ana" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e3" value="decision ∈ {APPROVE, CHALLENGE, BLOCK}&#xa;INSERT decisions + signals" style="fontSize=10;strokeWidth=2;strokeColor=#82b366;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="s_ana" target="s_dec" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="525" y="202"/>
+                            <mxPoint x="924" y="202"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e4" value="decision = ESCALATE_TO_HUMAN&#xa;INSERT decisions + signals" style="fontSize=10;strokeWidth=2;strokeColor=#9673a6;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="s_ana" target="s_ph" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e5" value="error del pipeline" style="fontSize=10;strokeWidth=2;strokeColor=#b85450;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="s_ana" target="s_fail" edge="1">
+                    <mxGeometry x="0.0088" y="11" relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="525" y="430"/>
+                        </Array>
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e6" value="POST /cases/{id}/resolution&#xa;INSERT human_resolutions" style="fontSize=10;strokeWidth=2;strokeColor=#9673a6;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="s_ph" target="s_res" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e7" value="" style="strokeWidth=2;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="s_dec" target="fin" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="1502" y="120"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e8" value="" style="strokeWidth=2;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="s_res" target="fin" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e9" value="" style="strokeWidth=2;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="s_fail" target="fin" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="924" y="349"/>
+                            <mxPoint x="1502" y="349"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="n_idem" value="Idempotencia&#xa;Reintento con el mismo transaction_id →&#xa;200 con el case_id existente.&#xa;No se crea caso ni se corre el grafo.&#xa;Lo garantiza el UNIQUE de la BD." style="rounded=0;whiteSpace=wrap;html=1;fontSize=10;align=left;spacingLeft=8;fillColor=#fff2cc;strokeColor=#d6b656;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="89" y="380" width="240" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_idem" value="" style="dashed=1;endArrow=none;strokeColor=#d6b656;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="n_idem" target="s_rec" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="n_poll" value="El cliente NO bloquea 15–30 s.&#xa;Async en el borde: 202 + case_id,&#xa;el dashboard consulta por polling.&#xa;(WebSocket = mejora, entregable 10)" style="rounded=0;whiteSpace=wrap;html=1;fontSize=10;align=left;spacingLeft=8;fillColor=#f5f5f5;strokeColor=#b3b3b3;dashed=1;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="420" y="90" width="240" height="76" as="geometry"/>
+                </mxCell>
+                <mxCell id="n_lat" value="decided_at − created_at = latencia del pipeline&#xa;Métrica de producción del entregable 6." style="rounded=0;whiteSpace=wrap;html=1;fontSize=10;align=left;spacingLeft=8;fillColor=#f5f5f5;strokeColor=#b3b3b3;dashed=1;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="1194" y="400" width="300" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="n_hitl" value="Cola HITL: GET /cases?status=PENDING_HUMAN&#xa;Sale del índice compuesto (status, created_at).&#xa;El checkpointer de LangGraph mantiene el grafo&#xa;suspendido en interrupt() mientras tanto." style="rounded=0;whiteSpace=wrap;html=1;fontSize=10;align=left;spacingLeft=8;fillColor=#e1d5e7;strokeColor=#9673a6;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="855" y="540" width="320" height="76" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_hitl" value="" style="dashed=1;endArrow=none;strokeColor=#9673a6;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="n_hitl" target="s_ph" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="1015" y="268"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="n_null" value="decision es null hasta aquí&#xa;En CaseDetail y CaseSummary, decision y confidence&#xa;llegan null mientras el caso está en RECEIVED / ANALYZING.&#xa;El dashboard debe listarlos igual." style="rounded=0;whiteSpace=wrap;html=1;fontSize=10;align=left;spacingLeft=8;fillColor=#f8cecc;strokeColor=#b85450;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="540" width="360" height="76" as="geometry"/>
+                </mxCell>
+                <mxCell id="n_cust" value="customer puede ser null en cualquier estado: cliente nuevo sin perfil.&#xa;No es un error — es el escenario más sospechoso. (Enmienda 1 del contrato v0.3)" style="rounded=0;whiteSpace=wrap;html=1;fontSize=11;align=left;spacingLeft=10;fillColor=#fff2cc;strokeColor=#d6b656;verticalAlign=middle;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="660" width="720" height="50" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>
