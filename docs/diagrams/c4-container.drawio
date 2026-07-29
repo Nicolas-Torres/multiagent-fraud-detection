@@ -1,0 +1,146 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="Página-1" id="dRtuS67UgYsgkpVd1u33">
+    <mxGraphModel dx="2470" dy="1103" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="900" math="0" shadow="0" adaptiveColors="auto">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" parent="1" style="text;html=1;fontSize=20;fontStyle=1;align=left;verticalAlign=middle;" value="C4 — Vista Container · estado al cerrar feature/domain-models" vertex="1">
+          <mxGeometry height="30" width="900" x="-79" y="23" as="geometry" />
+        </mxCell>
+        <mxCell id="subtitle" parent="1" style="text;html=1;fontSize=12;fontStyle=2;align=left;verticalAlign=middle;" value="Verde = construido y verificado · Gris discontinuo = pendiente · Azul = externo" vertex="1">
+          <mxGeometry height="24" width="900" x="-79" y="51" as="geometry" />
+        </mxCell>
+        <mxCell id="a_gw" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="Pasarela de pagos&#xa;&#xa;sistema origen" vertex="1">
+          <mxGeometry height="80" width="160" x="-79" y="190" as="geometry" />
+        </mxCell>
+        <mxCell id="a_an" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;fillColor=#f5f5f5;strokeColor=#999999;dashed=1;fontColor=#666666;" value="Analista de fraude&#xa;&#xa;dashboard (polling)" vertex="1">
+          <mxGeometry height="80" width="160" x="-79" y="302" as="geometry" />
+        </mxCell>
+        <mxCell id="sys" parent="1" style="swimlane;startSize=34;html=1;fontSize=12;fontStyle=1;fillColor=#fafafa;strokeColor=#666666;dashed=1;" value="Sistema Multi-Agente de Detección de Fraude — un solo contenedor desplegable (monolito en-proceso, sin broker)" vertex="1">
+          <mxGeometry height="763" width="921" x="270" y="130" as="geometry" />
+        </mxCell>
+        <mxCell id="c_api" parent="sys" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=none;strokeColor=#999999;dashed=1;fontColor=#666666;" value="API FastAPI&#xa;&#xa;POST /cases · GET /cases&#xa;/health · /ready" vertex="1">
+          <mxGeometry height="100" width="200" x="30" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="c_graph" parent="sys" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=none;strokeColor=#999999;dashed=1;fontColor=#666666;" value="Grafo de agentes (LangGraph)&#xa;&#xa;Context · Behavioral · Policy RAG&#xa;Threat Intel · Aggregation&#xa;Debate · Arbiter · Explainability&#xa;+ checkpointer (HITL)" vertex="1">
+          <mxGeometry height="100" width="280" x="526" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="c_alembic" parent="sys" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#d5e8d4;strokeColor=#82b366;" value="Alembic&#xa;&#xa;sync&#xa;4 migraciones" vertex="1">
+          <mxGeometry height="100" width="140" x="742" y="432" as="geometry" />
+        </mxCell>
+        <mxCell id="c_dom" parent="sys" style="swimlane;startSize=28;html=1;fontSize=11;fontStyle=1;fillColor=#e8f5e9;strokeColor=#82b366;" value="Capa de dominio — CERRADA en esta etapa" vertex="1">
+          <mxGeometry height="188" width="823" x="49" y="232" as="geometry" />
+        </mxCell>
+        <mxCell id="d_pyd" parent="c_dom" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#d5e8d4;strokeColor=#82b366;align=left;spacingLeft=8;" value="schemas Pydantic (frontera)&#xa;&#xa;types.py: CountryCode · Money · Confidence&#xa;TransactionIn/Read · CustomerBehaviorIn/Read&#xa;DecisionRead · SignalRead · CaseDetail&#xa;CaseSummary · CaseCreated · Page[T]&#xa;HumanResolutionIn/Read" vertex="1">
+          <mxGeometry height="120" width="320" x="49" y="49" as="geometry" />
+        </mxCell>
+        <mxCell id="d_orm" parent="c_dom" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#d5e8d4;strokeColor=#82b366;align=left;spacingLeft=8;" value="modelos ORM (SQLAlchemy 2.0 async)&#xa;&#xa;Transaction · CustomerBehavior&#xa;Case · Decision · Signal · HumanResolution&#xa;lazy=selectin en todas las relaciones&#xa;properties: Decision.debate · Case.customer" vertex="1">
+          <mxGeometry height="120" width="320" x="457" y="49" as="geometry" />
+        </mxCell>
+        <mxCell id="c_db" parent="sys" style="shape=cylinder3;boundedLbl=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#d5e8d4;strokeColor=#82b366;verticalAlign=middle;" value="PostgreSQL 17 + pgvector&#xa;&#xa;CONSTRUIDO: transactions · customer_behaviors · cases · decisions · signals · human_resolutions&#xa;PENDIENTE: web_search_allowlist · checkpointer · embeddings de políticas" vertex="1">
+          <mxGeometry height="130" width="700" x="91.5" y="611" as="geometry" />
+        </mxCell>
+        <mxCell id="x_llm" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=none;strokeColor=#999999;dashed=1;fontColor=#666666;" value="LLMs&#xa;&#xa;Anthropic Claude (Arbiter)&#xa;Google Gemini (análisis)" vertex="1">
+          <mxGeometry height="90" width="200" x="1421" y="185" as="geometry" />
+        </mxCell>
+        <mxCell id="x_web" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=none;strokeColor=#999999;dashed=1;fontColor=#666666;" value="Fuentes web externas&#xa;&#xa;búsqueda gobernada por&#xa;allowlist en tabla" vertex="1">
+          <mxGeometry height="90" width="200" x="1426" y="287" as="geometry" />
+        </mxCell>
+        <mxCell id="x_ls" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=none;strokeColor=#999999;dashed=1;fontColor=#666666;" value="LangSmith&#xa;&#xa;trazas · evals&#xa;entregables 6 y 7" vertex="1">
+          <mxGeometry height="90" width="200" x="1418" y="418" as="geometry" />
+        </mxCell>
+        <mxCell id="e_gw" edge="1" parent="1" source="a_gw" style="fontSize=10;strokeWidth=2;strokeColor=#6c8ebf;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="c_api" value="POST /cases&#xa;202 + case_id">
+          <mxGeometry relative="1" x="-0.0046" y="18" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_an" edge="1" parent="1" source="a_an" style="fontSize=10;strokeWidth=2;dashed=1;strokeColor=#999999;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="c_api" value="GET /cases (polling)&#xa;POST /resolution">
+          <mxGeometry relative="1" x="-0.4278" y="20" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="400" y="342" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_api_graph" edge="1" parent="1" source="c_api" style="fontSize=10;strokeWidth=2;dashed=1;strokeColor=#999999;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="c_graph" value="dispara en&#xa;segundo plano">
+          <mxGeometry relative="1" x="-0.027" y="18" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_api_dom" edge="1" parent="1" source="c_api" style="fontSize=10;strokeWidth=2;dashed=1;strokeColor=#999999;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="d_pyd" value="valida y serializa">
+          <mxGeometry relative="1" x="0.0718" y="53" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="528" y="230" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_graph_dom" edge="1" parent="1" source="c_graph" style="fontSize=10;strokeWidth=2;dashed=1;strokeColor=#999999;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="d_orm" value="persiste el resultado">
+          <mxGeometry relative="1" x="-0.3435" y="51" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_dom_db" edge="1" parent="1" source="d_orm" style="fontSize=10;strokeWidth=2;strokeColor=#82b366;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="c_db" value="async · psycopg3">
+          <mxGeometry relative="1" x="0.3251" y="47" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="712" y="471" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_al_db" edge="1" parent="1" source="c_alembic" style="fontSize=10;strokeWidth=2;strokeColor=#82b366;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;entryPerimeter=0;" target="c_db" value="upgrade head&#xa;(Job de pre-deploy)">
+          <mxGeometry relative="1" x="-0.3435" y="-50" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="1082" y="806" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_g_llm" edge="1" parent="1" source="c_graph" style="strokeWidth=2;dashed=1;strokeColor=#999999;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="x_llm" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_g_web" edge="1" parent="1" source="c_graph" style="strokeWidth=2;dashed=1;strokeColor=#999999;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" target="x_web" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1280" y="230" />
+              <mxPoint x="1280" y="332" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_g_ls" edge="1" parent="1" source="c_graph" style="strokeWidth=2;dashed=1;strokeColor=#999999;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" target="x_ls" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1280" y="230" />
+              <mxPoint x="1280" y="463" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ci" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=none;strokeColor=#999999;dashed=1;fontColor=#666666;" value="CI — mío&#xa;lint → pytest → alembic check → build" vertex="1">
+          <mxGeometry height="70" width="290" x="192" y="971" as="geometry" />
+        </mxCell>
+        <mxCell id="ghcr" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;" value="GHCR&#xa;imagen con tag inmutable&#xa;PUNTO DE HAND-OFF" vertex="1">
+          <mxGeometry height="70" width="220" x="639" y="971" as="geometry" />
+        </mxCell>
+        <mxCell id="cd" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=none;strokeColor=#999999;dashed=1;fontColor=#666666;" value="CD — compañero&#xa;Terraform · rollout · secretos · migración" vertex="1">
+          <mxGeometry height="70" width="290" x="1062" y="971" as="geometry" />
+        </mxCell>
+        <mxCell id="e_ci" edge="1" parent="1" source="ci" style="fontSize=10;strokeWidth=2;dashed=1;strokeColor=#999999;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="ghcr" value="push">
+          <mxGeometry relative="1" x="0.0191" y="17" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_cd" edge="1" parent="1" source="ghcr" style="fontSize=10;strokeWidth=2;dashed=1;strokeColor=#999999;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="cd" value="pull de un tag concreto">
+          <mxGeometry relative="1" x="0.0246" y="18" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="n_next" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;align=left;spacingLeft=10;fillColor=#fff2cc;strokeColor=#d6b656;verticalAlign=middle;" value="SIGUIENTE ETAPA: el State del grafo&#xa;State ≠ CaseDetail. Memoria de trabajo interna vs. frontera pública.&#xa;Lo persiste el checkpointer, no la sesión de SQLAlchemy.&#xa;Un null en CaseDetail = &quot;no aplica&quot;; en State = &quot;todavía no&quot;." vertex="1">
+          <mxGeometry height="220" width="200" x="-99" y="512" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

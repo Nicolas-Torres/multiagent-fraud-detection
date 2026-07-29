@@ -1,0 +1,75 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="Página-1" id="_seTHv3cFUktZN578wGe">
+    <mxGraphModel dx="1830" dy="743" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1320" pageHeight="560" math="0" shadow="0" adaptiveColors="auto">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" parent="1" style="text;html=1;align=left;verticalAlign=middle;fontStyle=1;fontSize=14;" value="Diagrama de apoyo — Recorrido de Transaction por la infra construida" vertex="1">
+          <mxGeometry height="30" width="700" x="-137" y="12" as="geometry" />
+        </mxCell>
+        <mxCell id="note" parent="1" style="text;html=1;align=left;verticalAlign=middle;fontStyle=2;" value="Las dos capas se mantienen separadas a propósito: Pydantic valida en la frontera; el ORM persiste. Verde = construido · Gris discontinuo = pendiente." vertex="1">
+          <mxGeometry height="30" width="900" x="-137" y="46" as="geometry" />
+        </mxCell>
+        <mxCell id="boundary" parent="1" style="swimlane;startSize=26;html=1;fillColor=#e8f4f8;strokeColor=#6c8ebf;verticalAlign=top;" value="Frontera (contrato)" vertex="1">
+          <mxGeometry height="180" width="240" x="360" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="pyd" parent="boundary" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" value="TransactionIn (Pydantic)&#xa;amount &gt; 0 · AwareDatetime&#xa;ISO currency / country · Channel" vertex="1">
+          <mxGeometry height="100" width="200" x="20" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="persist" parent="1" style="swimlane;startSize=26;html=1;fillColor=#f0f0f0;strokeColor=#6c8ebf;verticalAlign=top;" value="Persistencia" vertex="1">
+          <mxGeometry height="180" width="520" x="706" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="orm" parent="persist" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" value="Transaction (modelo ORM)&#xa;Mapped / mapped_column&#xa;PK natural · Numeric(12,2) · TIMESTAMPTZ" vertex="1">
+          <mxGeometry height="100" width="240" x="20" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="engine" parent="persist" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" value="Async session&#xa;INSERT" vertex="1">
+          <mxGeometry height="80" width="180" x="300" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="gateway" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="Pasarela de pagos" vertex="1">
+          <mxGeometry height="60" width="140" x="-137" y="190" as="geometry" />
+        </mxCell>
+        <mxCell id="api" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;dashed=1;" value="POST /cases" vertex="1">
+          <mxGeometry height="60" width="120" x="176" y="190" as="geometry" />
+        </mxCell>
+        <mxCell id="table" parent="1" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" value="tabla transactions&#xa;(Postgres + pgvector)" vertex="1">
+          <mxGeometry height="90" width="150" x="1021" y="370" as="geometry" />
+        </mxCell>
+        <mxCell id="behav" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;dashed=1;" value="Behavioral Pattern Agent&#xa;lee histórico WHERE customer_id" vertex="1">
+          <mxGeometry height="70" width="240" x="574" y="380" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" edge="1" parent="1" source="gateway" style="dashed=1;strokeColor=#999999;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="api" value="POST {transaction}">
+          <mxGeometry relative="1" x="-0.0058" y="15" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e2" edge="1" parent="1" source="api" style="edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="pyd" value="valida">
+          <mxGeometry relative="1" y="13" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e3" edge="1" parent="1" source="pyd" style="edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="orm" value="mapea">
+          <mxGeometry relative="1" x="-0.0411" y="15" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e4" edge="1" parent="1" source="orm" style="edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="engine" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e5" edge="1" parent="1" source="engine" style="edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="table" value="INSERT">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e6" edge="1" parent="1" source="table" style="dashed=1;strokeColor=#999999;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="behav" value="SELECT histórico">
+          <mxGeometry relative="1" x="0.0048" y="-17" as="geometry">
+            <mxPoint as="offset" />
+            <mxPoint x="857" y="415" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

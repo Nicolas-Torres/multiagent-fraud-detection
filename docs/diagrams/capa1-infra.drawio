@@ -1,0 +1,171 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="Página-1" id="rHmvBtCtDeemkzdNNv2R">
+    <mxGraphModel dx="1830" dy="1143" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1300" pageHeight="640" math="0" shadow="0" adaptiveColors="auto">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" parent="1" style="text;html=1;align=left;verticalAlign=middle;fontStyle=1;fontSize=14;" value="Capa 1 — Fundación de infraestructura (vista Container C4)" vertex="1">
+          <mxGeometry height="30" width="620" x="40" y="-140" as="geometry" />
+        </mxCell>
+        <mxCell id="legend" parent="1" style="text;html=1;align=left;verticalAlign=middle;fontStyle=2;" value="Verde sólido = construido&#xa;Gris discontinuo = pendiente" vertex="1">
+          <mxGeometry height="40" width="260" x="40" y="-106" as="geometry" />
+        </mxCell>
+        <mxCell id="gateway" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="Pasarela de pagos" vertex="1">
+          <mxGeometry height="60" width="150" x="-55" y="94" as="geometry" />
+        </mxCell>
+        <mxCell id="analyst" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="Analista de fraude" vertex="1">
+          <mxGeometry height="60" width="150" x="-49" y="198" as="geometry" />
+        </mxCell>
+        <mxCell id="dashboard" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;dashed=1;" value="Dashboard analista" vertex="1">
+          <mxGeometry height="60" width="150" x="-49" y="310" as="geometry" />
+        </mxCell>
+        <mxCell id="svc" parent="1" style="swimlane;startSize=30;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;" value="multiagent-fraud-detection · backend (FastAPI)" vertex="1">
+          <mxGeometry height="620" width="675" x="214" y="-50" as="geometry">
+            <mxRectangle height="30" width="284" x="290" y="100" as="alternateBounds" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="api" parent="svc" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;dashed=1;" value="Capa API&#xa;POST /cases · GET /cases · /resolution" vertex="1">
+          <mxGeometry height="60" width="220" x="45" y="144" as="geometry" />
+        </mxCell>
+        <mxCell id="graph" parent="svc" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;dashed=1;" value="Worker del grafo&#xa;LangGraph + Checkpointer" vertex="1">
+          <mxGeometry height="70" width="210" x="324" y="139" as="geometry" />
+        </mxCell>
+        <mxCell id="config" parent="svc" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" value="Config&#xa;(pydantic-settings)" vertex="1">
+          <mxGeometry height="60" width="170" x="11" y="459" as="geometry" />
+        </mxCell>
+        <mxCell id="engine" parent="svc" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" value="Async Engine&#xa;SQLAlchemy 2.0 · psycopg3" vertex="1">
+          <mxGeometry height="60" width="200" x="299" y="459" as="geometry" />
+        </mxCell>
+        <mxCell id="alembic" parent="svc" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" value="Alembic&#xa;(migraciones)" vertex="1">
+          <mxGeometry height="60" width="170" x="314" y="535" as="geometry" />
+        </mxCell>
+        <mxCell id="hitl" parent="svc" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;dashed=1;" value="Cola HITL" vertex="1">
+          <mxGeometry height="60" width="150" x="354" y="42" as="geometry" />
+        </mxCell>
+        <mxCell id="e_cfg_eng" edge="1" parent="svc" source="config" style="edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="engine" value="DATABASE_URL">
+          <mxGeometry relative="1" x="0.0222" y="15" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_graph_eng" edge="1" parent="svc" style="dashed=1;strokeColor=#999999;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" value="lee/escribe">
+          <mxGeometry relative="1" x="0.216" y="34" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="359" y="341.45" />
+              <mxPoint x="359" y="341.45" />
+            </Array>
+            <mxPoint x="359.00310344827585" y="209" as="sourcePoint" />
+            <mxPoint x="359.00310344827585" y="459" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rag" parent="svc" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;dashed=1;" value="RAG retriever" vertex="1">
+          <mxGeometry height="60" width="170" x="470" y="304" as="geometry" />
+        </mxCell>
+        <mxCell id="rymWD9v4Z_-RB5e5ancP-1" edge="1" parent="svc" source="graph" style="dashed=1;strokeColor=#999999;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="rag" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="429" y="334" />
+            </Array>
+            <mxPoint x="138" y="254" as="sourcePoint" />
+            <mxPoint x="451" y="296" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rymWD9v4Z_-RB5e5ancP-2" edge="1" parent="svc" source="config" style="edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="alembic" value="">
+          <mxGeometry relative="1" x="0.0222" y="15" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="240" y="489" />
+              <mxPoint x="240" y="565" />
+            </Array>
+            <mxPoint x="206" y="560" as="sourcePoint" />
+            <mxPoint x="324" y="560" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="llm" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;dashed=1;" value="APIs LLM&#xa;(Anthropic · Gemini)" vertex="1">
+          <mxGeometry height="60" width="190" x="984" y="10" as="geometry" />
+        </mxCell>
+        <mxCell id="web" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;dashed=1;" value="Búsqueda web&#xa;(gobernada)" vertex="1">
+          <mxGeometry height="60" width="190" x="984" y="166" as="geometry" />
+        </mxCell>
+        <mxCell id="pg" parent="1" style="swimlane;startSize=30;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="Postgres + pgvector" vertex="1">
+          <mxGeometry height="240" width="290" x="997" y="319" as="geometry" />
+        </mxCell>
+        <mxCell id="t_tx" parent="pg" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" value="transactions" vertex="1">
+          <mxGeometry height="40" width="250" x="20" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="t_pending" parent="pg" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;dashed=1;" value="cases · audit · hitl_queue&#xa;checkpoints · policy vectors" vertex="1">
+          <mxGeometry height="80" width="250" x="20" y="110" as="geometry" />
+        </mxCell>
+        <mxCell id="e_gw_api" edge="1" parent="1" source="gateway" style="dashed=1;strokeColor=#999999;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="api" value="POST /cases">
+          <mxGeometry relative="1" x="0.013" y="13" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_an_dash" edge="1" parent="1" source="analyst" style="edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="dashboard" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_dash_api" edge="1" parent="1" source="dashboard" style="dashed=1;strokeColor=#999999;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="api" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="161.59" y="338" />
+              <mxPoint x="161.59" y="124" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_api_graph" edge="1" parent="1" source="api" style="dashed=1;strokeColor=#999999;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="graph" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_eng_pg" edge="1" parent="1" source="engine" style="edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="pg" value="SQL async">
+          <mxGeometry relative="1" x="-0.0317" y="10" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_rag_pg" edge="1" parent="1" source="rag" style="dashed=1;strokeColor=#999999;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" target="t_pending" value="vectores">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="923" y="284" />
+              <mxPoint x="923" y="470" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_graph_hitl" edge="1" parent="1" source="graph" style="dashed=1;strokeColor=#999999;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" target="hitl" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="643" y="81" />
+              <mxPoint x="643" y="81" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_graph_llm" edge="1" parent="1" source="graph" style="dashed=1;strokeColor=#999999;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="llm" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1079" y="124" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_graph_web" edge="1" parent="1" source="graph" style="dashed=1;strokeColor=#999999;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" target="web" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1079" y="124" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rymWD9v4Z_-RB5e5ancP-3" edge="1" parent="1" source="alembic" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.75;entryDx=0;entryDy=0;" target="pg" value="">
+          <mxGeometry relative="1" x="0.0222" y="15" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="698" y="514" />
+              <mxPoint x="923.6" y="514" />
+              <mxPoint x="923.6" y="499" />
+            </Array>
+            <mxPoint x="698" y="530" as="sourcePoint" />
+            <mxPoint x="997" y="535" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
