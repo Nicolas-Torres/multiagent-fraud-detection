@@ -1,67 +1,40 @@
-"""Inyecta la topologia del grafo en el README como bloque Mermaid.
+"""Exporta la topologia del grafo como PNG para el README.
 
-Muestra nodos y aristas; la agrupacion en supersteps no es visible aqui y la
-afirma `scripts/smoke_graph.py`.
+El diagrama se deriva del grafo compilado, no se dibuja a mano. El README lo
+referencia por una ruta fija, asi que regenerar el archivo actualiza el README
+sin tocarlo.
 
-    uv run python scripts/sync_graph_diagram.py           # regenera
-    uv run python scripts/sync_graph_diagram.py --check   # falla si esta desactualizado
+El PNG lleva fondo blanco horneado, por lo que se lee igual en modo claro y
+oscuro de GitHub.
 
-El README debe contener, una sola vez, estas dos marcas:
+Requiere conexion: `draw_mermaid_png()` no renderiza en local, hace un POST a
+la API de mermaid.ink.
 
-    <!-- graph-topology:start -->
-    <!-- graph-topology:end -->
+    uv run python scripts/export_graph_diagram.py
 """
 
-import sys
 from pathlib import Path
 
 from multiagent_fraud_detection.graph.builder import build_graph
 
-README = Path("README.md")
-INICIO = "<!-- graph-topology:start -->"
-FIN = "<!-- graph-topology:end -->"
-
-mermaid_config = {
-    "config": {
-        "theme": "neutral"
-    }
-}
-
-def bloque_mermaid() -> str:
-    diagrama = build_graph().get_graph().draw_mermaid(frontmatter_config=mermaid_config).strip()
-    return f"{INICIO}\n\n```mermaid\n{diagrama}\n```\n\n{FIN}"
-
-
-def con_diagrama(texto: str, bloque: str) -> str:
-    inicio, fin = texto.find(INICIO), texto.find(FIN)
-    if inicio == -1 or fin == -1 or fin < inicio:
-        raise SystemExit(
-            f"{README.name} no tiene las marcas del diagrama.\n"
-            f"Agrega estas dos lineas donde quieras que aparezca:\n"
-            f"  {INICIO}\n  {FIN}"
-        )
-    return texto[:inicio] + bloque + texto[fin + len(FIN) :]
+# Independiente del directorio desde el que se ejecute el script.
+PNG_PATH = (
+    Path(__file__).resolve().parents[1] / "docs" / "diagrams" / "graph_topology.png"
+)
 
 
 def main() -> None:
-    actual = README.read_text(encoding="utf-8")
-    nuevo = con_diagrama(actual, bloque_mermaid())
+    png = build_graph().get_graph().draw_mermaid_png(background_color="white")
 
-    if "--check" in sys.argv:
-        if actual != nuevo:
-            raise SystemExit(
-                "El diagrama del README esta desactualizado.\n"
-                "Corre: uv run python scripts/sync_graph_diagram.py"
-            )
-        print("README.md: diagrama al dia")
+    # Sin este corte, cada corrida deja un blob binario nuevo en git aunque la
+    # topologia no haya cambiado.
+    if PNG_PATH.exists() and PNG_PATH.read_bytes() == png:
+        print(f"sin cambios: {PNG_PATH.name}")
         return
 
-    if actual == nuevo:
-        print("README.md: sin cambios")
-        return
-
-    README.write_text(nuevo, encoding="utf-8")
-    print(f"README.md: diagrama actualizado ({len(nuevo.splitlines())} lineas)")
+    PNG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    PNG_PATH.write_bytes(png)
+    print(f"escrito: {PNG_PATH.name} ({len(png):,} bytes)")
 
 
 if __name__ == "__main__":
