@@ -13,7 +13,7 @@ git show contrato-v0.2:docs/contrato_de_interfaz.md
 
 ## [No publicado]
 
-Enmiendas acumuladas hacia v0.4 en [`enmiendas_v0_4.md`](enmiendas_v0_4.md).
+Enmiendas acumuladas hacia v0.4 en [`enmiendas_pendientes.md`](enmiendas_pendientes.md).
 Bloqueada por una decisión abierta: dónde aterrizan `agent_errors`,
 `base_confidence` y `confidence_rationale`.
 
