@@ -1,6 +1,6 @@
 """Smoke test del esqueleto del grafo.
 
-Verifica el cableado antes de que exista un solo prompt: olas, reducers,
+Verifica el cableado antes de que exista un solo prompt: supersteps, reducers,
 filtrado del input y supervivencia ante la falla de un agente.
 
     uv run python scripts/smoke_graph.py
@@ -52,13 +52,13 @@ def transaccion() -> TransactionIn:
     )
 
 
-def verificar_olas(agent_route: list[str]) -> None:
-    """El orden ENTRE olas es determinista; DENTRO de una ola, arbitrario."""
+def verificar_supersteps(agent_route: list[str]) -> None:
+    """El orden ENTRE supersteps es determinista; DENTRO de uno, arbitrario."""
     cursor = 0
-    for i, ola in enumerate(SUPERSTEPS):
-        tramo = set(agent_route[cursor : cursor + len(ola)])
-        assert tramo == ola, f"ola {i}: se esperaba {ola}, llego {tramo}"
-        cursor += len(ola)
+    for i, superstep in enumerate(SUPERSTEPS):
+        tramo = set(agent_route[cursor : cursor + len(superstep)])
+        assert tramo == superstep, f"supersteps {i}: se esperaba {superstep}, llego {tramo}"
+        cursor += len(superstep)
     assert cursor == len(agent_route), "sobran nodos en agent_route"
 
 
@@ -74,8 +74,8 @@ async def main() -> None:
     )
 
     print("agent_route:", estado["agent_route"])
-    verificar_olas(estado["agent_route"])
-    print("  ok - 10 nodos, agrupados por ola")
+    verificar_supersteps(estado["agent_route"])
+    print("  ok - 10 nodos, agrupados por supersteps")
 
     assert "clave_intrusa" not in estado
     print("  ok - input_schema filtro la clave que no declara")
