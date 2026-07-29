@@ -61,6 +61,9 @@ def degrades(agent: str) -> Callable[[NodeFn], NodeFn]:
                     ],
                 }
 
+        # Marca estructural: permite afirmar en un test que ningun nodo de
+        # evidencia quedo sin decorar al agregarse.
+        wrapper.degrades_as = agent
         return wrapper
 
     return decorator
