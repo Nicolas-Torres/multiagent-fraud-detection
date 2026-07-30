@@ -22,9 +22,12 @@ que no alcanzan confianza suficiente pasan a una cola de revisión humana.
 | Infraestructura local (Postgres + pgvector, migraciones) | ✅ |
 | Modelo de dominio: 6 tablas, schemas de frontera | ✅ |
 | Esqueleto del grafo: estado, topología, degradación | ✅ |
-| Nodos de agentes (cuerpo) | ⬜ stubs |
 | Persistencia de la decisión | ⬜ |
-| RAG de políticas internas | ⬜ |
+| Agentes de lógica pura (Context, Behavioral, Aggregation) | ⬜ |
+| Tabla `web_search_allowlist` | ⬜ |
+| RAG de políticas internas + Policy RAG Agent | ⬜ |
+| Búsqueda web gobernada + Threat Intel Agent | ⬜ |
+| Agentes con LLM (Debate x2, Arbiter, Explainability) | ⬜ |
 | API FastAPI + HITL | ⬜ |
 | CI, imagen y despliegue | ⬜ |
 
