@@ -90,7 +90,9 @@ class GraphState(GraphInput, total=False):
     pro_customer_argument: str
     # `float` y no el alias `Confidence`: en un TypedDict nada valida, y el
     # rango se hace cumplir donde el valor se produce.
+    risk_score: float
     base_confidence: float
+    scoring_version: str
     decision: DecisionType
     confidence: float
     confidence_rationale: str
