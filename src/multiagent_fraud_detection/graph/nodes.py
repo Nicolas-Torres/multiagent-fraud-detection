@@ -11,7 +11,13 @@ import logging
 from collections.abc import Awaitable, Callable
 from functools import wraps
 
-from multiagent_fraud_detection.enums import DecisionType, Severity
+from langgraph.runtime import Runtime
+from sqlalchemy import delete, update
+
+from multiagent_fraud_detection.db.models import AgentError as AgentErrorRow
+from multiagent_fraud_detection.db.models import Case, Decision, Signal
+from multiagent_fraud_detection.enums import CaseStatus, DecisionType, Severity
+from multiagent_fraud_detection.graph.context import GraphContext
 from multiagent_fraud_detection.graph.state import AgentError, GraphState, WorkingSignal
 
 logger = logging.getLogger(__name__)
@@ -161,7 +167,113 @@ async def explainability(state: GraphState) -> dict:
     }
 
 
-async def persist_decision(state: GraphState) -> dict:
-    # Reemplazo del agregado: DELETE por case_id (la cascada barre signals) +
-    # INSERT, todo en una transaccion. Con la guarda del invariante de citacion.
-    return {"agent_route": [PERSIST]}
+def _verificar_invariantes(state: GraphState) -> None:
+    """Guardas, no reparaciones: si alguna dispara, el Arbiter tiene un bug.
+
+    Una guarda que repara esconde el bug. Estas levantan, y el wrapper del
+    background task escribe FAILED.
+    """
+    decision = state["decision"]
+    base = state.get("base_confidence")
+
+    if decision is not DecisionType.ESCALATE_TO_HUMAN:
+        # Diferir a un humano no es un veredicto: por eso queda exento. Sin la
+        # excepcion, un caso sin citas no tendria ninguna salida posible.
+        if not state.get("citations_internal"):
+            raise ValueError("veredicto autonomo sin respaldo interno")
+        if base is None:
+            raise ValueError("veredicto autonomo sin score deterministico")
+
+    if base is not None and state["confidence"] != base and not state.get(
+        "confidence_rationale"
+    ):
+        raise ValueError("el Arbiter ajusto la confianza sin justificarlo")
+
+
+async def persist_decision(
+    state: GraphState, runtime: Runtime[GraphContext]
+) -> dict:
+    """Unico punto donde el grafo escribe a las tablas.
+
+    Semantica de **reemplazo del agregado**: el resultado de este nodo para
+    este caso es exactamente esto, no "asegurate de que estas filas existan".
+    Un reintento sustituye, no complementa.
+
+    La clave de idempotencia es `case_id`, que ya es PK de `decisions`; el
+    `ON DELETE CASCADE` barre `signals` y `agent_errors` sin nombrarlas.
+    """
+    _verificar_invariantes(state)
+
+    case_id = state["case_id"]
+    decision = state["decision"]
+    estado = (
+        CaseStatus.PENDING_HUMAN
+        if decision is DecisionType.ESCALATE_TO_HUMAN
+        else CaseStatus.DECIDED
+    )
+
+    async with runtime.context.session_factory() as session:
+        async with session.begin():
+            # delete() de Core y no un borrado por objeto: con lazy="selectin"
+            # el ORM cargaria los hijos para borrarlos uno por uno en vez de
+            # dejar que la cascada de la BD haga su trabajo.
+            await session.execute(
+                delete(Decision).where(Decision.case_id == case_id)
+            )
+
+            session.add(
+                Decision(
+                    case_id=case_id,
+                    decision=decision,
+                    confidence=state["confidence"],
+                    risk_score=state.get("risk_score"),
+                    base_confidence=state.get("base_confidence"),
+                    confidence_rationale=state.get("confidence_rationale"),
+                    scoring_version=state.get("scoring_version"),
+                    # model_dump(mode="json"): en modo Python, HttpUrl y
+                    # datetime no son serializables por psycopg.
+                    citations_internal=[
+                        c.model_dump(mode="json")
+                        for c in state.get("citations_internal", [])
+                    ],
+                    citations_external=[
+                        c.model_dump(mode="json")
+                        for c in state.get("citations_external", [])
+                    ],
+                    debate_pro_fraud=state.get("pro_fraud_argument", ""),
+                    debate_pro_customer=state.get("pro_customer_argument", ""),
+                    agent_route=state.get("agent_route", []),
+                    explanation_customer=state.get("explanation_customer", ""),
+                    explanation_audit=state.get("explanation_audit", ""),
+                    signals=[
+                        # `emitted_by` no cruza: el contrato define Signal sin
+                        # procedencia expuesta al cliente.
+                        Signal(
+                            case_id=case_id,
+                            code=s.code,
+                            description=s.description,
+                            severity=s.severity,
+                        )
+                        for s in state.get("signals", [])
+                    ],
+                    agent_errors=[
+                        AgentErrorRow(
+                            case_id=case_id,
+                            agent=e.agent,
+                            error_type=e.error_type,
+                            message=e.message,
+                            occurred_at=e.occurred_at,
+                        )
+                        for e in state.get("agent_errors", [])
+                    ],
+                )
+            )
+
+            await session.execute(
+                update(Case).where(Case.case_id == case_id).values(status=estado)
+            )
+
+    # No se agrega a `agent_route`: ese campo es el rastro de los AGENTES, y
+    # este nodo es la costura con la base. Que corrio lo prueba la fila, no
+    # una cadena en una lista.
+    return {}

@@ -1,172 +1,140 @@
-# Enmiendas pendientes — Contrato de Interfaz v0.4
+# Enmiendas pendientes — Contrato de Interfaz
 
-**Estado**: acumulando. Se consolida en `contrato_de_interfaz_v0_4.md` al cerrar
-la etapa del grafo (hoy es un esqueleto: la topología existe, los agentes no).
+**Estado**: acumulando hacia v0.5. Se consolidan en `contrato_de_interfaz.md` al
+cerrar la etapa de **dataset y seed**.
 
-> Documento de trabajo. Predecesor vigente: `contrato_de_interfaz_v0_3.md`.
+> Documento de trabajo: se **vacía** al publicar una versión, no se archiva.
+> Nunca hay dos. Vigente: v0.4.
+>
+> Contexto completo de esta etapa: [`briefing_dataset.md`](briefing_dataset.md).
 
 ---
 
-## 1. Maduras — decididas, listas para redactar
+## 1. Decididas — listas para redactar
 
-| # | Enmienda | Toca | Origen |
-|---|---|---|---|
-| 1 | Invariante de citación | §2.5 `Decision` | diseño del Arbiter |
-| 2 | `signals` no está en "orden de producción" | §2.5 `Decision` | verificado en smoke test |
-| 3 | `agent_route`: orden por superstep, no total | §2.5 `Decision` | verificado en smoke test |
-| 4 | `PENDING_HUMAN` es estado terminal del grafo | §5 decisiones cerradas | se descartó `interrupt()` |
-| 5 | Cuatro puntos de escritura y qué ve el dashboard en cada estado | §7 nuevo apartado | derivado de los observadores |
-
-### 1.1 — Invariante de citación
-
-> Ningún **veredicto autónomo** sin respaldo interno. Diferir a un humano no es
-> un veredicto.
-
-Formalmente: `citations_internal` es no vacío siempre que
-`decision != ESCALATE_TO_HUMAN`.
-
-Dos capas, sin solapamiento:
-
-- **Arbiter** (regla de negocio): sin citas no puede emitir `APPROVE`,
-  `CHALLENGE` ni `BLOCK` → degrada a `ESCALATE_TO_HUMAN`. La ausencia de
-  respaldo *es* la razón para llamar al humano.
-- **Nodo de persistencia** (guarda): la misma condición como aserción. Si
-  dispara, el Arbiter tiene un bug — y una guarda que repara es una guarda que
-  esconde bugs, así que levanta.
-
-Sin la excepción para `ESCALATE_TO_HUMAN`, un caso donde el RAG no recupera
-nada no tendría salida: no podría aprobar, ni bloquear, ni escalar.
-
-**Consecuencia para el dashboard**: puede asumir citas internas no vacías en
-todo caso `DECIDED`. Es una garantía, no una probabilidad.
-
-### 1.2 — `signals` no está en "orden de producción"
-
-v0.3 §2.5 promete *"orden de producción preservado"*. Es falso: tres agentes
-emiten señales desde ramas paralelas, y el orden entre ramas de un mismo
-superstep no es el de declaración.
-
-Verificado: se declaró `transaction_context` primero y la ruta lo devolvió
-tercero.
-
-**Redacción propuesta**: el orden lo fija Evidence Aggregation con un criterio
-determinístico y documentado (no "de producción"). Es requisito de
-reproducibilidad para el harness del entregable 7, no cosmética.
-
-### 1.3 — `agent_route`: orden por superstep, no total
-
-Mismo hecho, otro campo. El orden **entre** supersteps está garantizado;
-**dentro** de uno es estable entre corridas pero no significa precedencia.
-
-**Redacción propuesta**: documentar que `agent_route` es una secuencia de
-supersteps aplanada, y que la adyacencia dentro de un grupo no implica orden
-causal. Un auditor que lea la ruta como cadena causal se equivocaría.
-
-### 1.4 — `PENDING_HUMAN` es estado terminal del grafo
-
-El `interrupt()` de LangGraph se descartó: el `Command(resume=...)` no
-transportaba nada y cobraba un thread suspendido y filas de checkpointer por
-cada caso pendiente. El grafo termina en el nodo de persistencia; la resolución
-del analista es flujo HTTP puro.
-
-La máquina de estados de §2.1 **no cambia**. Cambia cómo se alcanza
-`RESOLVED`: lo escribe el endpoint, no el grafo reanudado.
-
-**Puerta abierta**: el día que exista `REQUEST_INFO`, o que la resolución deba
-regenerar la explicación al cliente, eso es un **segundo grafo corto** invocado
-por el endpoint — no el primero reanudado. Para entonces el estado original ya
-está archivado en las tablas.
-
-### 1.5 — Cuatro puntos de escritura
-
-Cada uno existe porque un observador externo necesita ver algo en ese instante.
-Si nadie mira, no hay escritura.
-
-| | Quién escribe | Qué | Observador |
-|---|---|---|---|
-| **W0** | endpoint `POST /cases` | `transactions` + `cases` en `RECEIVED` | sin esto no hay `case_id` que devolver |
-| **W1** | wrapper del background task | `status = ANALYZING` | distingue "aceptado" de "corriendo" |
-| **W2** | nodo de persistencia (único en el grafo) | `decisions` + `signals` + `decided_at` + `status`, una transacción | la cola HITL |
-| **W3** | endpoint `POST /resolution` | `human_resolutions` + `RESOLVED` | el analista |
-
-**Garantía derivada, que el dashboard puede asumir:**
-
-| `status` | `decision` | `human_resolution` |
+| # | Enmienda | Toca |
 |---|---|---|
-| `RECEIVED`, `ANALYZING` | `null` | `null` |
-| `DECIDED`, `PENDING_HUMAN` | **completa** (nunca parcial) | `null` |
-| `RESOLVED` | completa | presente |
-| `FAILED` | puede ser `null` | `null` |
+| 1 | Muere el supuesto `America/Lima` | §2.7 |
+| 2 | `CustomerBehavior` gana `currency` y `timezone` | §2.5 |
+| 3 | `CustomerBehavior` gana cinco campos de evaluación de políticas | §2.5 |
+| 4 | `Transaction` gana `issuer_bank` | §2.5 |
+| 5 | Índices de historial en `transactions` | §7 |
 
-No hay estados intermedios visibles: W2 escribe todo en un commit.
+### 1.1 — Muere el supuesto de zona horaria única
 
-`FAILED` no lo escribe ningún nodo — un agente caído degrada la decisión, no la
-aborta. `FAILED` es para una excepción no capturada del grafo entero, y la
-escribe el wrapper de W1, que es quien tiene el `try`.
+§2.7 de v0.4 ya lo marca como 🔶. El dataset tiene **siete países**; interpretar
+la ventana horaria de un cliente en Madrid como hora de Lima la corre siete horas
+y evalúa otra cosa. Afecta al 86% de los clientes.
 
-**Idempotencia de W2**: `DELETE FROM decisions WHERE case_id = :id` (la cascada
-barre `signals`) + `INSERT`. Semántica de **reemplazo del agregado**, no
-"asegurar que estas filas existan". Un reintento sustituye, no complementa.
+**Resolución**: `timezone` (IANA) como columna del perfil. El seed la deriva del
+país mientras la fuente no la traiga —una aproximación del adaptador, no del
+dominio—. Derivarla en tiempo de lectura no sirve: US abarca seis zonas y MX tres.
 
----
+Descartado guardar la ventana ya convertida a UTC: el horario de verano hace que
+la conversión no sea constante, y hornearía un supuesto de estación.
 
-## 2. Abierta — bloquea la redacción de v0.4
+### 1.2 — La moneda es atributo de la cuenta
 
-### 2.1 — Tres campos del `State` sin destino
+`usual_amount_avg` es hoy un número sin moneda. Con el dataset, 77 de 999 clientes
+tienen historial en dos monedas, y comparar "3x el promedio" entre ellas fabrica
+falsos positivos.
 
-El `State` produce tres valores relevantes para auditoría que **no tienen dónde
-aterrizar**: ni columna en `decisions`, ni campo en el contrato, ni salida al
-dashboard.
+**Resolución**: `currency` en el perfil, constante por cliente. No es una
+simplificación: una tarjeta liquida en la moneda de la cuenta, no en la del país
+donde ocurre la compra. La dimensión internacional sobrevive intacta porque
+`country` sigue variando.
 
-| Campo | Qué contiene | Por qué un auditor lo quiere |
-|---|---|---|
-| `agent_errors` | qué agente falló y por qué | *"se aprobó sin inteligencia externa porque ese agente estaba caído"* justifica o invalida la decisión a posteriori |
-| `base_confidence` | el score determinístico, antes del Arbiter | sin él no se puede medir **cuánto** movió el Arbiter la confianza |
-| `confidence_rationale` | la justificación del ajuste | v0.3 §2.5 promete confianza *"ajustable por el Arbiter con justificación"* y no define dónde vive esa justificación |
+Fuera de alcance, documentado: cuentas multi-moneda y conversión FX.
 
-Los tres son el mismo problema: la trazabilidad que el contrato promete en
-prosa no tiene representación en el schema.
+### 1.3 — Campos nuevos del perfil
 
-**Opciones sobre la mesa** (no decidido):
+| Campo | Habilita |
+|---|---|
+| `usual_channel` | FP-06 canal nuevo con monto alto |
+| `account_creation_date` | FP-09 cuenta nueva |
+| `last_profile_update` | FP-10 cambio de datos + transacción inmediata |
+| `issuer_bank` | FP-11 alerta sobre emisor |
+| `daily_limit` | FP-12 fraccionamiento |
 
-| Opción | Costo | Consecuencia |
-|---|---|---|
-| Columnas nuevas en `decisions` | migración + campos en `Decision` | consultable; alimenta métricas del entregable 6 |
-| Todo dentro de `explanation_audit` | cero | narrativo; no se puede agregar ni graficar |
-| JSONB único de metadatos de ejecución | una columna | flexible, pero es exactamente lo que la regla §7.2 llama "lo que el sistema mide" y manda a tabla |
+### 1.4 — Índices de historial
 
-Se decide al modelar el nodo de persistencia (`feature/decision-persistence`).
-**Hasta entonces v0.4 no se redacta**, o habría que redactar v0.5 dos semanas
-después por una sola fila.
+Cuatro políticas (FP-03, 04, 05, 12) evalúan **secuencias**, no transacciones
+sueltas. Necesitan `transactions (customer_id, timestamp)` y
+`(device_id, timestamp)`.
 
----
-
-## 3. Hallazgos de implementación que **no** tocan el contrato
-
-Van al repaso de etapa, no al contrato. Se anotan acá para no perderlos.
-
-- **Cero aristas condicionales.** `DECIDED` vs `PENDING_HUMAN` es un valor de
-  `status` que escribe un mismo nodo, no una bifurcación del grafo. El diseño
-  original anticipaba edges condicionales; no hicieron falta.
-- **Atomicidad del superstep.** Si un nodo de un superstep paralelo lanza, se
-  pierden también los aportes de sus hermanos y el grafo aborta. Verificado con
-  un grafo mínimo en `scripts/smoke_degradation.py`. Consecuencia: los nodos de
-  evidencia **nunca lanzan** — capturan y devuelven `agent_errors`.
-- **Reintentos adentro del nodo, no `RetryPolicy`.** Son incompatibles: si el
-  nodo captura su propia excepción, LangGraph nunca ve la falla y la política no
-  dispara. `RetryPolicy` queda solo para los nodos fatales (Arbiter,
-  Explainability, persistencia).
-- **Sin checkpointer.** Sin `interrupt()` y con los nodos capturando su falla,
-  solo cubriría la muerte del proceso — más barato con una consulta sobre casos
-  estancados en `ANALYZING`. Queda como recomendación del entregable 10.
-- **El diagrama de topología se autogenera**: `build_graph().get_graph()
-  .draw_mermaid()`. No se puede desincronizar del código.
+Al crear el compuesto, el índice suelto en `customer_id` queda redundante —es un
+prefijo por la izquierda— y se elimina en la misma migración.
 
 ---
 
-## 4. Nota de proceso
+## 2. Abiertas — bloquean la redacción de v0.5
 
-`contrato_de_interfaz_v0_3.md` y los `repaso_*.md` **no están versionados en el
-repo**. El contrato es el artefacto de frontera que valida el compañero (§1) y
-que define lo que consume el dashboard (§2–§4): debería vivir en `docs/` junto
-a este archivo, no fuera de control de versiones.
+### 2.1 — ¿`usual_channel` singular o lista?
+
+El dataset trae uno, pero `usual_countries` y `usual_devices` son listas. Puede
+ser correcto —un cliente tiene un canal preferido y varios dispositivos— o un
+artefacto del generador.
+
+### 2.2 — Fuga temporal en el historial
+
+Con las políticas de secuencia, `transactions` cumple **doble función**: fuente de
+casos e historial que los agentes consultan. El agente de secuencias **debe**
+filtrar `timestamp < timestamp de la transacción analizada`, no solo "reciente",
+o vería el futuro. Es un requisito de corrección; si el harness no lo respeta, sus
+métricas salen optimistas.
+
+¿Se documenta en el contrato o queda como regla de implementación del agente?
+
+### 2.3 — ¿`CaseSummary` gana `risk_score`?
+
+La cola HITL hoy muestra `decision` y `confidence`. Para triaje, ordenar por
+riesgo es más útil que por confianza: el analista quiere ver primero lo más
+sospechoso, no lo más incierto.
+
+No se decidió al redactar v0.4 —se dejó fuera para no ampliar el alcance sin
+discutirlo—. Es una columna en una proyección plana, barata en cualquier momento.
+
+### 2.4 — Ground truth incompleto
+
+El dataset no trae etiquetas y hay que pedirlas (§8 del briefing). Además:
+
+- **FP-11 no puede tener ground truth**: el generador asigna el banco del propio
+  cliente, así que no hay forma de identificar sus positivos.
+- **FP-09 dice "promedio del segmento"** y solo existe el promedio del cliente.
+  Viable redefiniéndolo, con la desviación documentada.
+- **Las únicas etiquetas humanas** que produce el sistema vienen de casos
+  escalados —por construcción, los ambiguos—: ground truth sesgado por muestreo.
+
+Las tres van a Limitaciones (entregable 7), no al contrato. Se anotan acá para no
+perderlas.
+
+### 2.5 — Fórmula de `base_confidence` y `risk_score`
+
+v0.4 define **qué significan** y **en qué dirección se mueven**; no define los
+pesos por severidad, la función de agregación ni el delta máximo que el Arbiter
+puede aplicar. Eso vive dentro de `evidence_aggregation` y necesita el catálogo de
+`code`, que no existe.
+
+No toca el schema: `scoring_version` ya está previsto justamente para que la
+fórmula pueda cambiar sin invalidar lo persistido.
+
+---
+
+## 3. Hallazgos que **no** tocan el contrato
+
+Van al repaso de etapa. Se anotan acá para no perderlos.
+
+- **Cero aristas condicionales** en el grafo: `DECIDED` vs `PENDING_HUMAN` es un
+  valor de `status` que escribe un mismo nodo, no una bifurcación.
+- **Atomicidad del superstep**: si un nodo paralelo lanza, se pierden también los
+  aportes de sus hermanos y el grafo aborta. Verificado con un grafo mínimo. De
+  ahí que los nodos de evidencia **nunca lancen**.
+- **Reintentos adentro del nodo**, no vía `RetryPolicy`: son incompatibles, porque
+  un nodo que captura su excepción nunca deja que la política dispare.
+- **Sin checkpointer**: solo cubriría la muerte del proceso, más barato con una
+  consulta sobre casos estancados en `ANALYZING`. Recomendación del entregable 10.
+- **Dependencias de runtime por `context_schema`**, no por import global: tres
+  nodos necesitarán la base (perfil, secuencias, persistencia) y el import global
+  ataría cualquier import del módulo a que haya base configurada.
+- **Un test no es dueño de la base**: contar filas globalmente lo vuelve
+  dependiente del orden de ejecución. Filtrar siempre por la clave del caso.

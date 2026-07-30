@@ -34,6 +34,7 @@ from multiagent_fraud_detection.graph.nodes import (
     persist_decision,
     transaction_context,
 )
+from multiagent_fraud_detection.graph.context import GraphContext
 from multiagent_fraud_detection.graph.state import GraphInput, GraphState
 
 
@@ -45,7 +46,11 @@ def build_graph():
     su propia falla. Solo cubriria la muerte del proceso, que sale mas barato
     con una consulta sobre casos estancados en ANALYZING.
     """
-    builder = StateGraph(GraphState, input_schema=GraphInput)
+    builder = StateGraph(
+        GraphState,
+        context_schema=GraphContext,
+        input_schema=GraphInput
+    )
 
     builder.add_node(CONTEXT, transaction_context)
     builder.add_node(BEHAVIORAL, behavioral_pattern)

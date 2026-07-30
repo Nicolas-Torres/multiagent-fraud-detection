@@ -98,16 +98,19 @@ variable que la aplicación conoce es `DATABASE_URL`; el resto las lee
 
 ## Verificación
 
-Tres *smoke tests* comprueban cada capa. Los dos del grafo no necesitan base de
-datos.
+Cuatro *smoke tests* comprueban cada capa. Todos necesitan la base arriba y las
+migraciones aplicadas.
 
 ```bash
-uv run python scripts/smoke_read.py          # round-trip contra Postgres
+docker compose up -d && uv run alembic upgrade head
+
+uv run python scripts/smoke_read.py          # round-trip de la capa Read
 uv run python scripts/smoke_graph.py         # supersteps, reducers, input_schema
 uv run python scripts/smoke_degradation.py   # un agente caído no aborta el grafo
+uv run python scripts/smoke_persistence.py   # un reintento no duplica señales
 ```
 
-Regenerar el diagrama de topología (requiere conexión):
+Regenerar el diagrama de topología (requiere conexión a internet):
 
 ```bash
 uv run python scripts/export_graph_diagram.py

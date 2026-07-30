@@ -4,7 +4,7 @@ from multiagent_fraud_detection.config.settings import settings
 
 engine: AsyncEngine = create_async_engine(
     settings.database_url,
-    echo=True,
+    echo=settings.log_level.upper() == "DEBUG",
     pool_pre_ping=True,
 )
 

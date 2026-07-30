@@ -11,14 +11,19 @@ Responde tres preguntas, en orden de dependencia:
 
 import asyncio
 import operator
-from datetime import UTC, datetime
-from decimal import Decimal
+import sys
 from typing import Annotated, TypedDict
-from uuid import uuid4
+from uuid import UUID
+
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 from langgraph.graph import END, START, StateGraph
+from sqlalchemy import select
 
-from multiagent_fraud_detection.enums import Channel
+from _fixtures import CONTEXTO, limpiar, sembrar, transaccion
+from multiagent_fraud_detection.db.models import Decision
+from multiagent_fraud_detection.db.session import AsyncSessionLocal
 
 from multiagent_fraud_detection.graph import builder as builder_mod
 from multiagent_fraud_detection.graph import nodes as nodes_mod
@@ -32,7 +37,6 @@ from multiagent_fraud_detection.graph.nodes import (
     THREAT_INTEL,
     degrades,
 )
-from multiagent_fraud_detection.schemas.transaction import TransactionIn
 
 # Nodos que deben degradar en vez de lanzar: si fallan, todavia hay decision.
 # Arbiter, Explainability y el persistidor NO estan aqui a proposito: sin
@@ -46,20 +50,6 @@ NODOS_QUE_DEGRADAN = {
     PRO_FRAUD: "debate_pro_fraud",
     PRO_CUSTOMER: "debate_pro_customer",
 }
-
-
-def _transaccion() -> TransactionIn:
-    return TransactionIn(
-        transaction_id="T-1002",
-        customer_id="CU-002",
-        amount=Decimal("9500.00"),
-        currency="PEN",
-        country="PE",
-        channel=Channel.MOBILE,
-        device_id="D-02",
-        timestamp=datetime(2025, 12, 17, 23, 45, tzinfo=UTC),
-        merchant_id="M-002",
-    )
 
 
 def verificar_cobertura_del_decorador() -> None:
@@ -109,16 +99,22 @@ async def verificar_atomicidad_del_superstep() -> None:
 # --- 3. El caso real: el mismo fallo, decorado ---
 
 
+CASE_ID = UUID("00000000-0000-0000-0000-0000000000d1")
+TX_ID = "T-SMOKE-DEGRAD"
+
+
 async def verificar_degradacion_en_el_grafo() -> None:
     @degrades(THREAT_INTEL)
     async def threat_intel_caido(state):
         raise ConnectionError("timeout del proveedor de inteligencia externa")
 
+    await sembrar(CASE_ID, TX_ID)
     original = builder_mod.external_threat_intel
     builder_mod.external_threat_intel = threat_intel_caido
     try:
         estado = await builder_mod.build_graph().ainvoke(
-            {"case_id": uuid4(), "transaction": _transaccion()}
+            {"case_id": CASE_ID, "transaction": transaccion(TX_ID)},
+            context=CONTEXTO,
         )
     finally:
         builder_mod.external_threat_intel = original
@@ -136,11 +132,18 @@ async def verificar_degradacion_en_el_grafo() -> None:
 
     ruta = estado["agent_route"]
     assert THREAT_INTEL in ruta, "el agente caido debe figurar en el audit trail"
-    assert ruta[-1] == "persist_decision", f"el grafo no llego al final: {ruta[-1]}"
-    print(f"  ok - el grafo completo los {len(ruta)} nodos y el caido quedo en la ruta")
+    print(f"  ok - el caido quedo en la ruta de {len(ruta)} agentes")
 
-    assert estado["decision"], "sin decision, la degradacion no sirvio de nada"
-    print(f"  ok - hubo decision degradada: {estado['decision']}")
+    # Que el grafo llego al final lo prueba la fila, no una cadena en la ruta.
+    async with AsyncSessionLocal() as session:
+        decision = (
+            await session.execute(select(Decision).where(Decision.case_id == CASE_ID))
+        ).scalar_one()
+
+    assert decision.degraded_agents == [THREAT_INTEL]
+    print(f"  ok - la degradacion llego a la BD: degraded_agents={decision.degraded_agents}")
+    print(f"  ok - hubo decision degradada: {decision.decision.value}")
+    await limpiar(CASE_ID, TX_ID)
 
 
 async def main() -> None:

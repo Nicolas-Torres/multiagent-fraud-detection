@@ -1,8 +1,10 @@
 # Contrato de Interfaz — Sistema Multi-Agente de Detección de Fraude
-**Versión 0.3 — capa de persistencia cerrada y verificada**
+**Versión 0.4 — grafo, scoring y trazabilidad de ejecución**
 
 > Define las **fronteras** entre el motor de agentes (yo), la infraestructura (mi
 > compañero) y el dashboard del analista. 🔶 = decisión conjunta pendiente.
+>
+> Qué cambió respecto de versiones anteriores: [`CHANGELOG.md`](CHANGELOG.md).
 
 ---
 
@@ -63,6 +65,7 @@ Ambos sin autenticación, `200` cuando OK.
 | `LANGSMITH_PROJECT` | `fraud-detection` |
 | `LOG_LEVEL` | `INFO` |
 
+> `LOG_LEVEL` gobierna también el echo de SQL de SQLAlchemy: solo en `DEBUG`.
 > El allowlist de búsqueda web **no** es env var → tabla gobernada (§4).
 
 ### 1.5 Empaquetado
@@ -77,9 +80,9 @@ Ambos sin autenticación, `200` cuando OK.
 lint → pytest → alembic upgrade head → alembic check → build → push a GHCR
 ```
 
-> **Nuevo respecto a v0.2:** `alembic check` como gate. Retorna código distinto de
-> cero si un modelo cambió sin migración correspondiente. Requiere Postgres como
-> `services:` en el job.
+> `alembic check` retorna distinto de cero si un modelo cambió sin migración
+> correspondiente. Exige que la base esté en `head`, por eso el `upgrade` va
+> antes. Requiere Postgres como `services:` en el job.
 
 ---
 
@@ -102,6 +105,11 @@ stateDiagram-v2
     FAILED --> [*]
 ```
 
+> **`PENDING_HUMAN` es estado terminal del grafo.** El análisis no queda
+> suspendido esperando al analista: termina, persiste, y la resolución entra
+> por HTTP (§7.3). La máquina de estados no cambia; cambia quién escribe la
+> transición a `RESOLVED`.
+
 ### 2.2 Enums
 
 | Enum | Valores | Caso |
@@ -113,8 +121,8 @@ stateDiagram-v2
 | `Severity` | `low`, `medium`, `high` | minúscula |
 
 > **Nota de implementación** (no afecta al dashboard): en Postgres se persiste el
-> **nombre** del miembro (`MEDIUM`), no su valor. La frontera JSON siempre expone el
-> **valor** (`"medium"`). Verificado en smoke test.
+> **nombre** del miembro (`MEDIUM`), no su valor. La frontera JSON siempre expone
+> el **valor** (`"medium"`). Verificado en smoke test.
 
 ### 2.3 Endpoints
 
@@ -123,7 +131,7 @@ stateDiagram-v2
 | `POST` | `/api/v1/cases` | Ingresar transacción | `Transaction` | `CaseCreated` | `202` nuevo / `200` reintento |
 | `GET` | `/api/v1/cases` | Listar/filtrar cola (HITL) | query: `status`, `limit`, `offset` | `Page[CaseSummary]` | `200` |
 | `GET` | `/api/v1/cases/{case_id}` | Detalle completo | — | `CaseDetail` | `200` |
-| `POST` | `/api/v1/cases/{case_id}/resolution` | Acción del analista | **`HumanResolutionIn`** | `CaseDetail` | `200` |
+| `POST` | `/api/v1/cases/{case_id}/resolution` | Acción del analista | `HumanResolutionIn` | `CaseDetail` | `200` |
 | `GET` | `/health` | Liveness | — | `{status}` | `200` |
 | `GET` | `/ready` | Readiness (Postgres) | — | `{status}` | `200` |
 
@@ -159,7 +167,7 @@ stateDiagram-v2
 
 Vive en Postgres; el **Behavioral Pattern Agent** lo recupera por `customer_id`
 dentro del grafo. En `CaseDetail` aparece como el **snapshot congelado** usado en
-el análisis (§7.3).
+el análisis (§7.4).
 
 | Campo | Tipo | Validación |
 |---|---|---|
@@ -178,33 +186,109 @@ el análisis (§7.3).
 > nuevo* → eso es señal, no dato inválido.
 >
 > **Normalización de formato** (`"08-20"` → `(8, 20)`, `"PE"` → `["PE"]`): vive en
-> el **script de seed**, no en el schema. Un adaptador por fuente; el dominio recibe
-> datos canónicos. Cuantizar el promedio a 2 decimales también es tarea del seed.
+> el **script de seed**, no en el schema. Un adaptador por fuente; el dominio
+> recibe datos canónicos.
 
 #### `Decision` (salida del grafo)
 
 | Campo | Tipo | Notas |
 |---|---|---|
 | `decision` | `DecisionType` | |
-| `confidence` | `float` (0.0–1.0) | **híbrida**: score determinístico desde señales, ajustable por el Arbiter con justificación |
-| `signals` | `list[Signal]` | orden de producción preservado |
+| **`risk_score`** | `float \| null` (0.0–1.0) | 🆕 **sospecha**, determinístico. Ordena la cola y vigila el drift; **no** decide |
+| `confidence` | `float` (0.0–1.0) | **seguridad en el veredicto autónomo** — ver nota |
+| **`base_confidence`** | `float \| null` (0.0–1.0) | 🆕 la confianza antes del ajuste del Arbiter |
+| **`confidence_rationale`** | `str \| null` | 🆕 justificación del ajuste; `null` = no hubo ajuste |
+| **`scoring_version`** | `str \| null` | 🆕 versión de la fórmula que produjo los scores |
+| `signals` | `list[Signal]` | orden determinístico fijado por Evidence Aggregation |
 | `citations_internal` | `list[InternalCitation]` | políticas (RAG) |
 | `citations_external` | `list[ExternalCitation]` | alertas web (gobernada) |
 | `debate` | `DebateSummary` | pro-fraude / pro-cliente |
-| `agent_route` | `list[str]` | audit trail: qué agentes corrieron, **en orden** |
+| `agent_route` | `list[str]` | rastro de **agentes**, agrupado por superstep |
+| **`degraded_agents`** | `list[str]` | 🆕 agentes que fallaron; vacío = evidencia completa |
 | `explanation_customer` | `str` | |
 | `explanation_audit` | `str` | |
-| **`decided_at`** | `datetime` | 🆕 lo acuña el servidor |
+| `decided_at` | `datetime` | lo acuña el servidor |
 
 **`Signal`**: `code` (`AMOUNT_OUT_OF_RANGE`), `description`, `severity` (`Severity`)
-— *sin `id`: una señal no tiene identidad expuesta al cliente.*
+— *sin `id` ni procedencia: una señal no tiene identidad expuesta al cliente.*
 **`InternalCitation`**: `policy_id`, `chunk_id`, `version`
 **`ExternalCitation`**: `url`, `summary`, `retrieved_at`
 **`DebateSummary`**: `pro_fraud_argument`, `pro_customer_argument`
 
-> `confidence` es `float`, no `Decimal`. El contraste con el dinero es deliberado:
-> `Decimal` existe porque los montos se suman y deben cuadrar al centavo. Un score
-> no se suma ni se audita contablemente.
+##### Riesgo y confianza son dos números, no uno
+
+| | Sospecha (`risk_score`) | Confianza (`confidence`) |
+|---|---|---|
+| Muchas señales graves | alta | **alta** — `BLOCK` claro |
+| Ninguna señal | baja | **alta** — `APPROVE` claro |
+| Señales contradictorias | media | **baja** |
+| Evidencia incompleta | sin cambio | **baja** |
+
+La sospecha es **monótona** en las severidades. La confianza tiene **forma de U**:
+máxima en los dos extremos, mínima en el medio. Una función monótona no puede
+producir las dos, y por eso el contrato expone ambas.
+
+Consecuencia: con evidencia incompleta la confianza **baja** sin que el riesgo se
+mueva. Una falla de agente no es evidencia de fraude.
+
+##### La confianza es híbrida, y el rastro es auditable
+
+`base_confidence` lo produce **código**; el Arbiter solo puede moverlo dentro de
+un delta acotado. `confidence_rationale` explica el delta.
+
+- `confidence_rationale = null` significa **una sola cosa**: no hubo ajuste.
+- Si `confidence != base_confidence`, la justificación **existe** — garantizado
+  por el sistema, no por convención (§7.3).
+
+`risk_score` **no** es ajustable por el Arbiter: si un LLM pudiera moverlo,
+dejaría de servir para vigilar drift (entregable 6).
+
+##### La cita autoriza el veredicto, no lo acompaña
+
+Las políticas internas **prescriben una acción** (*"monto > 3x y horario fuera de
+rango → CHALLENGE"*), no describen riesgo. El veredicto no sale de umbralizar un
+score: sale de la política que aplica.
+
+De ahí el invariante, que es estructural y no de calidad:
+
+> **Ningún veredicto autónomo sin respaldo interno y sin score determinístico.**
+> Diferir a un humano no es un veredicto.
+
+Formalmente, cuando `decision != ESCALATE_TO_HUMAN`:
+`citations_internal` es no vacío **y** `base_confidence` no es `null`.
+
+`ESCALATE_TO_HUMAN` queda exento: sin la excepción, un caso sin políticas
+recuperadas no tendría ninguna salida posible —no podría aprobar, ni bloquear,
+ni escalar—. La ausencia de respaldo *es* la razón para llamar al humano.
+
+**El dashboard puede asumirlo**: en todo caso `DECIDED`, las citas internas no
+están vacías.
+
+##### Orden de `signals` y de `agent_route`
+
+Ninguno de los dos es "orden de producción". Tres agentes emiten señales desde
+ramas paralelas, y el orden **entre** ramas de un mismo superstep no es el de
+declaración.
+
+- **`signals`**: el orden lo fija **Evidence Aggregation** con un criterio
+  determinístico y documentado. Es requisito de reproducibilidad para el harness
+  del entregable 7, no cosmética.
+- **`agent_route`**: es una secuencia de supersteps aplanada. El orden **entre**
+  supersteps está garantizado; la adyacencia **dentro** de un grupo no implica
+  precedencia causal. Un auditor que lea la ruta como cadena causal se equivocaría.
+
+`agent_route` contiene **agentes**, no todos los nodos del grafo: el nodo que
+persiste no figura. Que corrió lo prueba la existencia de la fila.
+
+##### Degradación
+
+Un agente que falla **no aborta el análisis**: degrada la decisión y su nombre
+aparece en `degraded_agents`. El detalle de la falla (tipo, mensaje, instante) es
+frontera interna (§7.2).
+
+> `degraded_agents` vacío significa evidencia completa. **Es una garantía del
+> sistema, no una convención del cliente**: el dashboard no tiene que contar
+> elementos de otra lista para deducirlo.
 
 #### `CaseDetail` — respuesta del `GET /cases/{case_id}`
 
@@ -213,7 +297,7 @@ el análisis (§7.3).
 | `case_id` | `UUID` | generado por el servidor, ≠ `transaction_id` |
 | `status` | `CaseStatus` | |
 | `transaction` | `Transaction` | |
-| **`customer`** | **`CustomerBehavior \| null`** | 🆕 nullable: cliente nuevo sin perfil |
+| `customer` | `CustomerBehavior \| null` | nullable: cliente nuevo sin perfil |
 | `decision` | `Decision \| null` | null hasta `DECIDED`/`PENDING_HUMAN` |
 | `human_resolution` | `HumanResolutionRead \| null` | solo cuando `RESOLVED` |
 | `created_at` | `datetime` | |
@@ -272,17 +356,20 @@ Los tres campos anteriores **más `resolved_at`** (`datetime`, lo acuña el serv
 | `UUID` | string | `"00000000-...-00000000000a"` |
 | `HttpUrl` | string | `"https://example.com/alerta"` |
 | enum | su **valor** | `"medium"`, `"ESCALATE_TO_HUMAN"` |
+| `list[str]` | array de strings | `["external_threat_intel"]` |
 
 > **Acción para el dashboard**: `amount` y `usual_amount_avg` llegan como **string**.
 > Parsearlos como número en JS pierde centavos por la misma razón por la que no son
-> `float` en Python.
+> `float` en Python. Los scores (`risk_score`, `confidence`, `base_confidence`)
+> **sí** son números: no se suman ni se auditan contablemente.
 
 ### 2.7 Notas de modelado
 
 - **`case_id` ≠ `transaction_id`**: UUID del servidor; desacopla identidad interna y habilita reintentos.
 - **`amount` es `Decimal`**: los `float` pierden centavos por redondeo binario.
-- **`timestamp` UTC + zona**: se guarda UTC; `usual_hours` es hora local → se asume
-  `America/Lima` para v1 y se documenta el supuesto.
+- **`timestamp` UTC + zona**: se guarda UTC. `usual_hours` es hora **local del
+  cliente**; la zona sale del perfil, no de un supuesto global. 🔶 *Pendiente de
+  cerrar en la etapa de dataset.*
 
 ---
 
@@ -294,12 +381,13 @@ Consume el Contrato de API. Dos vistas:
 
 **Detalle** (`GET /cases/{id}`) → `CaseDetail`: transacción · contexto del cliente
 (contraste, **puede ser null**) · señales con severidad · citas internas (políticas
-+ versión) · citas externas (URL + resumen) · debate pro/contra · confianza +
-explicación de auditoría · explicación al cliente · **acciones** (Aprobar/Rechazar
-+ notas → `POST .../resolution`).
++ versión) · citas externas (URL + resumen) · debate pro/contra · riesgo y
+confianza + explicación de auditoría · explicación al cliente · **acciones**
+(Aprobar/Rechazar + notas → `POST .../resolution`).
 
 > El detalle debe manejar `customer: null` mostrando "cliente sin perfil previo"
-> —que es información de fraude, no un hueco—.
+> —que es información de fraude, no un hueco—, y `degraded_agents` no vacío
+> mostrando qué evidencia faltó al decidir.
 
 ---
 
@@ -326,15 +414,20 @@ o dato de gobernanza (mutable, con audit trail)?* Lo primero → env var. Lo seg
 
 | # | Decisión | Resolución |
 |---|---|---|
-| 1 | Cálculo de confianza | **Híbrida** (determinístico desde señales + ajuste del Arbiter) |
+| 1 | Cálculo de confianza | **Híbrida**: determinístico (`base_confidence`) + ajuste acotado del Arbiter con justificación |
 | 2 | Payload del `POST /cases` | **Solo `Transaction`**; el grafo recupera el perfil |
 | 3 | Notificación al dashboard | **Polling** en v1; WebSocket = mejora (entregable 10) |
 | 4 | Allowlist de búsqueda web | **Tabla gobernada** con audit trail |
 | 5 | Duplicados | **Idempotencia** por `transaction_id` |
-| 6 | 🆕 `signals` | **Tabla relacional** (unidad de evaluación) |
-| 7 | 🆕 `citations_*` | **JSONB** (narrativa de auditoría) |
-| 8 | 🆕 Perfil del cliente en el caso | **Snapshot congelado** en JSONB, sin FK |
-| 9 | 🆕 `Decision` | **Tabla propia** con PK compartida con `cases` |
+| 6 | `signals` | **Tabla relacional** (unidad de evaluación) |
+| 7 | `citations_*` | **JSONB** (narrativa de auditoría) |
+| 8 | Perfil del cliente en el caso | **Snapshot congelado** en JSONB, sin FK |
+| 9 | `Decision` | **Tabla propia** con PK compartida con `cases` |
+| 10 | 🆕 HITL | **Sin `interrupt()`**: `PENDING_HUMAN` es terminal para el grafo; la resolución es flujo HTTP |
+| 11 | 🆕 Riesgo vs confianza | **Dos números distintos**, con formas distintas |
+| 12 | 🆕 Falla de un agente | **Degrada** la decisión, no la aborta; `FAILED` solo por excepción no capturada |
+| 13 | 🆕 Errores de agente | **Tabla** `agent_errors` (el sistema los mide); la frontera expone solo `degraded_agents` |
+| 14 | 🆕 Escritura del grafo | **Un solo punto**, con semántica de reemplazo del agregado |
 
 ---
 
@@ -342,15 +435,16 @@ o dato de gobernanza (mutable, con audit trail)?* Lo primero → env var. Lo seg
 
 - **Migraciones**: postura propuesta = imagen soporta `alembic upgrade head`; el CD lo invoca como Job de pre-deploy.
 - **Convención de tags** de la imagen en GHCR (semver + git SHA).
+- **Zona horaria del perfil** (§2.7): se cierra en la etapa de dataset.
 
 ---
 
-## 7. Modelo de persistencia 🆕
+## 7. Modelo de persistencia
 
 > Frontera **interna**: no la ve el dashboard. Se documenta porque es donde se
-> resolvió el "JSONB vs relacional" que v0.2 dejó abierto.
+> resuelve el "JSONB vs relacional" y dónde viven las garantías que §2 promete.
 
-### 7.1 Las seis tablas
+### 7.1 Las siete tablas
 
 | Tabla | PK | Notas |
 |---|---|---|
@@ -359,41 +453,80 @@ o dato de gobernanza (mutable, con audit trail)?* Lo primero → env var. Lo seg
 | `cases` | `case_id` (UUID, surrogate) | FK + **UNIQUE** en `transaction_id`; índice compuesto `(status, created_at)` |
 | `decisions` | `case_id` (**PK = FK** a `cases`) | 1:1 implícito, sin constraint extra |
 | `signals` | `id` (BIGSERIAL) | FK a `decisions.case_id`; índice en `code` |
+| **`agent_errors`** | `id` (BIGSERIAL) | 🆕 FK a `decisions.case_id`; índice en `agent` |
 | `human_resolutions` | `case_id` (**PK = FK** a `cases`) | 1:1 implícito |
 
-Los tres hijos llevan `ON DELETE CASCADE` a nivel BD.
+Los hijos llevan `ON DELETE CASCADE` a nivel BD.
 
-**Falta**: `web_search_allowlist` (§4) y las tablas del checkpointer de LangGraph
-(las crea LangGraph, no Alembic).
+**Falta**: `web_search_allowlist` (§4).
 
-### 7.2 Regla JSONB vs relacional vs ARRAY
+### 7.2 `agent_errors`: tabla, no JSONB
 
-| Si el contenido… | Va a |
-|---|---|
-| es un escalar homogéneo, se lee siempre completo, no existe sin su dueño | **`ARRAY`** |
-| tiene forma anidada, se produce y se archiva, se lee entero junto al caso | **`JSONB`** |
-| tiene identidad, ciclo de vida propio, o el sistema lo **mide** | **tabla** |
+Mismo criterio que `signals`: **el sistema los mide**. *"¿Con qué frecuencia falla
+el agente de inteligencia externa?"* es métrica de producción (entregable 6) y
+*"¿qué decisiones se tomaron degradadas?"* es métrica de calidad (entregable 7).
+Ambas quieren `GROUP BY agent`, y el índice es su razón de ser.
 
-Destilado: **JSONB para lo que el sistema produce y archiva; relacional para lo que
-el sistema mide.**
+Columnas: `agent`, `error_type`, `message`, `occurred_at`.
 
-Aplicación concreta:
+`occurred_at` **no** tiene `server_default`: el instante lo acuña el grafo cuando
+la falla ocurre. Con `now()` de Postgres todos los errores de un mismo commit
+compartirían timestamp y se perdería justo el dato útil.
 
-- `signals` → **tabla**. Son la unidad de evaluación: el harness del entregable 7
-  compara esperadas vs. producidas, y el monitoreo del entregable 6 vigila su
-  distribución. El índice en `code` hace que el `GROUP BY` sea instantáneo.
-- `citations_internal` / `citations_external` → **JSONB**. Narrativa de auditoría:
-  se leen enteras junto al caso, nunca solas.
-- `agent_route` → **`varchar[]`**. Secuencia de escalares donde el **orden es la
-  información**.
-- `debate` → **dos columnas `Text` planas**. Objeto de dos campos fijos que no va a
-  crecer; JSONB solo agregaría indirección. Se recompone como objeto en la frontera.
+La frontera expone `degraded_agents` —solo los nombres— derivado de esta tabla con
+una property del ORM. **No se modela lo que se puede derivar.**
 
-> **JSONB no significa "sin schema"**: significa que el schema vive en Pydantic en
-> vez de en el DDL. `InternalCitation`, `ExternalCitation` y `DebateSummary` son el
-> contrato de forma de esas columnas, de ida y de vuelta.
+### 7.3 Los cuatro puntos de escritura
 
-### 7.3 El snapshot congelado
+Cada uno existe porque un observador externo necesita ver algo en ese instante.
+
+| | Quién escribe | Qué | Por qué existe |
+|---|---|---|---|
+| **W0** | endpoint `POST /cases` | `transactions` + `cases` en `RECEIVED` | sin esto no hay `case_id` que devolver |
+| **W1** | wrapper del background task | `status = ANALYZING` | distingue "aceptado" de "corriendo" |
+| **W2** | **único nodo persistidor del grafo** | `decisions` + `signals` + `agent_errors` + `decided_at` + `status`, **una transacción** | la cola HITL |
+| **W3** | endpoint `POST /resolution` | `human_resolutions` + `RESOLVED` | el grafo ya terminó |
+
+**Garantía derivada, que el dashboard puede asumir:**
+
+| `status` | `decision` | `human_resolution` |
+|---|---|---|
+| `RECEIVED`, `ANALYZING` | `null` | `null` |
+| `DECIDED`, `PENDING_HUMAN` | **completa** (nunca parcial) | `null` |
+| `RESOLVED` | completa | presente |
+| `FAILED` | puede ser `null` | `null` |
+
+No hay estados intermedios visibles: W2 escribe todo en un commit.
+
+`FAILED` **no lo escribe ningún nodo**: un agente caído degrada, no aborta. Es para
+una excepción no capturada del grafo entero, y la escribe el wrapper de W1 —quien
+tiene el `try`—.
+
+**Idempotencia de W2 — reemplazo del agregado.** La clave es `case_id`:
+
+```sql
+DELETE FROM decisions WHERE case_id = :id;   -- la cascada barre los hijos
+INSERT INTO decisions ...; INSERT INTO signals ...; INSERT INTO agent_errors ...;
+UPDATE cases SET status = ...;
+```
+
+La semántica es *"el resultado de W2 para este caso es exactamente esto"*, no
+*"asegúrate de que estas filas existan"*. **Un reintento sustituye, no complementa**
+— y hace falta porque `signals.id` es BIGSERIAL sin UNIQUE: una segunda escritura
+no chocaría con nada y duplicaría en silencio, envenenando la unidad de medida del
+entregable 7.
+
+**Guardas en W2**, que hacen cumplir lo que §2.5 promete:
+
+1. `decision != ESCALATE_TO_HUMAN` ⟹ `citations_internal` no vacío.
+2. `decision != ESCALATE_TO_HUMAN` ⟹ `base_confidence` no es `null`.
+3. `base_confidence` no `null` **y** `confidence != base_confidence` ⟹ hay `confidence_rationale`.
+
+Las tres **levantan**, no reparan: si alguna dispara, el Arbiter tiene un bug, y
+una guarda que repara lo esconde. El Arbiter degrada a `ESCALATE_TO_HUMAN` antes
+de que la guarda pueda dispararse; llegar a W2 en violación es un defecto.
+
+### 7.4 El snapshot congelado
 
 `cases.customer_snapshot` es JSONB **nullable**, no un FK a `customer_behaviors`.
 
@@ -403,49 +536,51 @@ Una transacción es un evento: nunca se actualiza, así que un FK siempre devuel
 que se usó para decidir. Un perfil de comportamiento **sí muta**: un FK haría que un
 caso de enero mostrara el perfil de marzo → auditoría rota.
 
-Consecuencia: `customer_behaviors` es "estado actual" plano, **sin versionado**. La
-historia la guarda el caso.
-
 Corolario: **no hay FK de `transactions.customer_id` a `customer_behaviors`**. Una
 transacción de un cliente sin perfil debe poder insertarse; ese caso no es un error,
 es el escenario que el sistema tiene que analizar.
 
-### 7.4 Convenciones de persistencia
+### 7.5 Regla JSONB vs relacional vs ARRAY
 
-- **Enums — Opción A**: `native_enum=False`, sin CHECK a nivel BD. Validación en
-  boundary Pydantic + capa in-Python de SQLAlchemy. Motivo: el autogenerate de
-  Alembic no rastrea CHECK de enums no-nativos → un constraint desincronizado da
-  falsa seguridad. Aplica a los cinco enums.
-- **Sin `CheckConstraint`** en general: `alembic check` y `--autogenerate` tienen un
-  punto ciego con ellos; requieren migración manual. Con un solo escritor (la app),
-  el boundary cubre las rutas reales.
-- **Nulabilidad** sale del tipo `Mapped[...]`, nunca `nullable=False` explícito.
-- **`lazy="selectin"`** en todas las relaciones: obligatorio en async, el lazy
-  loading por defecto lanza `MissingGreenlet`. Se sobreescribe por consulta cuando
-  la cola no necesita los hijos.
-- **`model_dump(mode="json")`** al escribir Pydantic a JSONB: en modo Python,
-  `HttpUrl` y `datetime` no son serializables por psycopg.
-- **PK surrogate**: UUID cuando la identidad **viaja al cliente** (`case_id` va en la
-  URL); entero autoincremental cuando es interna (`signals.id`, que además preserva
-  el orden de inserción gratis).
-- **Mutación in situ no se detecta**: `obj.lista.append(x)` no marca el objeto como
-  sucio en `ARRAY` ni en JSONB. Reasignar la colección completa.
-- **`onupdate=func.now()`** se dispara en Python, no en la BD. Un `UPDATE` por SQL
-  crudo no toca `updated_at`.
-- **`now()` de Postgres es `transaction_timestamp()`**: todo lo insertado en un mismo
-  commit comparte instante. `decided_at - created_at` mide latencia real solo porque
-  en producción son transacciones distintas.
+| Si el contenido… | Va a |
+|---|---|
+| es un escalar homogéneo, se lee siempre completo, no existe sin su dueño | **`ARRAY`** |
+| tiene forma anidada, se produce y se archiva, se lee entero junto al caso | **`JSONB`** |
+| tiene identidad, ciclo de vida propio, o el sistema lo **mide** | **tabla** |
 
-### 7.5 Cadena de migraciones
+Destilado: **JSONB para lo que el sistema produce y archiva; relacional para lo
+que el sistema mide.** Detalle en [ADR-0002](adr/0002-jsonb-vs-relacional-vs-array.md).
+
+### 7.6 Convenciones de persistencia
+
+- **Enums — Opción A**: `native_enum=False`, sin CHECK a nivel BD.
+- **Sin `CheckConstraint`** en general: punto ciego de `--autogenerate` y `alembic check`.
+- **Nulabilidad** sale del tipo `Mapped[...]`, nunca `nullable=True/False` explícito.
+- **`lazy="selectin"`** en todas las relaciones: obligatorio en async.
+- **`model_dump(mode="json")`** al escribir Pydantic a JSONB.
+- **PK surrogate**: UUID cuando la identidad **viaja al cliente**; entero
+  autoincremental cuando es interna (y preserva orden de inserción gratis).
+- **Borrado por `delete()` de Core**, no por objeto: con `lazy="selectin"` el ORM
+  cargaría los hijos para borrarlos uno por uno en vez de dejar que la cascada
+  de la BD haga su trabajo.
+- **Mutación in situ no se detecta**: reasignar la colección completa.
+- **`onupdate=func.now()`** se dispara en Python, no en la BD.
+- **`now()` de Postgres es `transaction_timestamp()`**: todo lo insertado en un
+  mismo commit comparte instante.
+
+### 7.7 Cadena de migraciones
 
 ```
 c558fd490ae6  (pgvector)
-   → b2a8d4bf4ee2  (transactions)
-      → 97de35e4842b  (customer_behaviors)
-         → ac3bc6c8573d  (cases, decisions, signals, human_resolutions)  ← head
+ → b2a8d4bf4ee2  (transactions)
+   → 97de35e4842b  (customer_behaviors)
+     → ac3bc6c8573d  (cases, decisions, signals, human_resolutions)
+       → 307787653e5e  (scoring en decisions)
+         → 694142a4c8b6  (agent_errors)  ← head
 ```
 
 ---
 
-**Estado**: v0.3 — persistencia cerrada y verificada contra Postgres.
+**Estado**: v0.4 — scoring y trazabilidad de ejecución cerrados y verificados
+contra Postgres.
 **Valida el compañero**: §1. **Valido yo**: §2–§4, §7.
