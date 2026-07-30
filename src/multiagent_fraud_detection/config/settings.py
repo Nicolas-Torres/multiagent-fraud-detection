@@ -9,5 +9,6 @@ class Settings(BaseSettings):
     )
 
     database_url: str
+    log_level: str = "INFO"
 
 settings = Settings()
