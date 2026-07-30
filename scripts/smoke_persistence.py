@@ -66,13 +66,29 @@ def estado(**cambios) -> dict:
     return base
 
 
-async def contar() -> tuple[int, int, int, CaseStatus]:
+async def contar() -> tuple[int, int, int, CaseStatus | None]:
+    """Filtrado por CASE_ID: un test no es dueno de la base.
+
+    Contar filas globalmente lo volveria dependiente del orden de ejecucion y
+    de lo que otros smoke tests dejaron atras.
+    """
     async with AsyncSessionLocal() as s:
         return (
-            (await s.execute(select(func.count()).select_from(Decision))).scalar(),
-            (await s.execute(select(func.count()).select_from(Signal))).scalar(),
-            (await s.execute(select(func.count()).select_from(AgentErrorRow))).scalar(),
-            (await s.execute(select(Case.status).where(Case.case_id == CASE_ID))).scalar(),
+            (await s.execute(
+                select(func.count()).select_from(Decision)
+                .where(Decision.case_id == CASE_ID)
+            )).scalar(),
+            (await s.execute(
+                select(func.count()).select_from(Signal)
+                .where(Signal.case_id == CASE_ID)
+            )).scalar(),
+            (await s.execute(
+                select(func.count()).select_from(AgentErrorRow)
+                .where(AgentErrorRow.case_id == CASE_ID)
+            )).scalar(),
+            (await s.execute(
+                select(Case.status).where(Case.case_id == CASE_ID)
+            )).scalar(),
         )
 
 
@@ -99,7 +115,9 @@ async def main() -> None:
         RUNTIME,
     )
     async with AsyncSessionLocal() as s:
-        codigos = (await s.execute(select(Signal.code))).scalars().all()
+        codigos = (await s.execute(
+            select(Signal.code).where(Signal.case_id == CASE_ID)
+        )).scalars().all()
     assert codigos == ["NEW_DEVICE"], codigos
     print(f"  ok - reemplazo del agregado, no union: {codigos}")
 
