@@ -4,6 +4,7 @@ from multiagent_fraud_detection.db.models.case import Case
 from multiagent_fraud_detection.db.models.decision import Decision
 from multiagent_fraud_detection.db.models.human_resolution import HumanResolution
 from multiagent_fraud_detection.db.models.signal import Signal
+from multiagent_fraud_detection.db.models.agent_error import AgentError
 
 __all__ = [
     "Case",
@@ -12,4 +13,5 @@ __all__ = [
     "HumanResolution",
     "Signal",
     "Transaction",
+    "AgentError"
 ]

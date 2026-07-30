@@ -48,6 +48,7 @@ class DecisionRead(BaseModel):
     citations_external: list[ExternalCitation]
     debate: DebateSummary
     agent_route: list[str]
+    degraded_agents: list[str]
     explanation_customer: str
     explanation_audit: str
     decided_at: AwareDatetime

@@ -13,6 +13,7 @@ from multiagent_fraud_detection.enums import DecisionType
 if TYPE_CHECKING:
     from multiagent_fraud_detection.db.models.case import Case
     from multiagent_fraud_detection.db.models.signal import Signal
+    from multiagent_fraud_detection.db.models.agent_error import AgentError
 
 
 class Decision(Base):
@@ -72,3 +73,21 @@ class Decision(Base):
             "pro_fraud_argument": self.debate_pro_fraud,
             "pro_customer_argument": self.debate_pro_customer,
         }
+
+    agent_errors: Mapped[list["AgentError"]] = relationship(
+        back_populates="decision",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+        order_by="AgentError.id",
+    )
+
+    @property
+    def degraded_agents(self) -> list[str]:
+        """Agentes que fallaron durante el analisis.
+
+        La frontera expone quien fallo, no el stack trace: el detalle vive en
+        `agent_errors` para el GROUP BY del monitoreo. Sin deduplicar a
+        proposito — con `@degrades` cada nodo produce a lo sumo un error, asi
+        que un repetido seria un bug que no conviene esconder.
+        """
+        return [error.agent for error in self.agent_errors]
