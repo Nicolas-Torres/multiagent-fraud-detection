@@ -29,6 +29,14 @@ class Decision(Base):
 
     confidence: Mapped[float] = mapped_column(Float)
 
+    risk_score: Mapped[float | None] = mapped_column(Float)
+
+    base_confidence: Mapped[float | None] = mapped_column(Float)
+
+    confidence_rationale: Mapped[str | None] = mapped_column(Text)
+
+    scoring_version: Mapped[str | None] = mapped_column(String(16))
+
     citations_internal: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
 
     citations_external: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
