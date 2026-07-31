@@ -22,7 +22,8 @@ que no alcanzan confianza suficiente pasan a una cola de revisión humana.
 | Infraestructura local (Postgres + pgvector, migraciones) | ✅ |
 | Modelo de dominio: 6 tablas, schemas de frontera | ✅ |
 | Esqueleto del grafo: estado, topología, degradación | ✅ |
-| Persistencia de la decisión | ⬜ |
+| Persistencia de la decisión | ✅ |
+| Dataset sintético y seed | ⬜ |
 | Agentes de lógica pura (Context, Behavioral, Aggregation) | ⬜ |
 | Tabla `web_search_allowlist` | ⬜ |
 | RAG de políticas internas + Policy RAG Agent | ⬜ |
@@ -122,10 +123,10 @@ uv run python scripts/export_graph_diagram.py
 
 ```
 ├── compose.yml                  # Postgres 17 + pgvector
-├── migrations/versions/         # c558 pgvector · b2a8 · 97de · ac3b (head)
+├── migrations/versions/         # c558 pgvector · b2a8 · 97de · ac3b · 3077 · 6941 (head)
 ├── scripts/                     # smoke tests y utilidades
 ├── docs/
-│   ├── contrato_de_interfaz.md  # documento vivo (v0.3)
+│   ├── contrato_de_interfaz.md  # documento vivo (v0.4)
 │   ├── CHANGELOG.md
 │   ├── enmiendas_pendientes.md  # staging de la próxima versión
 │   ├── adr/                     # decisiones de arquitectura
