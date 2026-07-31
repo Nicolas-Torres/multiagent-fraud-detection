@@ -64,7 +64,7 @@ El diagrama se genera desde el grafo compilado
 | Herramienta | Rol |
 |---|---|
 | Python 3.12 · [uv](https://docs.astral.sh/uv/) | Runtime y gestor de proyecto (build reproducible con `uv.lock`) |
-| PostgreSQL 17 + pgvector | Base relacional **y** vectorial ([ADR-0001](docs/adr/0001-postgres-con-pgvector-como-unica-base.md)) |
+| PostgreSQL 18 + pgvector | Base relacional **y** vectorial ([ADR-0001](docs/adr/0001-postgres-con-pgvector-como-unica-base.md)) |
 | SQLAlchemy 2.0 (async) + psycopg3 | ORM y driver |
 | Alembic | Migraciones versionadas (motor síncrono) |
 | Pydantic v2 | Validación en la frontera |
@@ -122,7 +122,7 @@ uv run python scripts/export_graph_diagram.py
 ## Estructura
 
 ```
-├── compose.yml                  # Postgres 17 + pgvector
+├── compose.yml                  # Postgres 18 + pgvector
 ├── migrations/versions/         # c558 pgvector · b2a8 · 97de · ac3b · 3077 · 6941 (head)
 ├── scripts/                     # smoke tests y utilidades
 ├── docs/

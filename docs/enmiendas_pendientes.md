@@ -6,7 +6,7 @@ cerrar la etapa de **dataset y seed**.
 > Documento de trabajo: se **vacía** al publicar una versión, no se archiva.
 > Nunca hay dos. Vigente: v0.4.
 >
-> Contexto completo de esta etapa: [`briefing_dataset.md`](briefing_dataset.md).
+> Contexto: [`briefing_dataset.md`](briefing_dataset.md) (§1.1–1.4, §2.1–2.5) y la puesta en marcha de la base compartida en AWS (§1.5–1.7, §2.6–2.8).
 
 ---
 
@@ -19,6 +19,9 @@ cerrar la etapa de **dataset y seed**.
 | 3 | `CustomerBehavior` gana cinco campos de evaluación de políticas | §2.5 |
 | 4 | `Transaction` gana `issuer_bank` | §2.5 |
 | 5 | Índices de historial en `transactions` | §7 |
+| 6 | La forma de `DATABASE_URL` cambia: TLS y password codificado | §1.4 |
+| 7 | Postgres destino sube a **18** | §1.4 |
+| 8 | Tres entornos de base de datos, no uno | §1.4 |
 
 ### 1.1 — Muere el supuesto de zona horaria única
 
@@ -64,6 +67,61 @@ sueltas. Necesitan `transactions (customer_id, timestamp)` y
 
 Al crear el compuesto, el índice suelto en `customer_id` queda redundante —es un
 prefijo por la izquierda— y se elimina en la misma migración.
+
+### 1.5 — La forma de `DATABASE_URL` cambia
+
+RDS trae `rds.force_ssl` activo: una conexión sin TLS se rechaza en el handshake,
+antes de autenticar. La URL necesita `?sslmode=require`.
+
+Y el password viaja **percent-encoded**. No es cosmético: dentro de una URL el
+password no es un campo, es un tramo delimitado por `:` y `@`, así que cualquier
+carácter estructural lo parte. Un `$` final pegado al `@` (`...pass$@host`) se lo
+come Bash como expansión de parámetros posicionales al hacer `source` —sin error
+ni advertencia—: password mutilado y `authentication failed` que parece problema
+de AWS.
+
+**Resolución**: `?sslmode=require` es parte de la forma esperada de
+`DATABASE_URL`, y §1.4 documenta que el valor inyectado desde los Secrets del CD
+viene codificado. SQLAlchemy hace `unquote` al parsear, así que el driver recibe
+el password literal: es el mecanismo previsto, no un parche.
+
+El `%` no rompe Alembic porque `env.py` inyecta la URL desde `settings` con
+`create_engine` directo, sin pasar por el `ConfigParser` de `alembic.ini`. Aquella
+decisión paga aquí.
+
+### 1.6 — Postgres destino sube a 18
+
+La instancia compartida corre **PostgreSQL 18.3**; el compose local corría 17.
+Mientras difieran, "pasa en local" deja de ser evidencia de "pasa en la nube".
+
+**Resolución**: 18 es la versión destino. `compose.yml` ya está alineado, y el job
+de CI fija `pgvector/pgvector:pg18` como `services:` cuando se escriba (§1.6 del
+contrato). La versión menor puede diferir —18.1 local vs 18.3 en RDS—: mismo
+formato en disco, mismo SQL.
+
+pgvector disponible en la instancia: 0.8.1.
+
+### 1.7 — Tres entornos de base de datos, no uno
+
+v0.4 nombra `DATABASE_URL` como si apuntara a un solo lugar. Ya son tres.
+
+| Entorno | Dónde | Para qué | Quién la toca |
+|---|---|---|---|
+| **Local** | contenedor de `compose.yml` | iterar migraciones, smoke tests | cada uno la suya |
+| **Compartido** | RDS `database-1`, base `fraud` | integración: mis tablas, su dashboard | los dos |
+| **Producción** | no existe todavía | el despliegue final | el CD |
+
+Dos precisiones que salieron de crearla:
+
+- La base es **`fraud`**, no la que RDS provisiona por defecto (`postgres`). Esa
+  queda como base de mantenimiento; mezclarla con datos de aplicación estorba en
+  restores y permisos.
+- Las extensiones son **por base de datos**, no por cluster: `CREATE EXTENSION
+  vector` corre dentro de `fraud`.
+
+**Resolución**: §1.4 deja de hablar de "la base" y enumera los entornos. El local
+no desaparece al existir el compartido: se itera en local, se integra en
+compartido.
 
 ---
 
@@ -118,6 +176,44 @@ puede aplicar. Eso vive dentro de `evidence_aggregation` y necesita el catálogo
 No toca el schema: `scoring_version` ya está previsto justamente para que la
 fórmula pueda cambiar sin invalidar lo persistido.
 
+### 2.6 — Reglas de convivencia sobre la base compartida
+
+Con la base compartida, tres operaciones dejan de ser locales y pasan a afectar al
+otro. El esquema es mío —poseo el dominio—, pero el efecto lo siente el dashboard.
+
+- **Migraciones.** Las corrí desde mi laptop para desbloquear el arranque. Eso fue
+  un **bootstrap**, no el procedimiento: §1.2 dice que el CD las invoca como Job de
+  pre-deploy. Mientras ese CD no exista, alguien las corre a mano y conviene fijar
+  quién y con qué aviso.
+- **`downgrade`.** Es la única operación de esta lista que destruye trabajo ajeno.
+  Nadie la ejecuta sobre la compartida sin avisar.
+- **Seed.** Sembrar deja de ser "poblar mi local": un seed que solo inserta falla
+  al segundo intento por clave duplicada, y uno que trunca borra los casos que el
+  dashboard estaba mostrando. El diseño del script es de la rama de dataset; la
+  coordinación —quién siembra y cuándo— es frontera.
+
+### 2.7 — Dos roles de base de datos: migrar y servir
+
+Hoy hay un solo rol, el master de RDS, y es `rds_superuser`. Migrar necesita DDL;
+servir tráfico solo necesita DML. Con un rol único, un bug de la app puede
+ejecutar un `DROP TABLE`.
+
+Separarlos convierte una variable de entorno en dos: `DATABASE_URL` para el
+runtime, `MIGRATION_DATABASE_URL` para el Job de pre-deploy. Toca §1.2 y §1.4.
+
+No urge en la compartida —datos sintéticos, reconstruibles—. Sí antes de producción.
+
+### 2.8 — Exposición de red de la base compartida
+
+La instancia es `publicly accessible`: cualquiera con el hostname llega al 5432, y
+como AWS publica sus rangos, el escaneo es continuo e independiente de que el
+hostname se conozca. Los datos son sintéticos y el esquema se reconstruye con
+`alembic upgrade head`, así que el daño posible es molestia y factura, no pérdida.
+
+Es decisión de infraestructura —territorio de mi compañero—, pero es frontera y
+por eso queda escrita: o el security group se limita a nuestras IPs, o el contrato
+reconoce explícitamente que la base compartida es un entorno desechable.
+
 ---
 
 ## 3. Hallazgos que **no** tocan el contrato
@@ -138,3 +234,19 @@ Van al repaso de etapa. Se anotan acá para no perderlos.
   ataría cualquier import del módulo a que haya base configurada.
 - **Un test no es dueño de la base**: contar filas globalmente lo vuelve
   dependiente del orden de ejecución. Filtrar siempre por la clave del caso.
+- **Postgres 18 movió el directorio de datos** dentro de la imagen: de
+  `/var/lib/postgresql/data` a `/var/lib/postgresql`. Con el mount viejo el
+  contenedor arranca y muere. Y cruzar una versión mayor exige
+  `docker compose down -v`: los directorios de datos no son compatibles entre
+  mayores.
+- **El master de RDS es `rds_superuser`**, así que `CREATE EXTENSION vector` corre
+  desde la migración `c558fd490ae6` sin aprovisionamiento previo. La enmienda que
+  se anticipaba —sacar la extensión de las migraciones— no hizo falta. Revive solo
+  si algún día se migra con un rol sin privilegios (§2.7).
+- **`pg_available_extensions` reporta disponible, no instalada.** Verificar que
+  una extensión existe se hace contra `pg_extension`.
+- **Las variables exportadas contaminan `docker compose`.** Recrear el contenedor
+  desde una terminal con las variables de la nube exportadas hizo que `initdb`
+  creara el rol `postgres` en vez de `fraud`. El síntoma fue `password
+  authentication failed`, porque Postgres oculta si el rol existe cuando la
+  autenticación es por password. Recrear siempre desde terminal limpia.
