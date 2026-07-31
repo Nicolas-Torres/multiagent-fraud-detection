@@ -5,27 +5,43 @@
 > dataset sintético entregado por el equipo de banca, las decisiones ya tomadas
 > con su argumento, y lo que queda abierto.
 >
-> **Fuera de alcance de esta etapa**: la rama `feature/decision-persistence`
-> (columnas de scoring en `decisions`, tabla `agent_errors`, nodo persistidor).
-> Se trabaja en paralelo y no se pisa con esto: toca `decisions`, no
-> `customer_behaviors` ni `transactions`.
+> **Ya no es fuera de alcance**: `feature/decision-persistence` (columnas de
+> scoring en `decisions`, tabla `agent_errors`, nodo persistidor) se mergeó a
+> `main`. Lo que era coordinación entre ramas paralelas es ahora punto de partida.
 
 **Contexto previo necesario**: `contrato_de_interfaz.md` (§2.5 schemas, §2.7
 supuestos, §7 persistencia), `reviews/02-domain-models.md`,
-`enmiendas_pendientes.md`.
+`enmiendas_pendientes.md` (§1.5–1.7 y §2.6–2.8 describen la base compartida).
 
 ---
 
 ## 1. Punto de partida
 
-Construido y en `main`: infraestructura local (Postgres 17 + pgvector,
-Alembic), seis tablas con sus schemas de frontera, y el esqueleto del grafo
-—`GraphState`, topología de siete supersteps, degradación ante caída de un
-agente—. Los nueve agentes son stubs.
+Construido y en `main`: infraestructura local (Postgres 18 + pgvector, Alembic),
+seis tablas con sus schemas de frontera, el esqueleto del grafo —`GraphState`,
+topología de siete supersteps, degradación ante caída de un agente— y la
+persistencia de la decisión con sus columnas de scoring. Los nueve agentes son
+stubs.
 
 **Nada de lo construido se invalida con el dataset.** La topología no se toca:
-el agente de secuencias que hará falta (§7) lee la transacción y consulta la
-BD, no lee lo que otro nodo escribe → cae en la ola 0 como los otros tres.
+el agente de secuencias que hará falta (§7) lee la transacción y consulta la BD,
+no lee lo que otro nodo escribe → cae en la ola 0 como los otros tres.
+
+### Lo que cambió debajo
+
+Existe una **base compartida en AWS RDS** (PostgreSQL 18.3, base `fraud`) donde
+ambos desarrollamos. Mi compañero construye el dashboard contra ella y hoy tiene
+las seis tablas **vacías**: un dashboard sin filas no se puede diseñar, ni
+siquiera equivocándose.
+
+Eso reordena la prioridad de esta etapa. No es la siguiente por orden lógico —lo
+sería igual—, es **la que lo desbloquea a él**. El resto del sistema puede
+esperar; su trabajo no.
+
+Local subió de 17 a 18 para alinear con RDS: mientras difirieran, "pasa en local"
+dejaba de ser evidencia de "pasa en la nube". La forma de `DATABASE_URL` cambió
+con ello (`?sslmode=require`, password percent-encoded) → `enmiendas_pendientes.md`
+§1.5–1.7.
 
 ---
 
@@ -409,6 +425,33 @@ Cada uno de los dos `feat(db)` sigue el patrón de siempre: schema Pydantic →
 ORM → `alembic revision --autogenerate` → **leer la migración** → `upgrade head`
 → verificar con `\d+`.
 
+### 9.5 El seed tiene dos destinos
+
+Hasta ahora sembrar era "poblar mi local". Con la base compartida, el mismo
+script escribe en un entorno donde otra persona está mirando. Eso le impone tres
+requisitos que no tendría si fuera solo mío.
+
+**Idempotente, no destructivo.** Un seed que solo inserta revienta al segundo
+intento por `transaction_id` duplicado. Uno que trunca borra los casos que el
+dashboard estaba renderizando. La pregunta de §10.3 deja de ser una preferencia
+de estilo y pasa a ser un requisito de convivencia.
+
+**Destino explícito, nunca implícito.** El script imprime a qué host apunta
+—enmascarando credenciales— antes de escribir una sola fila, y escribir en la
+compartida exige un flag deliberado. El accidente es barato de cometer: una
+variable exportada que sobrevivió en la terminal basta para que un `seed` de
+prueba aterrice en RDS. Y en la compartida deshacerlo no es `docker compose down -v`.
+
+**Separar cargar historial de crear casos.** Las 7 000 transacciones son
+historial que las políticas de secuencia necesitan (§10.2), pero el dashboard
+necesita **casos con decisión** para pintar la cola HITL, no transacciones
+sueltas. Son dos operaciones con destinatarios distintos y conviene que sean dos
+comandos, no uno.
+
+> Quién siembra la compartida y con qué aviso es frontera, no implementación:
+> queda en `enmiendas_pendientes.md` §2.6 junto con las migraciones y el
+> `downgrade`.
+
 ---
 
 ## 10. Preguntas abiertas para el chat nuevo
@@ -426,14 +469,28 @@ ORM → `alembic revision --autogenerate` → **leer la migración** → `upgrad
    transacción analizada`**, no solo "reciente". Es un requisito, no una
    optimización, y el harness tiene que respetarlo o sus métricas son optimistas.
 
-3. **Idempotencia del seed.** `transaction_id` es PK: correrlo dos veces revienta.
-   ¿*Truncate* y recarga, `ON CONFLICT DO NOTHING`, o *upsert*? Precedente
-   cercano: el reemplazo del agregado que se eligió para el nodo persistidor.
+3. **Idempotencia del seed.** `transaction_id` es PK: correrlo dos veces
+   revienta. Con la base compartida, *truncate* y recarga queda descartado —borra
+   trabajo ajeno— así que la elección real es entre `ON CONFLICT DO NOTHING` y
+   *upsert*. La distinción importa: el primero trata el dataset como inmutable
+   —lo que ya está, está—; el segundo permite corregirlo cuando el equipo de
+   banca entregue la versión con etiquetas (§8), que va a pasar. Precedente
+   cercano y opuesto: el nodo persistidor eligió **reemplazo del agregado**
+   (DELETE + INSERT), pero ahí el dueño del agregado es uno solo y el reintento
+   es substitutivo por diseño. Acá hay dos escritores.
 
 4. **¿Cuántos casos se analizan?** Las 7 000 son historial necesario para las
    secuencias, pero correr el grafo completo con llamadas a LLM sobre 7 000
    transacciones es caro y lento. Hay que separar *cargar historial* de *crear
    casos*, y decidir el muestreo para la demo y para el harness.
+
+   La base compartida le pone número al muestreo: mi compañero necesita casos
+   suficientes para que la cola tenga paginación real y variedad de `status` y
+   `decision` —incluidos `PENDING_HUMAN` y `FAILED`, que son los que ejercitan la
+   UI que más importa—. Eso se puede lograr sin correr el grafo completo:
+   sembrar casos con decisiones fabricadas es más barato y más controlable que
+   generarlos con LLM. La pregunta se parte en dos: **cuántos casos reales** para
+   el harness, y **cuántos casos de utilería** para desbloquear el dashboard.
 
 5. **Tabla de comercios en lista negra** (FP-07) y **`web_search_allowlist`**
    (§4 del contrato, la única tabla que aún no existe): ¿entran en esta etapa
