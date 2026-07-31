@@ -1,6 +1,6 @@
 services:
   db:
-    image: pgvector/pgvector:pg17
+    image: pgvector/pgvector:pg18
     container_name: fraud-db
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-fraud}
@@ -9,7 +9,7 @@ services:
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fraud} -d ${POSTGRES_DB:-fraud}"]
       interval: 5s
