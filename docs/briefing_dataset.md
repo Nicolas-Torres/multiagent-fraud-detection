@@ -54,7 +54,7 @@ Tres archivos del equipo de banca:
 | Archivo | Contenido |
 |---|---|
 | `transactions.csv` | 7 000 transacciones |
-| `customer_behavior.csv` | 1 000 perfiles de comportamiento |
+| `customer_behaviors.csv` | 1 000 perfiles de comportamiento |
 | `fraud_policies.json` | 11 políticas, `FP-01` … `FP-11`, versión `2025.1` |
 
 Generados por un script con `numpy.random.seed(42)`, reproducible.
@@ -68,7 +68,7 @@ data/
 └── policies/
     └── fraud_policies_2025.1.json
 scripts/
-└── generate_dataset.py               # el generador, como procedencia
+└── generate_data.py               # el generador, como procedencia
 ```
 
 - `data/` y no `docs/` ni `src/`: es insumo del dominio.

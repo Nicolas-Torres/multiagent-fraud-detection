@@ -118,6 +118,17 @@ Regenerar el diagrama de topología (requiere conexión a internet):
 uv run python scripts/export_graph_diagram.py
 ```
 
+Regenerar y verificar el dataset (no necesita base de datos):
+
+```bash
+uv run python scripts/generate_data.py       # perfiles y transacciones
+uv run python scripts/build_ground_truth.py  # etiquetas del harness
+uv run python scripts/validate_dataset.py    # código ≠ 0 si algo falla
+```
+
+El generador es determinista: `git diff --exit-code data/` después de
+regenerar es una guarda válida de CI.
+
 ---
 
 ## Estructura
@@ -126,6 +137,13 @@ uv run python scripts/export_graph_diagram.py
 ├── compose.yml                  # Postgres 18 + pgvector
 ├── migrations/versions/         # c558 pgvector · b2a8 · 97de · ac3b · 3077 · 6941 (head)
 ├── scripts/                     # smoke tests y utilidades
+├── data/
+│   ├── policies/
+│   │   └── fraud_policies_2025.1.json
+│   ├── customer_behaviors.csv
+│   ├── ground_truth.csv
+│   ├── transactions.csv
+│   └── README.md
 ├── docs/
 │   ├── contrato_de_interfaz.md  # documento vivo (v0.4)
 │   ├── CHANGELOG.md
