@@ -17,7 +17,7 @@ cerrar la etapa de **dataset y seed**.
 | 1 | Muere el supuesto `America/Lima` | §2.7 |
 | 2 | `CustomerBehavior` gana `currency` y `timezone` | §2.5 |
 | 3 | `CustomerBehavior` gana cinco campos de evaluación de políticas | §2.5 |
-| 4 | `Transaction` gana `issuer_bank` | §2.5 |
+| 4 | ~~`Transaction` gana `issuer_bank`~~ — **retirada** (§1.3) | — |
 | 5 | Índices de historial en `transactions` | §7 |
 | 6 | La forma de `DATABASE_URL` cambia: TLS y password codificado | §1.4 |
 | 7 | Postgres destino sube a **18** | §1.4 |
@@ -51,17 +51,31 @@ Fuera de alcance, documentado: cuentas multi-moneda y conversión FX.
 
 ### 1.3 — Campos nuevos del perfil
 
+> **Corrección de numeración.** El análisis previo leyó los comentarios del
+> generador en vez del catálogo, y a partir de la octava política se corrían un
+> número. El catálogo real es `FP-01`…`FP-11` **sin huecos**: no falta `FP-08`
+> ni existe `FP-12`. Los identificadores de abajo son los correctos.
+
 | Campo | Habilita |
 |---|---|
 | `usual_channel` | FP-06 canal nuevo con monto alto |
-| `account_creation_date` | FP-09 cuenta nueva |
-| `last_profile_update` | FP-10 cambio de datos + transacción inmediata |
-| `issuer_bank` | FP-11 alerta sobre emisor |
-| `daily_limit` | FP-12 fraccionamiento |
+| `account_creation_date` | FP-08 cuenta nueva + monto > 5× del segmento |
+| `last_profile_update` | FP-09 cambio de datos + transacción inmediata |
+| `daily_limit` | FP-11 fraccionamiento |
+| `currency` | corrección §1.2 |
+| `timezone` | corrección §1.1 |
+| `segment` | FP-08 — el promedio contra el que compara |
+
+**`issuer_bank` no se modela.** Era el insumo de FP-10 (alerta pública sobre el
+emisor/BIN) y de nada más. Con FP-10 fuera del alcance —§2.4—, sería una columna
+sin consumidor. Se queda en el CSV como dato de origen; modelarla es una
+migración de una línea el día que exista un proveedor de alertas real.
+
+Consecuencia: **`Transaction` no cambia**. Esa tabla solo recibe índices (§1.4).
 
 ### 1.4 — Índices de historial
 
-Cuatro políticas (FP-03, 04, 05, 12) evalúan **secuencias**, no transacciones
+Cuatro políticas (FP-03, 04, 05, 11) evalúan **secuencias**, no transacciones
 sueltas. Necesitan `transactions (customer_id, timestamp)` y
 `(device_id, timestamp)`.
 
@@ -123,15 +137,41 @@ Dos precisiones que salieron de crearla:
 no desaparece al existir el compartido: se itera en local, se integra en
 compartido.
 
+Ya implementada en `scripts/build_ground_truth.py`. Va al contrato como parte de
+la semántica de `DecisionType`.
+
+### 1.9 — Idempotencia del seed: upsert, con `--reset` explícito
+
+§2.6 anota que sembrar sobre la base compartida dejó de ser inocuo. El diseño del
+script sí es de esta rama.
+
+**Resolución**: `ON CONFLICT DO UPDATE` por defecto; `TRUNCATE ... CASCADE` detrás
+de un flag.
+
+`ON CONFLICT DO NOTHING` se descartó por ser la opción que *parece* más segura y
+es la peor: si el dataset se regenera y el seed vuelve a correr, no pasa nada, la
+base conserva las filas viejas y uno cree que recargó. Fallo silencioso justo en
+el dato que sostiene todas las métricas.
+
+El upsert es la versión por fila del principio que ya rige el nodo persistidor:
+*un reintento sustituye, no acumula*. Que los casos existentes no se corrompan
+cuando un perfil cambia ya está garantizado porque `customer_snapshot` es JSONB
+congelado, no FK.
+
+El modo destructivo existe pero arrastra `cases` por el FK, y por eso es explícito.
+
 ---
 
 ## 2. Abiertas — bloquean la redacción de v0.5
 
-### 2.1 — ¿`usual_channel` singular o lista?
+### 2.1 — ~~¿`usual_channel` singular o lista?~~ → **decidida: singular**
 
-El dataset trae uno, pero `usual_countries` y `usual_devices` son listas. Puede
-ser correcto —un cliente tiene un canal preferido y varios dispositivos— o un
-artefacto del generador.
+No era un artefacto del generador: lo fuerza la cardinalidad. `Channel` tiene dos
+valores. Una lista tendría un elemento —idéntico al singular— o los dos, y
+entonces FP-06 ("canal nuevo con monto alto") **nunca puede dispararse**: la
+política muere. Una lista de 2 sobre 2 posibles es una tautología.
+
+Se revisa el día que `Channel` crezca (ATM, POS, API). Ese es el disparador.
 
 ### 2.2 — Fuga temporal en el historial
 
@@ -141,7 +181,22 @@ filtrar `timestamp < timestamp de la transacción analizada`, no solo "reciente"
 o vería el futuro. Es un requisito de corrección; si el harness no lo respeta, sus
 métricas salen optimistas.
 
-¿Se documenta en el contrato o queda como regla de implementación del agente?
+**Resolución: invariante de persistencia (§7), no frontera de API.** Al dashboard
+no le importa, así que no toca §2. Toda consulta de historial lleva
+`WHERE timestamp <= :as_of`, donde `as_of` es el timestamp de la transacción bajo
+análisis, **nunca `now()`**. El `<=` incluye la transacción actual, que es lo
+correcto para contar velocidad.
+
+Se hace cumplir en un solo punto: una función de repositorio por la que pasan
+todas las consultas de ventana. Un invariante que depende de que cada autor lo
+recuerde no es un invariante.
+
+El ground truth ya lo respeta: en una ráfaga de cuatro, solo la cuarta lleva la
+etiqueta de FP-03. Cuando llegó la primera, el patrón no existía.
+
+> Por qué importa: en producción esto es imposible —el futuro no está en la tabla
+> cuando llega el caso—, así que un agente que no filtre **funciona bien en
+> producción y solo falla en evaluación**, inflando sus propias métricas.
 
 ### 2.3 — ¿`CaseSummary` gana `risk_score`?
 
@@ -152,19 +207,33 @@ sospechoso, no lo más incierto.
 No se decidió al redactar v0.4 —se dejó fuera para no ampliar el alcance sin
 discutirlo—. Es una columna en una proyección plana, barata en cualquier momento.
 
-### 2.4 — Ground truth incompleto
+### 2.4 — ~~Ground truth incompleto~~ → **resuelta: lo producimos nosotros**
 
-El dataset no trae etiquetas y hay que pedirlas (§8 del briefing). Además:
+Premisa caída: el equipo de banca se retiró del curso. El generador y el catálogo
+pasaron a ser nuestros, así que las etiquetas dejaron de ser una petición
+bloqueante y se volvieron una decisión de diseño.
 
-- **FP-11 no puede tener ground truth**: el generador asigna el banco del propio
-  cliente, así que no hay forma de identificar sus positivos.
-- **FP-09 dice "promedio del segmento"** y solo existe el promedio del cliente.
-  Viable redefiniéndolo, con la desviación documentada.
-- **Las únicas etiquetas humanas** que produce el sistema vienen de casos
-  escalados —por construcción, los ambiguos—: ground truth sesgado por muestreo.
+`data/ground_truth.csv` tiene una fila por cada una de las 7 000 transacciones,
+con `expected_policies`, `expected_decision`, `fraud_group_id` e `is_closing`.
+Archivo aparte, no columnas de `transactions.csv`: **el sistema bajo evaluación
+nunca ve las etiquetas**.
 
-Las tres van a Limitaciones (entregable 7), no al contrato. Se anotan acá para no
-perderlas.
+De los tres puntos originales:
+
+- **FP-08** (antes mal numerada como FP-09) queda **resuelta**. Decía "promedio de
+  su segmento" y solo existía el del cliente. Se agregó `segment` al perfil, con
+  multiplicadores que separan las distribuciones; el promedio del segmento es una
+  consulta acotada por moneda.
+- **FP-10** (antes mal numerada como FP-11) queda **fuera del alcance**, con una
+  razón mejor que la original. No es que falten etiquetas: su evidencia es
+  búsqueda web real, no reproducible entre corridas. *Una política cuya evidencia
+  no es reproducible no es evaluable en un harness.* Eso va a Limitaciones del
+  entregable 7 y a Recomendaciones del 10.
+- **El sesgo de las etiquetas humanas** sigue igual: `human_resolutions` solo
+  recibe casos escalados —los ambiguos por construcción—. Ese ground truth no es
+  intercambiable con `ground_truth.csv` y no debe mezclarse al medir.
+
+**Alcance final: 10 de 11 políticas** (FP-01…FP-09 y FP-11).
 
 ### 2.5 — Fórmula de `base_confidence` y `risk_score`
 

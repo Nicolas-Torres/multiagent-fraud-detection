@@ -1,17 +1,19 @@
 # Briefing — Etapa "Dataset, campos nuevos, índices y seed"
-**Sistema Multi-Agente de Detección de Fraude · handoff para chat dedicado**
-
-> Documento de **apertura** de etapa, no de cierre. Condensa el análisis del
-> dataset sintético entregado por el equipo de banca, las decisiones ya tomadas
-> con su argumento, y lo que queda abierto.
+> ⚠️ **Documento consumido.** Su función era inicializar la etapa de dataset y
+> seed; eso ya ocurrió. Dos partes quedaron equivocadas o superadas:
 >
-> **Ya no es fuera de alcance**: `feature/decision-persistence` (columnas de
-> scoring en `decisions`, tabla `agent_errors`, nodo persistidor) se mergeó a
-> `main`. Lo que era coordinación entre ramas paralelas es ahora punto de partida.
-
-**Contexto previo necesario**: `contrato_de_interfaz.md` (§2.5 schemas, §2.7
-supuestos, §7 persistencia), `reviews/02-domain-models.md`,
-`enmiendas_pendientes.md` (§1.5–1.7 y §2.6–2.8 describen la base compartida).
+> - **§7, §8 y §10** describen un alcance, una lista de peticiones al equipo de
+>   banca y unas preguntas abiertas que ya se resolvieron. El estado actual está
+>   en [`enmiendas_pendientes.md`](enmiendas_pendientes.md).
+> - **La numeración de políticas está corrida** a partir de la octava: el
+>   análisis leyó los comentarios del generador en vez del catálogo. El catálogo
+>   real es `FP-01`…`FP-11` **sin huecos**. No falta `FP-08` ni existe `FP-12`.
+>   Donde el documento diga FP-09, FP-10, FP-11 y FP-12, léase FP-08, FP-09,
+>   FP-10 y FP-11.
+>
+> El resto —los hechos medidos sobre el dataset original (§3–§5) y el argumento
+> de las decisiones (§6)— sigue siendo válido y es la materia prima del acta de
+> etapa. Se borra al cerrarla.
 
 ---
 
@@ -310,55 +312,19 @@ argumento fuerte, y sale de una columna.
 
 ---
 
-## 7. Alcance: 9 de 11 políticas
+## 7–8. Alcance y peticiones — **superadas**
 
-El agente de secuencias **desbloquea cuatro políticas de una vez** (FP-03, 04,
-05, 12): mismo agente, mismos índices, mismas consultas de ventana. No son
-cuatro costos, es uno.
+El equipo de banca se retiró del curso. El generador y el catálogo pasaron a ser
+nuestros, así que los ocho puntos del §8 dejaron de ser peticiones bloqueantes y
+se volvieron ediciones a `scripts/generate_data.py`. Los ocho están aplicados.
 
-| Política | Viable | Necesita |
-|---|---|---|
-| FP-01, FP-02 | ✅ | nada |
-| FP-06 canal nuevo + monto alto | ✅ | `usual_channel` (ya está) |
-| FP-10 cambio de datos + tx inmediata | ✅ | `last_profile_update` (ya está) |
-| FP-03, 04, 05, 12 | ✅ | **agente de secuencias** + índices de historial |
-| FP-07 comercio en lista negra | ✅ | tabla de comercios en lista negra (seed chico) |
-| FP-09 cuenta nueva + monto grande | ⚠️ | dice *"promedio de su segmento"*; solo existe el del cliente. Viable redefiniéndolo y documentando la desviación |
-| FP-11 alerta externa sobre emisor/BIN | ❌ | fuente de alertas **y** sin ground truth: el generador asigna el banco del propio cliente, así que no hay forma de identificar los positivos |
+El alcance final es **10 de 11 políticas** —FP-01…FP-09 y FP-11—, no 9. Con la
+numeración corregida, la política que decía "promedio del segmento" es FP-08 y se
+resolvió agregando `segment` al perfil. La excluida es **FP-10** (alerta pública
+sobre el emisor/BIN), y por una razón distinta de la que se creía: no faltan
+etiquetas, su evidencia es búsqueda web real y no es reproducible entre corridas.
 
-**Recomendación**: implementar 9 (todas menos FP-09 y FP-11) y documentar esas
-dos como limitación explícita. FP-11 es buen material para Recomendaciones
-(entregable 10): la capacidad existe —el agente de búsqueda web gobernada—, lo
-que falta es un proveedor de alertas real.
-
----
-
-## 8. Lo que se le pide al equipo de banca
-
-Ordenado por lo que bloquea:
-
-1. **`expected_policies`** (lista, porque se solapan) y **`expected_decision`**,
-   solo en la transacción que cierra cada patrón. **Sin esto no hay entregable 7**:
-   la rúbrica pide precision, recall y F1 por nombre, y hoy el generador conoce
-   la intención de cada rama y la descarta al escribir.
-2. **`fraud_group_id`** para las secuencias.
-3. **Moneda por cuenta**, no por país; y `currency` en el perfil.
-4. **`timezone`** IANA en el perfil, si está disponible.
-5. **Los cuatro casos límite sin cobertura** (§5): ~5% de clientes nocturnos
-   (`22-06`), ~3% con `usual_devices` vacío, ~2% de transacciones **de clientes
-   sin perfil**, y algunos perfiles multi-país.
-6. **FP-10 fechada dentro de diciembre**, con `last_profile_update =
-   transacción − Δ` aleatorio (hoy: 70 transacciones a las 00:10:00 exactas, 67
-   fuera de la ventana).
-7. **Timestamps con offset** (`+00:00`).
-8. Menor: `f"CU-{i:03d}"` produce `CU-001`…`CU-1000`, ancho mixto; `:04d` uniforma.
-
-Los puntos 1, 2 y 5 convierten el dataset en instrumento de evaluación. El resto
-son correcciones.
-
-> **También falta `FP-08`** en la numeración de las políticas. Un hueco en una
-> secuencia es una política retenida o perdida — conviene confirmar antes de que
-> se note en la demo.
+Detalle y argumento: `enmiendas_pendientes.md` §1.3 y §2.4, y `data/README.md`.
 
 ---
 
@@ -455,6 +421,10 @@ comandos, no uno.
 ---
 
 ## 10. Preguntas abiertas para el chat nuevo
+
+> **Estado**: 10.1 (`usual_channel` singular), 10.3 (idempotencia del seed) y
+> 10.5 (qué tablas de seed entran en esta etapa) están decididas en
+> `enmiendas_pendientes.md` §1.8, §1.9 y §2.1. El resto sigue abierto.
 
 1. **`usual_channel` singular o `usual_channels: list[Channel]`?** El dataset
    trae uno, pero `usual_countries` y `usual_devices` son listas. La

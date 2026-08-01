@@ -23,7 +23,8 @@ que no alcanzan confianza suficiente pasan a una cola de revisión humana.
 | Modelo de dominio: 6 tablas, schemas de frontera | ✅ |
 | Esqueleto del grafo: estado, topología, degradación | ✅ |
 | Persistencia de la decisión | ✅ |
-| Dataset sintético y seed | ⬜ |
+| Dataset sintético y ground truth | ✅ |
+| Seed de la base desde el dataset | ⬜ |
 | Agentes de lógica pura (Context, Behavioral, Aggregation) | ⬜ |
 | Tabla `web_search_allowlist` | ⬜ |
 | RAG de políticas internas + Policy RAG Agent | ⬜ |

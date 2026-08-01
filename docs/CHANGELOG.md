@@ -19,6 +19,11 @@ git show contrato-v0.4:docs/contrato_de_interfaz.md
 Enmiendas hacia la próxima versión en [`enmiendas_pendientes.md`](enmiendas_pendientes.md),
 acumuladas en la etapa de dataset y seed.
 
+Corrección de fondo pendiente de redactar: **la numeración de políticas usada
+hasta ahora estaba corrida** a partir de la octava. El catálogo real es
+`FP-01`…`FP-11` sin huecos. Afecta a `briefing_dataset.md` y a
+`enmiendas_pendientes.md` §1.3, ambos ya anotados.
+
 ---
 
 ## [0.4] — Grafo, scoring y trazabilidad de ejecución
