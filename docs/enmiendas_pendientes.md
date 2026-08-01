@@ -16,12 +16,14 @@ cerrar la etapa de **dataset y seed**.
 |---|---|---|
 | 1 | Muere el supuesto `America/Lima` | §2.7 |
 | 2 | `CustomerBehavior` gana `currency` y `timezone` | §2.5 |
-| 3 | `CustomerBehavior` gana cinco campos de evaluación de políticas | §2.5 |
+| 3 | `CustomerBehavior` gana siete campos de evaluación de políticas | §2.5 |
 | 4 | ~~`Transaction` gana `issuer_bank`~~ — **retirada** (§1.3) | — |
 | 5 | Índices de historial en `transactions` | §7 |
 | 6 | La forma de `DATABASE_URL` cambia: TLS y password codificado | §1.4 |
 | 7 | Postgres destino sube a **18** | §1.4 |
 | 8 | Tres entornos de base de datos, no uno | §1.4 |
+| 9 | Precedencia entre políticas que aplican a la vez | §2.2 |
+| 10 | Idempotencia del seed: upsert | — (implementación) |
 
 ### 1.1 — Muere el supuesto de zona horaria única
 
@@ -136,6 +138,16 @@ Dos precisiones que salieron de crearla:
 **Resolución**: §1.4 deja de hablar de "la base" y enumera los entornos. El local
 no desaparece al existir el compartido: se itera en local, se integra en
 compartido.
+
+### 1.8 — Precedencia de acciones cuando dos políticas aplican
+
+14 transacciones del dataset satisfacen dos políticas a la vez (`FP-02;FP-05` es
+la más común). Cuando las acciones prescritas difieren hay que elegir una, y el
+Arbiter y el ground truth tienen que usar **la misma regla**, o la comparación es
+injusta.
+
+**Resolución**: gana la más restrictiva —
+`BLOCK` > `ESCALATE_TO_HUMAN` > `CHALLENGE` > `APPROVE`.
 
 Ya implementada en `scripts/build_ground_truth.py`. Va al contrato como parte de
 la semántica de `DecisionType`.
