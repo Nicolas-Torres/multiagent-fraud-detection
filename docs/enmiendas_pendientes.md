@@ -299,7 +299,10 @@ reconoce explícitamente que la base compartida es un entorno desechable.
 
 ## 3. Hallazgos que **no** tocan el contrato
 
-Van al repaso de etapa. Se anotan acá para no perderlos.
+Van al repaso de etapa. Se anotan acá para no perderlos. Agrupados por la etapa
+que los produjo: al cerrar, cada bloque va a su acta.
+
+### 3.a — Grafo y persistencia → acta 03
 
 - **Cero aristas condicionales** en el grafo: `DECIDED` vs `PENDING_HUMAN` es un
   valor de `status` que escribe un mismo nodo, no una bifurcación.
@@ -315,6 +318,13 @@ Van al repaso de etapa. Se anotan acá para no perderlos.
   ataría cualquier import del módulo a que haya base configurada.
 - **Un test no es dueño de la base**: contar filas globalmente lo vuelve
   dependiente del orden de ejecución. Filtrar siempre por la clave del caso.
+
+### 3.b — Base compartida e infraestructura → acta por decidir
+
+Este bloque no es del grafo ni del dataset: salió de un tercer hilo que corrió en
+paralelo (PRs #6 y #7). Al redactar hay que decidir si va al acta 03, al 04, o a
+una nota propia de infraestructura.
+
 - **Postgres 18 movió el directorio de datos** dentro de la imagen: de
   `/var/lib/postgresql/data` a `/var/lib/postgresql`. Con el mount viejo el
   contenedor arranca y muere. Y cruzar una versión mayor exige
@@ -331,3 +341,7 @@ Van al repaso de etapa. Se anotan acá para no perderlos.
   creara el rol `postgres` en vez de `fraud`. El síntoma fue `password
   authentication failed`, porque Postgres oculta si el rol existe cuando la
   autenticación es por password. Recrear siempre desde terminal limpia.
+
+### 3.c — Dataset y seed → acta 04
+
+*(vacío por ahora)*

@@ -166,6 +166,8 @@ regenerar es una guarda válida de CI.
 - **[Contrato de interfaz](docs/contrato_de_interfaz.md)** — las dos fronteras
   del sistema: la operativa (empaquetado, configuración, health) y la de API
   (endpoints y schemas). Incluye el modelo de persistencia.
+- **[`data/README.md`](data/README.md)** — el dataset sintético: esquema de los tres
+  archivos, semántica de las etiquetas, confusores y limitaciones.
 - **[CHANGELOG](docs/CHANGELOG.md)** — qué cambió entre versiones del contrato y
   por qué.
 - **[ADR](docs/adr/)** — decisiones de arquitectura, cada una con la alternativa
