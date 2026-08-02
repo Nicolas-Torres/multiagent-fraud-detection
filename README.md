@@ -175,6 +175,8 @@ regenerar es una guarda válida de CI.
 - **[Reviews](docs/reviews/)** — cierres de etapa, en orden cronológico.
 - **[Enmiendas pendientes](docs/enmiendas_pendientes.md)** — lo que va hacia la
   próxima versión del contrato. Vacío tras publicar v0.5.
+- **[Runbook de base nueva](docs/runbook_base_nueva.md)** — poner en marcha una
+  base vacía: crear, verificar, migrar, sembrar y comprobar.
 
 La documentación sigue **C4** (Context → Container → Component → Code) como
 columna estructural, más vistas dinámicas, y se escribe incrementalmente al
