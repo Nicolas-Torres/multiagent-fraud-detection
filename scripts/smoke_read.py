@@ -133,6 +133,10 @@ async def main() -> None:
         await sembrar(session)
     async with Session() as session:     # sesión NUEVA: lectura real desde Postgres
         await leer(session)
+    async with Session() as session:
+        await limpiar(session)
+        await session.commit()
+
     await engine.dispose()
 
 
