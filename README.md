@@ -24,7 +24,7 @@ que no alcanzan confianza suficiente pasan a una cola de revisión humana.
 | Esqueleto del grafo: estado, topología, degradación | ✅ |
 | Persistencia de la decisión | ✅ |
 | Dataset sintético y ground truth | ✅ |
-| Seed de la base desde el dataset | ⬜ |
+| Seed de la base desde el dataset | ✅ |
 | Agentes de lógica pura (Context, Behavioral, Aggregation) | ⬜ |
 | Tabla `web_search_allowlist` | ⬜ |
 | RAG de políticas internas + Policy RAG Agent | ⬜ |
@@ -174,7 +174,7 @@ regenerar es una guarda válida de CI.
   que se descartó.
 - **[Reviews](docs/reviews/)** — cierres de etapa, en orden cronológico.
 - **[Enmiendas pendientes](docs/enmiendas_pendientes.md)** — lo que va hacia la
-  próxima versión del contrato.
+  próxima versión del contrato. Vacío tras publicar v0.5.
 
 La documentación sigue **C4** (Context → Container → Component → Code) como
 columna estructural, más vistas dinámicas, y se escribe incrementalmente al
