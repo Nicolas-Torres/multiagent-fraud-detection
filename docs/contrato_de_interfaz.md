@@ -1,5 +1,5 @@
 # Contrato de Interfaz — Sistema Multi-Agente de Detección de Fraude
-**Versión 0.4 — grafo, scoring y trazabilidad de ejecución**
+**Versión 0.5 — dataset, seed e invariante temporal**
 
 > Define las **fronteras** entre el motor de agentes (yo), la infraestructura (mi
 > compañero) y el dashboard del analista. 🔶 = decisión conjunta pendiente.
@@ -57,7 +57,7 @@ Ambos sin autenticación, `200` cuando OK.
 | Variable | Ejemplo |
 |---|---|
 | `APP_PORT` | `8000` |
-| `DATABASE_URL` | `postgresql+psycopg://user:pass@host:5432/fraud` |
+| `DATABASE_URL` | `postgresql+psycopg://user:pass@host:5432/fraud?sslmode=require` |
 | `ANTHROPIC_API_KEY` | `sk-ant-...` |
 | `GEMINI_API_KEY` | `...` |
 | `LANGSMITH_API_KEY` | `ls-...` |
@@ -67,6 +67,48 @@ Ambos sin autenticación, `200` cuando OK.
 
 > `LOG_LEVEL` gobierna también el echo de SQL de SQLAlchemy: solo en `DEBUG`.
 > El allowlist de búsqueda web **no** es env var → tabla gobernada (§4).
+
+#### Tres entornos, no uno
+
+| Entorno | Dónde | Para qué | Quién la toca |
+|---|---|---|---|
+| **Local** | contenedor de `compose.yml` | iterar migraciones, smoke tests | cada uno la suya |
+| **Compartido** | RDS, base `fraud` | integración: el motor y el dashboard | los dos |
+| **Producción** | no existe todavía | el despliegue final | el CD |
+
+El local no desaparece al existir el compartido: se **itera** en local, se
+**integra** en compartido.
+
+Dos precisiones que salieron de crear la compartida:
+
+- La base es **`fraud`**, no la que RDS provisiona por defecto (`postgres`). Esa
+  queda como base de mantenimiento; mezclarla con datos de aplicación estorba en
+  restores y permisos.
+- Las extensiones son **por base de datos**, no por cluster: `CREATE EXTENSION
+  vector` corre dentro de `fraud`.
+
+#### Forma de `DATABASE_URL`
+
+**`?sslmode=require` es obligatorio.** RDS trae `rds.force_ssl` activo: una
+conexión sin TLS se rechaza en el handshake, antes de autenticar.
+
+**El password viaja percent-encoded.** No es cosmético: dentro de una URL el
+password no es un campo sino un tramo delimitado por `:` y `@`, así que cualquier
+carácter estructural lo parte. Un `$` pegado al `@` se lo come Bash como expansión
+de parámetros al hacer `source` —sin error ni advertencia—: password mutilado y un
+`authentication failed` que parece problema de AWS. SQLAlchemy hace `unquote` al
+parsear, así que el driver recibe el literal: es el mecanismo previsto, no un
+parche.
+
+El `%` del encoding no rompe Alembic porque `env.py` inyecta la URL desde
+`settings` con `create_engine` directo, sin pasar por el `ConfigParser` de
+`alembic.ini`. Aquella decisión paga aquí.
+
+#### Versión de Postgres
+
+**18** es la versión destino, en los tres entornos. Mientras difieran, "pasa en
+local" deja de ser evidencia de "pasa en la nube". La versión menor puede diferir
+(18.1 local vs 18.3 en RDS): mismo formato en disco, mismo SQL. pgvector 0.8.1.
 
 ### 1.5 Empaquetado
 
@@ -124,6 +166,18 @@ stateDiagram-v2
 > **nombre** del miembro (`MEDIUM`), no su valor. La frontera JSON siempre expone
 > el **valor** (`"medium"`). Verificado en smoke test.
 
+#### Precedencia de `DecisionType`
+
+Una transacción puede satisfacer **dos políticas a la vez** con acciones
+distintas —14 lo hacen en el dataset, `FP-02;FP-05` es la combinación más
+común—. Cuando eso pasa, gana la más restrictiva:
+
+BLOCK > ESCALATE_TO_HUMAN > CHALLENGE > APPROVE
+
+Es una regla del **contrato**, no del Arbiter: el harness del entregable 7 la usa
+para construir la decisión esperada, y si el Arbiter usara otra, la comparación
+mediría la discrepancia de reglas en vez de la calidad del sistema.
+
 ### 2.3 Endpoints
 
 | Método | Ruta | Propósito | Body | Respuesta | Código |
@@ -177,10 +231,37 @@ el análisis (§7.4).
 | `usual_hour_end` | `int` | `0–23`; `"08-20"` → `20` |
 | `usual_countries` | `list[str]` | cada elemento ISO α2, mayúsculas; **lista vacía permitida** |
 | `usual_devices` | `list[str]` | **lista vacía permitida** |
+| **`usual_channel`** | `Channel` | 🆕 singular, no lista |
+| **`account_creation_date`** | `date` | 🆕 |
+| **`last_profile_update`** | `datetime` | 🆕 aware, UTC |
+| **`daily_limit`** | `Decimal` | 🆕 `> 0`, misma moneda |
+| **`currency`** | `str` | 🆕 ISO 4217, mayúsculas |
+| **`timezone`** | `str` | 🆕 IANA; se **rechaza** lo que `ZoneInfo` no resuelva |
+| **`segment`** | `Segment` | 🆕 `retail`, `premium`, `business` |
 
-> **Semántica del rango horario**: `[start, end]` **inclusive** — `"08-20"` incluye
-> las 20:45. Un cliente nocturno (`22-06`) es válido: `start > end` **no** está
-> prohibido, y la lógica de comparación debe contemplar el cruce de medianoche.
+> **La moneda es atributo de la cuenta**, no del país donde ocurre la compra: una
+> tarjeta liquida en la moneda de su cuenta. Es lo que hace comparable `amount`
+> con `usual_amount_avg`; sin ella, "3× el promedio" mezcla unidades y fabrica
+> falsos positivos. La dimensión internacional sobrevive intacta porque `country`
+> sigue variando. *Fuera de alcance, documentado: cuentas multi-moneda y FX.*
+>
+> **`usual_channel` es singular a propósito.** `Channel` tiene dos valores, así
+> que una lista tendría un elemento —idéntico al singular— o los dos, y entonces
+> FP-06 ("canal nuevo con monto alto") nunca podría dispararse. Se revisa el día
+> que `Channel` crezca (ATM, POS, API).
+>
+> **`segment` es enum y no texto libre** porque la aplicación **agrupa por él**:
+> FP-08 compara contra el promedio del segmento. Un `varchar` admitiría `Retail`
+> y `retail` como grupos distintos y partiría el promedio sin que nada falle.
+
+> **Semántica del rango horario**: `[start, end]` **inclusive**, en **hora local
+> del cliente** — la que define `timezone`, nunca UTC ni un supuesto global.
+> `"08-20"` incluye las 20:45. Un cliente nocturno (`22-06`) es válido:
+> `start > end` **no** está prohibido, y la lógica de comparación debe contemplar
+> el cruce de medianoche.
+>
+> Evaluar la ventana en UTC clasificaría mal un tercio de las transacciones del
+> dataset. No es un detalle de precisión: es evaluar otra franja horaria.
 >
 > **Listas vacías**: "ningún dispositivo habitual" significa *todo dispositivo es
 > nuevo* → eso es señal, no dato inválido.
@@ -368,8 +449,15 @@ Los tres campos anteriores **más `resolved_at`** (`datetime`, lo acuña el serv
 - **`case_id` ≠ `transaction_id`**: UUID del servidor; desacopla identidad interna y habilita reintentos.
 - **`amount` es `Decimal`**: los `float` pierden centavos por redondeo binario.
 - **`timestamp` UTC + zona**: se guarda UTC. `usual_hours` es hora **local del
-  cliente**; la zona sale del perfil, no de un supuesto global. 🔶 *Pendiente de
-  cerrar en la etapa de dataset.*
+  cliente**; la zona sale de `CustomerBehavior.timezone`, no de un supuesto
+  global. ✅ *Cerrado en la etapa de dataset: el supuesto `America/Lima` de v0.2
+  está muerto.*
+
+  El dataset tiene siete países y afecta al 86% de los clientes. Derivar la zona
+  del país en tiempo de lectura tampoco sirve: US abarca varias zonas y MX
+  también. Se descartó guardar la ventana ya convertida a UTC —el horario de
+  verano hace que la conversión no sea constante y hornearía un supuesto de
+  estación—.
 
 ---
 
@@ -448,7 +536,7 @@ o dato de gobernanza (mutable, con audit trail)?* Lo primero → env var. Lo seg
 
 | Tabla | PK | Notas |
 |---|---|---|
-| `transactions` | `transaction_id` (natural) | índice en `customer_id` |
+| `transactions` | `transaction_id` (natural) | índices compuestos `(customer_id, timestamp)` y `(device_id, timestamp)` |
 | `customer_behaviors` | `customer_id` (natural) | `varchar(2)[]` y `varchar[]` para las listas |
 | `cases` | `case_id` (UUID, surrogate) | FK + **UNIQUE** en `transaction_id`; índice compuesto `(status, created_at)` |
 | `decisions` | `case_id` (**PK = FK** a `cases`) | 1:1 implícito, sin constraint extra |
@@ -456,9 +544,22 @@ o dato de gobernanza (mutable, con audit trail)?* Lo primero → env var. Lo seg
 | **`agent_errors`** | `id` (BIGSERIAL) | 🆕 FK a `decisions.case_id`; índice en `agent` |
 | `human_resolutions` | `case_id` (**PK = FK** a `cases`) | 1:1 implícito |
 
+| **`merchant_blacklist`** | `merchant_id` (natural) | 🆕 gobernanza; baja lógica con `active` |
+
 Los hijos llevan `ON DELETE CASCADE` a nivel BD.
 
 **Falta**: `web_search_allowlist` (§4).
+
+> `merchant_blacklist` es la primera tabla de **gobernanza** —dato mutable,
+> administrado por un humano, con audit trail—, la categoría que §4 definió para
+> el allowlist. Comparte su forma a propósito, incluido el nombre en singular:
+> describe la lista, no sus filas.
+>
+> PK natural con bandera `active`, no surrogate con historial de altas y bajas.
+> La consulta real es un lookup puntual, y la historia no se pierde: el caso
+> **congela su propia evidencia** en `signals`. Si el comercio se retira en marzo,
+> el caso de enero sigue diciendo qué decidió y por qué —mismo principio que
+> `cases.customer_snapshot`—.
 
 ### 7.2 `agent_errors`: tabla, no JSONB
 
@@ -568,7 +669,40 @@ que el sistema mide.** Detalle en [ADR-0002](adr/0002-jsonb-vs-relacional-vs-arr
 - **`now()` de Postgres es `transaction_timestamp()`**: todo lo insertado en un
   mismo commit comparte instante.
 
-### 7.7 Cadena de migraciones
+### 7.7 El invariante *as-of*
+
+**Toda consulta de historial lleva `timestamp <= :as_of`**, donde `as_of` es el
+timestamp de la transacción bajo análisis — **nunca `now()`**.
+
+Una transacción se juzga con lo que existía en el instante en que ocurrió. El
+`<=` es inclusivo a propósito: la transacción cuenta para su propia ventana, que
+es lo que FP-03 necesita ("más de 3 en menos de 5 minutos, contando ésta").
+
+Por qué es fácil de pasar por alto: **en producción es imposible de violar**. El
+futuro no está en la tabla cuando llega el caso. En evaluación sí, porque el
+dataset se carga completo de una vez. Un agente que no filtre **funciona bien en
+producción y solo falla en evaluación** — y falla hacia arriba, viendo ráfagas
+completas desde su primera transacción e inflando su propio recall. El harness
+certificaría un sistema que no funciona.
+
+**Se hace cumplir en un solo punto**: `db/repositories/transaction_history.py`.
+Un invariante que depende de que cada autor lo recuerde no es un invariante.
+
+Dos funciones, dos ejes de acceso:
+
+| Eje | Políticas | Por qué |
+|---|---|---|
+| cliente | FP-04, FP-05, FP-11 | reconstruyen la actividad de la cuenta |
+| dispositivo | FP-03 | un dispositivo usado con varias cuentas **es** la señal |
+
+FP-03 no filtra por cliente: hacerlo escondería el caso que la política busca. De
+ahí que sean dos índices y no uno.
+
+El ground truth del dataset respeta el mismo invariante: en una ráfaga de cuatro,
+solo la que **cierra** el patrón lleva la etiqueta. Cuando llegó la primera, el
+patrón todavía no existía y aprobarla era la respuesta correcta.
+
+### 7.8 Cadena de migraciones
 
 ```
 c558fd490ae6  (pgvector)
@@ -576,11 +710,14 @@ c558fd490ae6  (pgvector)
    → 97de35e4842b  (customer_behaviors)
      → ac3bc6c8573d  (cases, decisions, signals, human_resolutions)
        → 307787653e5e  (scoring en decisions)
-         → 694142a4c8b6  (agent_errors)  ← head
+         → 694142a4c8b6  (agent_errors)
+           → 073738cbc0ec  (campos de evaluación en customer_behaviors)
+             → 699755dfc00e  (índices de historial)
+               → 1276e208c3d9  (merchant_blacklist)  ← head
 ```
 
 ---
 
-**Estado**: v0.4 — scoring y trazabilidad de ejecución cerrados y verificados
+**Estado**: v0.5 — dataset, seed e invariante temporal cerrados y verificados
 contra Postgres.
 **Valida el compañero**: §1. **Valido yo**: §2–§4, §7.

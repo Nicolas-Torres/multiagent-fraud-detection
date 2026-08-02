@@ -23,7 +23,8 @@ que no alcanzan confianza suficiente pasan a una cola de revisión humana.
 | Modelo de dominio: 6 tablas, schemas de frontera | ✅ |
 | Esqueleto del grafo: estado, topología, degradación | ✅ |
 | Persistencia de la decisión | ✅ |
-| Dataset sintético y seed | ⬜ |
+| Dataset sintético y ground truth | ✅ |
+| Seed de la base desde el dataset | ✅ |
 | Agentes de lógica pura (Context, Behavioral, Aggregation) | ⬜ |
 | Tabla `web_search_allowlist` | ⬜ |
 | RAG de políticas internas + Policy RAG Agent | ⬜ |
@@ -117,6 +118,17 @@ Regenerar el diagrama de topología (requiere conexión a internet):
 uv run python scripts/export_graph_diagram.py
 ```
 
+Regenerar y verificar el dataset (no necesita base de datos):
+
+```bash
+uv run python scripts/generate_data.py       # perfiles y transacciones
+uv run python scripts/build_ground_truth.py  # etiquetas del harness
+uv run python scripts/validate_dataset.py    # código ≠ 0 si algo falla
+```
+
+El generador es determinista: `git diff --exit-code data/` después de
+regenerar es una guarda válida de CI.
+
 ---
 
 ## Estructura
@@ -125,6 +137,13 @@ uv run python scripts/export_graph_diagram.py
 ├── compose.yml                  # Postgres 18 + pgvector
 ├── migrations/versions/         # c558 pgvector · b2a8 · 97de · ac3b · 3077 · 6941 (head)
 ├── scripts/                     # smoke tests y utilidades
+├── data/
+│   ├── policies/
+│   │   └── fraud_policies_2025.1.json
+│   ├── customer_behaviors.csv
+│   ├── ground_truth.csv
+│   ├── transactions.csv
+│   └── README.md
 ├── docs/
 │   ├── contrato_de_interfaz.md  # documento vivo (v0.4)
 │   ├── CHANGELOG.md
@@ -147,13 +166,15 @@ uv run python scripts/export_graph_diagram.py
 - **[Contrato de interfaz](docs/contrato_de_interfaz.md)** — las dos fronteras
   del sistema: la operativa (empaquetado, configuración, health) y la de API
   (endpoints y schemas). Incluye el modelo de persistencia.
+- **[`data/README.md`](data/README.md)** — el dataset sintético: esquema de los tres
+  archivos, semántica de las etiquetas, confusores y limitaciones.
 - **[CHANGELOG](docs/CHANGELOG.md)** — qué cambió entre versiones del contrato y
   por qué.
 - **[ADR](docs/adr/)** — decisiones de arquitectura, cada una con la alternativa
   que se descartó.
 - **[Reviews](docs/reviews/)** — cierres de etapa, en orden cronológico.
 - **[Enmiendas pendientes](docs/enmiendas_pendientes.md)** — lo que va hacia la
-  próxima versión del contrato.
+  próxima versión del contrato. Vacío tras publicar v0.5.
 
 La documentación sigue **C4** (Context → Container → Component → Code) como
 columna estructural, más vistas dinámicas, y se escribe incrementalmente al

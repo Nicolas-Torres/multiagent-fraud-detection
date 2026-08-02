@@ -30,3 +30,16 @@ class Severity(StrEnum):
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
+
+
+class Segment(StrEnum):
+    """Segmento comercial del cliente.
+
+    Es enum y no `varchar` libre porque la aplicación **agrupa por él**: FP-08
+    compara el monto contra el promedio del segmento. Un texto libre admitiría
+    `Retail` y `retail` como grupos distintos y partiría el promedio en dos sin
+    que nada falle.
+    """
+    RETAIL = "retail"
+    PREMIUM = "premium"
+    BUSINESS = "business"

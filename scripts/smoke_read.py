@@ -6,7 +6,7 @@ Caso B: mínimo (ANALYZING, sin decisión ni snapshot) -> ejercita las ramas nul
 
 import asyncio
 import sys
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from uuid import UUID
 
@@ -21,7 +21,7 @@ from multiagent_fraud_detection.db.models import (
 )
 from multiagent_fraud_detection.db.session import engine  # <- ajusta si se llama distinto
 from multiagent_fraud_detection.enums import (
-    CaseStatus, Channel, DecisionType, HumanAction, Severity,
+    CaseStatus, Channel, DecisionType, HumanAction, Segment, Severity,
 )
 from multiagent_fraud_detection.schemas.case import CaseDetail, CaseSummary
 from multiagent_fraud_detection.schemas.customer_behavior import CustomerBehaviorIn
@@ -63,7 +63,14 @@ async def sembrar(session) -> None:
         usual_hour_end=22,
         usual_countries=["pe"],          # minúscula a propósito: debe salir "PE"
         usual_devices=["D-02"],
-    ).model_dump(mode="json")            # <- la regla del JSONB
+        usual_channel=Channel.MOBILE,
+        account_creation_date=date(2024, 3, 15),
+        last_profile_update=datetime(2025, 12, 10, 14, 3, tzinfo=UTC),
+        daily_limit=Decimal("6000.00"),
+        currency="pen",                  # minúscula a propósito: debe salir "PEN"
+        timezone="America/Lima",
+        segment=Segment.RETAIL,
+    ).model_dump(mode="json")            # <- la regla del JSONB           # <- la regla del JSONB
 
     caso_a = Case(
         case_id=CASE_A,
@@ -126,6 +133,10 @@ async def main() -> None:
         await sembrar(session)
     async with Session() as session:     # sesión NUEVA: lectura real desde Postgres
         await leer(session)
+    async with Session() as session:
+        await limpiar(session)
+        await session.commit()
+
     await engine.dispose()
 
 

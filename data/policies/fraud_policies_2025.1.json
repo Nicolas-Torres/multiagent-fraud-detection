@@ -1,0 +1,57 @@
+[
+  {
+    "policy_id": "FP-01",
+    "rule": "Monto > 3x promedio habitual y horario fuera de rango -> CHALLENGE",
+    "version": "2025.1"
+  },
+  {
+    "policy_id": "FP-02",
+    "rule": "Transacción internacional y dispositivo nuevo -> ESCALATE_TO_HUMAN",
+    "version": "2025.1"
+  },
+  {
+    "policy_id": "FP-03",
+    "rule": "Velocity check: Si el mismo dispositivo hace más de 3 transacciones en menos de 5 minutos -> BLOCK",
+    "version": "2025.1"
+  },
+  {
+    "policy_id": "FP-04",
+    "rule": "Card testing: Cuando aparecen 2 o más cobros de centavos seguidos de un monto grande, todo en menos de 10 minutos -> BLOCK",
+    "version": "2025.1"
+  },
+  {
+    "policy_id": "FP-05",
+    "rule": "Geolocalización imposible: Si el mismo cliente hace una transacción en Perú y otra en España con menos de 2 horas de diferencia -> ESCALATE_TO_HUMAN",
+    "version": "2025.1"
+  },
+  {
+    "policy_id": "FP-06",
+    "rule": "Canal nuevo con monto alto: Si un cliente que siempre usó web de repente usa la app móvil por primera vez y el monto duplica su promedio habitual -> CHALLENGE",
+    "version": "2025.1"
+  },
+  {
+    "policy_id": "FP-07",
+    "rule": "Merchant en lista negra: Si el comercio tiene historial de fraude registrado en la base interna y el monto supera 500 soles -> ESCALATE_TO_HUMAN",
+    "version": "2025.1"
+  },
+  {
+    "policy_id": "FP-08",
+    "rule": "Cuenta nueva, monto grande: Cuenta con < 30 días de vida que intenta mover > 5x el promedio típico de su segmento -> ESCALATE_TO_HUMAN",
+    "version": "2025.1"
+  },
+  {
+    "policy_id": "FP-09",
+    "rule": "Cambio de datos + transacción inmediata: Si el cliente modificó su email/teléfono en los últimos 30 minutos y de inmediato hace transacción -> BLOCK",
+    "version": "2025.1"
+  },
+  {
+    "policy_id": "FP-10",
+    "rule": "Alerta externa activa: Si hay alertas públicas de fraude sobre el banco emisor o BIN en últimas 24h -> CHALLENGE",
+    "version": "2025.1"
+  },
+  {
+    "policy_id": "FP-11",
+    "rule": "Fraccionamiento (smurfing): 3+ pagos al mismo comercio el mismo día que sumados superan su límite diario -> BLOCK",
+    "version": "2025.1"
+  }
+]

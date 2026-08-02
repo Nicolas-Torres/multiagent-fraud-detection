@@ -16,8 +16,40 @@ git show contrato-v0.4:docs/contrato_de_interfaz.md
 
 ## [No publicado]
 
-Enmiendas hacia la próxima versión en [`enmiendas_pendientes.md`](enmiendas_pendientes.md),
-acumuladas en la etapa de dataset y seed.
+Sin enmiendas acumuladas. Las próximas se anotan en
+[`enmiendas_pendientes.md`](enmiendas_pendientes.md).
+
+---
+
+## [0.5] — Dataset, seed e invariante temporal
+
+Diez enmiendas, salidas de convertir el dataset en instrumento de evaluación y de
+poner en marcha la base compartida.
+
+| # | Enmienda | Toca | Por qué |
+|---|---|---|---|
+| 1 | Muere el supuesto `America/Lima` | §2.5, §2.7 | El dataset tiene siete países. Interpretar la ventana de un cliente de Madrid como hora de Lima la corre siete horas y evalúa otra franja. Afecta al 86% de los clientes. |
+| 2 | `CustomerBehavior` gana `currency` y `timezone` | §2.5 | La moneda es atributo de la **cuenta**, no del país de la compra: sin ella, "3× el promedio" mezcla unidades. La zona no se puede derivar del país —US y MX abarcan varias—. |
+| 3 | `CustomerBehavior` gana cinco campos más | §2.5 | `usual_channel`, `account_creation_date`, `last_profile_update`, `daily_limit` y `segment` habilitan FP-06, FP-08, FP-09 y FP-11, que sin ellos no tenían insumo. |
+| 4 | Precedencia entre políticas concurrentes | §2.2 | 14 transacciones satisfacen dos políticas a la vez. Si el Arbiter y el ground truth usaran órdenes distintos, el harness mediría la discrepancia entre reglas, no la calidad del sistema. |
+| 5 | Índices compuestos de historial | §7.1 | Cuatro políticas evalúan secuencias. Dos ejes de acceso —cliente y dispositivo— porque FP-03 no filtra por cliente: un dispositivo usado con varias cuentas **es** la señal. |
+| 6 | 🆕 §7.7 El invariante *as-of* | §7.7 | Un agente que consulte historial sin acotar ve el futuro. En producción es imposible de violar, así que el bug **solo aparece en evaluación** — y hacia arriba, inflando el recall. |
+| 7 | `merchant_blacklist` entra al modelo | §7.1 | Primera tabla de gobernanza. PK natural con baja lógica: la historia no se pierde porque el caso congela su evidencia en `signals`. |
+| 8 | `DATABASE_URL` cambia de forma | §1.4 | RDS exige TLS (`?sslmode=require`) y el password viaja percent-encoded: dentro de una URL es un tramo delimitado, no un campo, y cualquier carácter estructural lo parte. |
+| 9 | Postgres destino sube a 18 | §1.4 | Mientras local y nube difieran, "pasa en local" deja de ser evidencia de "pasa en la nube". |
+| 10 | Tres entornos de base de datos, no uno | §1.4 | v0.4 hablaba de "la base" como si fuera una. Son tres: local para iterar, compartido para integrar, producción sin existir todavía. |
+
+**Retirada durante la etapa**: `Transaction` iba a ganar `issuer_bank`. Era el
+insumo de FP-10 y de nada más; con esa política fuera de alcance sería una columna
+sin consumidor. `Transaction` no cambia en v0.5.
+
+**Corrección de fondo**: la numeración de políticas usada hasta v0.4 estaba
+corrida a partir de la octava —el análisis leyó los comentarios del generador en
+vez del catálogo—. El catálogo real es `FP-01`…`FP-11` **sin huecos**: no falta
+`FP-08` ni existe `FP-12`. El alcance implementado pasó de 9/11 a **10/11**.
+
+Detalle en [`reviews/04-dataset-y-seed.md`](reviews/04-dataset-y-seed.md) y en
+los ADR 0003, 0004 y 0005.
 
 ---
 
