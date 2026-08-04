@@ -26,4 +26,16 @@ build-backend = "uv_build"
 dev = [
     "numpy>=2.5.1",
     "pandas>=3.0.5",
+    "pytest>=8.4.2",
+    "pytest-asyncio>=1.3.0",
 ]
+
+[tool.pytest.ini_options]
+# `src` para el paquete, `tests` para que los módulos de test se importen entre
+# sí (`from conftest import utc`). Sin esto haría falta instalar el paquete en
+# modo editable antes de correr la suite.
+pythonpath = ["src", "tests"]
+testpaths = ["tests"]
+addopts = "-q"
+# Los nodos del grafo son `async def`; sin esto pytest los saltea en silencio.
+asyncio_mode = "auto"

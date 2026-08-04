@@ -16,7 +16,22 @@ from sqlalchemy import delete, update
 
 from multiagent_fraud_detection.db.models import AgentError as AgentErrorRow
 from multiagent_fraud_detection.db.models import Case, Decision, Signal
+from multiagent_fraud_detection.db.repositories.customer_behavior import profile_for
+from multiagent_fraud_detection.db.repositories.transaction_history import (
+    history_for_customer,
+    history_for_device,
+)
 from multiagent_fraud_detection.enums import CaseStatus, DecisionType, Severity
+from multiagent_fraud_detection.domain.catalog import Owner
+from multiagent_fraud_detection.domain.engine import evaluate
+from multiagent_fraud_detection.domain.predicates import EvalContext
+from multiagent_fraud_detection.domain.scoring import (
+    SCORING_VERSION,
+    base_confidence,
+    has_contradiction,
+    risk_score,
+    signal_sort_key,
+)
 from multiagent_fraud_detection.graph.context import GraphContext
 from multiagent_fraud_detection.graph.state import AgentError, GraphState, WorkingSignal
 
@@ -51,9 +66,13 @@ def degrades(agent: str) -> Callable[[NodeFn], NodeFn]:
 
     def decorator(fn: NodeFn) -> NodeFn:
         @wraps(fn)
-        async def wrapper(state: GraphState) -> dict:
+        async def wrapper(*args, **kwargs) -> dict:
+            # `*args` y no `(state)`: los nodos que necesitan `GraphContext`
+            # reciben tambien `runtime`. `@wraps` preserva `__wrapped__`, asi
+            # que LangGraph inspecciona la firma ORIGINAL para decidir que
+            # pasar; el wrapper solo tiene que reenviarlo.
             try:
-                return await fn(state)
+                return await fn(*args, **kwargs)
             except Exception as exc:  # noqa: BLE001 - el punto es no propagar
                 logger.exception("nodo %s degradado", agent)
                 return {
@@ -75,39 +94,126 @@ def degrades(agent: str) -> Callable[[NodeFn], NodeFn]:
     return decorator
 
 
+def _a_working(señales, emitido_por: str) -> list[WorkingSignal]:
+    """`EmittedSignal` del dominio -> `WorkingSignal` del estado.
+
+    El dominio no conoce el grafo: sus senales no traen `emitted_by`. La
+    procedencia la pone el nodo, que es quien la sabe. `observed` no viaja al
+    estado —es evidencia numerica para el Arbiter y el monitoreo, no parte de
+    `Signal`— pero se conserva en `description`, que si se persiste.
+    """
+    return [
+        WorkingSignal(
+            code=s.code,
+            description=s.description,
+            severity=s.severity,
+            emitted_by=emitido_por,
+        )
+        for s in señales
+    ]
+
+
 # --- Ola 1: independientes entre si ---
 
 
 @degrades(CONTEXT)
-async def transaction_context(state: GraphState) -> dict:
+async def transaction_context(
+    state: GraphState, runtime: Runtime[GraphContext]
+) -> dict:
+    """Senales que no requieren conocer al cliente.
+
+    Es el **piso de evidencia** del sistema: el unico agente que sigue
+    produciendo senales cuando el cliente no tiene perfil —el escenario que el
+    contrato llama "el que mas importa"—. Por eso no consulta el perfil ni el
+    historial: si lo hiciera, dejaria de funcionar justo cuando hace falta.
+
+    Que evalue una sola politica (FP-07) no es un defecto del reparto: es lo que
+    resulta de derivarlo de los insumos que declara cada predicado (ADR-0007).
+    """
+    ctx = EvalContext(
+        transaction=state["transaction"],
+        blacklist=await runtime.context.blacklist.get(runtime.context.session_factory),
+    )
+    resultado = evaluate(runtime.context.catalog, Owner.CONTEXT, ctx)
+
     return {
         "agent_route": [CONTEXT],
-        "signals": [
-            WorkingSignal(
-                code="STUB_ABSOLUTE",
-                description="stub: senal leida de la transaccion sola",
-                severity=Severity.LOW,
-                emitted_by=CONTEXT,
-            )
-        ],
+        "signals": _a_working(resultado.signals, CONTEXT),
+        "matched_policies": list(resultado.matched_policies),
     }
 
 
 @degrades(BEHAVIORAL)
-async def behavioral_pattern(state: GraphState) -> dict:
-    # El stub simula el caso interesante: cliente sin perfil previo.
-    # `customer_snapshot=None` NO comunica eso; la senal si.
-    return {
-        "agent_route": [BEHAVIORAL],
-        "customer_snapshot": None,
-        "signals": [
+async def behavioral_pattern(
+    state: GraphState, runtime: Runtime[GraphContext]
+) -> dict:
+    """Contraste contra el perfil y el historial del cliente.
+
+    Nueve de las diez politicas evaluables. Tres consultas —perfil, historial de
+    la cuenta, historial del dispositivo— y despues aritmetica pura: la logica
+    esta toda en `domain/`, probada sobre las 7 000 transacciones sin base.
+
+    **El `as_of` es el timestamp de la transaccion, jamas `now()`.** Es el punto
+    mas delicado de la etapa: `now()` funciona perfecto en produccion —el futuro
+    no esta en la tabla cuando llega el caso— y solo miente en evaluacion, donde
+    el dataset se carga completo. Fallaria hacia arriba, viendo rafagas enteras
+    desde su primera transaccion e inflando su propio recall. El repositorio hace
+    cumplir el filtro; aca solo hay que pasarle el valor correcto.
+    """
+    transaccion = state["transaction"]
+    as_of = transaccion.timestamp
+
+    async with runtime.context.session_factory() as session:
+        # Secuencial y en una sola sesion, no `asyncio.gather`: una `AsyncSession`
+        # no admite operaciones concurrentes. Las tres consultas usan indice y
+        # cuestan menos que abrir dos sesiones mas.
+        perfil = await profile_for(session, customer_id=transaccion.customer_id)
+        hist_cliente = await history_for_customer(
+            session,
+            customer_id=transaccion.customer_id,
+            as_of=as_of,
+            exclude_transaction_id=transaccion.transaction_id,
+        )
+        hist_dispositivo = await history_for_device(
+            session,
+            device_id=transaccion.device_id,
+            as_of=as_of,
+            exclude_transaction_id=transaccion.transaction_id,
+        )
+
+    ctx = EvalContext(
+        transaction=transaccion,
+        profile=perfil,
+        history_customer=tuple(hist_cliente),
+        history_device=tuple(hist_dispositivo),
+    )
+    resultado = evaluate(runtime.context.catalog, Owner.BEHAVIORAL, ctx)
+    señales = _a_working(resultado.signals, BEHAVIORAL)
+
+    if perfil is None:
+        # La unica senal que no sale de un predicado. No es una observacion
+        # sobre la transaccion sino sobre la **evidencia**: el agente declara
+        # que no pudo comparar. `customer_snapshot=None` no lo comunica —seria
+        # indistinguible de "el nodo no corrio"—; la senal si.
+        señales.insert(
+            0,
             WorkingSignal(
                 code="NO_CUSTOMER_PROFILE",
-                description="stub: el cliente no tiene perfil de comportamiento",
+                description=(
+                    f"El cliente {transaccion.customer_id} no tiene perfil de "
+                    f"comportamiento: {len(resultado.skipped_policies)} politicas "
+                    f"no son evaluables"
+                ),
                 severity=Severity.MEDIUM,
                 emitted_by=BEHAVIORAL,
-            )
-        ],
+            ),
+        )
+
+    return {
+        "agent_route": [BEHAVIORAL],
+        "customer_snapshot": perfil,
+        "signals": señales,
+        "matched_policies": list(resultado.matched_policies),
     }
 
 
@@ -128,11 +234,74 @@ async def internal_policy_rag(state: GraphState) -> dict:
 
 
 @degrades(AGGREGATE)
-async def evidence_aggregation(state: GraphState) -> dict:
-    # Cuatro trabajos reales: deduplicar por `code` usando `emitted_by`,
-    # descartar lo que no paso el allowlist, ORDENAR de forma determinista
-    # (el orden entre ramas paralelas es arbitrario) y calcular el score.
-    return {"agent_route": [AGGREGATE], "base_confidence": 0.5}
+async def evidence_aggregation(
+    state: GraphState, runtime: Runtime[GraphContext]
+) -> dict:
+    """Consolida la evidencia de la ola 1 y produce los scores determinísticos.
+
+    No tiene logica de deteccion: no evalua politicas ni mira la transaccion.
+    Recibe lo que produjeron los agentes y lo deja en una forma unica —sin
+    duplicados, ordenada, medida— para que el Arbiter reciba lo mismo en cada
+    corrida.
+
+    **Sin `@degrades` a proposito.** Los nodos de la ola 1 degradan porque su
+    falla deja evidencia incompleta y el caso puede seguir. Si este fallara no
+    habria nada que consolidar: es el unico camino hacia la decision, y una
+    degradacion silenciosa produciria un caso sin scores que el invariante
+    rechazaria mas adelante, lejos de la causa.
+    """
+    señales = state.get("signals", [])
+    politicas = state.get("matched_policies", [])
+    errores = state.get("agent_errors", [])
+    catalogo = runtime.context.catalog
+
+    # 1. Deduplicar por codigo. Los dos agentes pueden emitir el mismo: hoy no
+    #    ocurre —ninguna politica cruza los nodos— pero eso depende del catalogo,
+    #    que es dato mutable. Gana la primera aparicion.
+    unicas: dict[str, WorkingSignal] = {}
+    for señal in señales:
+        unicas.setdefault(señal.code, señal)
+
+    # 2. Orden deterministico: severidad descendente, luego codigo.
+    ordenadas = sorted(
+        unicas.values(), key=lambda s: signal_sort_key(s.code, s.severity)
+    )
+
+    # 3. Politicas sin duplicar y en orden estable.
+    unicas_politicas = sorted(set(politicas))
+
+    # 4. Los dos scores.
+    #
+    # `NO_CUSTOMER_PROFILE` **no entra en el riesgo**. Es la unica senal que no
+    # sale de un predicado: no describe la transaccion, describe que faltó con
+    # que compararla. Sumarla al riesgo seria el mismo error de categoria que
+    # sumar un agente caido —"no pude evaluar" no es "esto es sospechoso"— y
+    # ademas subiria el riesgo de las ~96 transacciones sin perfil por una razon
+    # que no es de ellas.
+    #
+    # Donde si pesa es en la confianza, y una sola vez: por la penalizacion.
+    sin_perfil = any(s.code == "NO_CUSTOMER_PROFILE" for s in ordenadas)
+    riesgo = risk_score(
+        s.severity for s in ordenadas if s.code != "NO_CUSTOMER_PROFILE"
+    )
+    degradados = sorted({e.agent for e in errores})
+    confianza = base_confidence(
+        riesgo,
+        degraded_agents=degradados,
+        contradiction=has_contradiction(
+            catalogo[pid].action for pid in unicas_politicas
+        ),
+        missing_profile=sin_perfil,
+    )
+
+    return {
+        "agent_route": [AGGREGATE],
+        "evidence": ordenadas,
+        "policies": unicas_politicas,
+        "risk_score": riesgo,
+        "base_confidence": confianza,
+        "scoring_version": SCORING_VERSION,
+    }
 
 
 @degrades(PRO_FRAUD)
@@ -230,6 +399,8 @@ async def persist_decision(
                     base_confidence=state.get("base_confidence"),
                     confidence_rationale=state.get("confidence_rationale"),
                     scoring_version=state.get("scoring_version"),
+                    matched_policies=state.get("policies", []),
+                    policy_catalog_version=runtime.context.catalog.version,
                     # model_dump(mode="json"): en modo Python, HttpUrl y
                     # datetime no son serializables por psycopg.
                     citations_internal=[
@@ -254,7 +425,7 @@ async def persist_decision(
                             description=s.description,
                             severity=s.severity,
                         )
-                        for s in state.get("signals", [])
+                        for s in state.get("evidence", state.get("signals", []))
                     ],
                     agent_errors=[
                         AgentErrorRow(

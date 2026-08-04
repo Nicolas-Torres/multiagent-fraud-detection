@@ -42,7 +42,8 @@ class DecisionRead(BaseModel):
     base_confidence: Confidence | None = None
     confidence_rationale: str | None = None
     scoring_version: ScoringVersion | None = None
-    signals: list[SignalRead]
+    matched_policies: list[str] = []
+    policy_catalog_version: str | None = None
     signals: list[SignalRead]
     citations_internal: list[InternalCitation]
     citations_external: list[ExternalCitation]

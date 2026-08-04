@@ -40,12 +40,7 @@ explícito y no el comportamiento por defecto.
 
 import argparse
 import asyncio
-import csv
 import sys
-from datetime import date, datetime
-from decimal import Decimal
-from pathlib import Path
-from zoneinfo import ZoneInfo
 
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
@@ -60,11 +55,8 @@ from multiagent_fraud_detection.db.models import (
     Transaction,
 )
 from multiagent_fraud_detection.db.session import engine
-from multiagent_fraud_detection.schemas.customer_behavior import CustomerBehaviorIn
-from multiagent_fraud_detection.schemas.merchant_blacklist import MerchantBlacklistIn
-from multiagent_fraud_detection.schemas.transaction import TransactionIn
 
-DATA_DIR = Path(__file__).resolve().parents[1] / "data"
+from _dataset import BLACKLIST, leer_perfiles, leer_transacciones
 
 # 7 000 transacciones x 9 columnas son 63 000 parámetros, y psycopg corta en
 # 65 535. Un solo INSERT pasaría raspando hoy y reventaría al agregar una
@@ -72,96 +64,6 @@ DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 BATCH = 500
 
 Session = async_sessionmaker(engine, expire_on_commit=False)
-
-
-def _lista(celda: str) -> list[str]:
-    """`"PE;ES"` → `["PE", "ES"]`; `""` → `[]`.
-
-    Una celda vacía es una **lista vacía**, no un dato faltante: "ningún
-    dispositivo habitual" significa que todo dispositivo es nuevo. Eso es señal,
-    y el contrato lo declara válido explícitamente.
-    """
-    return [x for x in celda.split(";") if x]
-
-
-def leer_perfiles() -> list[CustomerBehaviorIn]:
-    ruta = DATA_DIR / "customer_behaviors.csv"
-    perfiles = []
-
-    with ruta.open(encoding="utf-8", newline="") as fh:
-        for fila in csv.DictReader(fh):
-            inicio, fin = fila["usual_hours"].split("-")
-
-            # `last_profile_update` viene **naive en hora local del cliente** y
-            # la columna es TIMESTAMPTZ. Es la única normalización que necesita
-            # otra columna del mismo registro: sin la zona, un perfil de Lima
-            # quedaría cinco horas corrido y FP-09 evaluaría otra ventana.
-            zona = ZoneInfo(fila["timezone"])
-            actualizado = datetime.fromisoformat(
-                fila["last_profile_update"]
-            ).replace(tzinfo=zona)
-
-            perfiles.append(
-                CustomerBehaviorIn(
-                    customer_id=fila["customer_id"],
-                    usual_amount_avg=Decimal(fila["usual_amount_avg"]),
-                    usual_hour_start=int(inicio),
-                    usual_hour_end=int(fin),
-                    usual_countries=_lista(fila["usual_countries"]),
-                    usual_devices=_lista(fila["usual_devices"]),
-                    usual_channel=fila["usual_channel"],
-                    account_creation_date=date.fromisoformat(
-                        fila["account_creation_date"]
-                    ),
-                    last_profile_update=actualizado,
-                    daily_limit=Decimal(fila["daily_limit"]),
-                    currency=fila["currency"],
-                    timezone=fila["timezone"],
-                    segment=fila["segment"],
-                )
-                # `issuer_bank` se descarta: era el insumo de FP-10, que quedó
-                # fuera de alcance. Se conserva en el CSV como dato de origen.
-            )
-
-    return perfiles
-
-
-def leer_transacciones() -> list[TransactionIn]:
-    ruta = DATA_DIR / "transactions.csv"
-
-    with ruta.open(encoding="utf-8", newline="") as fh:
-        return [
-            TransactionIn(
-                transaction_id=fila["transaction_id"],
-                customer_id=fila["customer_id"],
-                amount=Decimal(fila["amount"]),
-                currency=fila["currency"],
-                country=fila["country"],
-                # `chanel` → `channel`. El typo viene del enunciado del reto, no
-                # del generador. Renombrar una columna es traducción de forma
-                # pura: o el mapeo existe o revienta ruidosamente. Corregirlo en
-                # la fuente habría escondido que el adaptador hace su trabajo.
-                channel=fila["chanel"],
-                device_id=fila["device_id"],
-                # Ya trae offset explícito (`+00:00`), a diferencia del perfil.
-                timestamp=datetime.fromisoformat(fila["timestamp"]),
-                merchant_id=fila["merchant_id"],
-            )
-            for fila in csv.DictReader(fh)
-        ]
-
-
-# Dato de gobernanza, no del dataset... salvo que en este caso sí lo es: el
-# generador eligió `M-999` como el comercio marcado, y las etiquetas de FP-07
-# dependen de que esta fila exista. Va acá y no en una migración porque las
-# migraciones son esquema.
-BLACKLIST = [
-    MerchantBlacklistIn(
-        merchant_id="M-999",
-        reason="Comercio con reportes recurrentes de fraude (dataset sintético)",
-        added_by="seed",
-    )
-]
 
 
 async def _upsert(session, modelo, filas: list[dict], pk: str) -> None:

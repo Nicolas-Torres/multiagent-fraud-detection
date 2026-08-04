@@ -25,7 +25,7 @@ que no alcanzan confianza suficiente pasan a una cola de revisión humana.
 | Persistencia de la decisión | ✅ |
 | Dataset sintético y ground truth | ✅ |
 | Seed de la base desde el dataset | ✅ |
-| Agentes de lógica pura (Context, Behavioral, Aggregation) | ⬜ |
+| Agentes determinísticos (Context, Behavioral, Aggregation) | ✅ |
 | Tabla `web_search_allowlist` | ⬜ |
 | RAG de políticas internas + Policy RAG Agent | ⬜ |
 | Búsqueda web gobernada + Threat Intel Agent | ⬜ |

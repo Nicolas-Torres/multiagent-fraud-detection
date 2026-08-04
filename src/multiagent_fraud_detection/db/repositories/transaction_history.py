@@ -21,8 +21,15 @@ evaluación** — y falla hacia arriba, viendo ráfagas completas desde su prime
 transacción e inflando su propio recall. El harness certificaría un sistema que
 no funciona.
 
-El `<=` es inclusivo a propósito: la transacción bajo análisis cuenta para su
-propia ventana. FP-03 dice "más de 3 en menos de 5 minutos" contando ésta.
+El `<=` es inclusivo a propósito, pero eso deja **la transacción bajo análisis
+dentro de su propia ventana**, y ahí hay una trampa: los predicados del dominio
+cuentan `len(previas) + 1` porque el `+1` *es* la transacción actual. Sumar las
+dos convenciones la contaría dos veces y FP-03 dispararía con tres previas en
+lugar de cuatro.
+
+Por eso existe `exclude_transaction_id`. La convención del dominio es la que
+manda —es la misma con la que se construyó el ground truth— y el filtro vive
+acá y no en cada llamador, por el mismo motivo que el `as_of`.
 
 ---
 
@@ -69,6 +76,7 @@ async def history_for_customer(
     customer_id: str,
     as_of: datetime,
     window: timedelta = DEFAULT_WINDOW,
+    exclude_transaction_id: str | None = None,
 ) -> list[Transaction]:
     """Actividad reciente de la cuenta, en orden cronológico.
 
@@ -79,6 +87,8 @@ async def history_for_customer(
         .where(Transaction.customer_id == customer_id, *_window_stmt(as_of, window))
         .order_by(Transaction.timestamp)
     )
+    if exclude_transaction_id is not None:
+        stmt = stmt.where(Transaction.transaction_id != exclude_transaction_id)
     return list((await session.scalars(stmt)).all())
 
 
@@ -88,6 +98,7 @@ async def history_for_device(
     device_id: str,
     as_of: datetime,
     window: timedelta = DEFAULT_WINDOW,
+    exclude_transaction_id: str | None = None,
 ) -> list[Transaction]:
     """Actividad reciente del dispositivo, cruzando cuentas.
 
@@ -101,4 +112,6 @@ async def history_for_device(
         .where(Transaction.device_id == device_id, *_window_stmt(as_of, window))
         .order_by(Transaction.timestamp)
     )
+    if exclude_transaction_id is not None:
+        stmt = stmt.where(Transaction.transaction_id != exclude_transaction_id)
     return list((await session.scalars(stmt)).all())
