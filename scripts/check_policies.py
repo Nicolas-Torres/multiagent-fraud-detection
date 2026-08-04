@@ -1,0 +1,178 @@
+"""Corre el motor determinístico sobre el dataset y lo compara con el ground truth.
+
+    uv run python scripts/check_policies.py           →  resumen + código de salida
+    uv run python scripts/check_policies.py --detalle →  además, cada discrepancia
+
+**Sin base de datos, sin red, sin LLM.** Las 7 000 transacciones en segundos. Por
+eso es un gate de CI y no un smoke test: corre en cada push, no cuando alguien se
+acuerda.
+
+## Qué prueba, y por qué eso vale
+
+`build_ground_truth.py` y el motor son **dos implementaciones independientes de
+las mismas once políticas**: una escrita a mano con pandas, la otra interpretando
+las vinculaciones del catálogo. Que coincidan en 7 000 filas es evidencia fuerte
+de que ambas están bien; que discrepen es un hallazgo, no un fallo de tipeo.
+
+Comparten sólo los parámetros que ninguna norma menciona —la tabla FX, los
+promedios por segmento, la precedencia—, porque un desacuerdo sobre el factor del
+sol no probaría nada: sería ruido con forma de hallazgo (ADR-0007).
+
+## Qué NO prueba
+
+Que el sistema decida bien. En esta etapa `citations_internal` está vacío —el RAG
+no existe— así que todo veredicto autónomo es imposible y el grafo completo
+mandaría todo a `ESCALATE_TO_HUMAN`. Acá se mide la **capa de reglas**: qué
+políticas disparan y qué acción prescriben. El F1 de la decisión del sistema llega
+con el RAG.
+
+Tampoco prueba las consultas: acá el historial se arma en memoria. Un bug de
+`as_of` en el repositorio sólo lo atrapa el smoke contra la base sembrada.
+"""
+
+import argparse
+import sys
+from collections import defaultdict
+from datetime import timedelta
+
+from multiagent_fraud_detection.domain.catalog import Owner, load_catalog
+from multiagent_fraud_detection.domain.engine import evaluate, prescribed_action
+from multiagent_fraud_detection.domain.predicates import EvalContext
+
+from _dataset import (
+    BLACKLIST,
+    DATA_DIR,
+    leer_ground_truth,
+    leer_perfiles,
+    leer_transacciones,
+)
+
+# La misma ventana que usa el repositorio de historial: acá se replica en memoria
+# para que el gate mida lo mismo que va a correr contra Postgres.
+WINDOW = timedelta(hours=26)
+
+POLICIES = DATA_DIR / "policies"
+
+
+def evaluar_todo(catalog, perfiles, transacciones, blacklist):
+    """Recorre el dataset en orden cronológico, acumulando historial.
+
+    El orden importa y el acumulado también: una transacción se juzga con lo que
+    existía **antes** de ella. Es el invariante *as-of* reproducido en memoria —el
+    mismo que el repositorio hace cumplir con `timestamp <= :as_of`—.
+    """
+    por_cliente = defaultdict(list)
+    por_dispositivo = defaultdict(list)
+    salida = {}
+
+    for tx in sorted(transacciones, key=lambda t: t.timestamp):
+        hist_cli = [
+            t for t in por_cliente[tx.customer_id] if tx.timestamp - t.timestamp < WINDOW
+        ]
+        hist_dev = [
+            t for t in por_dispositivo[tx.device_id] if tx.timestamp - t.timestamp < WINDOW
+        ]
+
+        ctx = EvalContext(
+            transaction=tx,
+            profile=perfiles.get(tx.customer_id),
+            history_customer=tuple(hist_cli),
+            history_device=tuple(hist_dev),
+            blacklist=blacklist,
+        )
+
+        # Los dos agentes por separado y luego consolidados, igual que el grafo:
+        # Context y Behavioral corren en paralelo y Evidence Aggregation une.
+        ev = evaluate(catalog, Owner.CONTEXT, ctx).merge(
+            evaluate(catalog, Owner.BEHAVIORAL, ctx)
+        )
+
+        salida[tx.transaction_id] = (
+            sorted(ev.matched_policies),
+            prescribed_action(catalog, ev.matched_policies).value,
+            ev.signals,
+        )
+
+        por_cliente[tx.customer_id].append(tx)
+        por_dispositivo[tx.device_id].append(tx)
+
+    return salida
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--detalle", action="store_true", help="lista cada discrepancia")
+    args = ap.parse_args()
+
+    catalog = load_catalog(
+        POLICIES / "fraud_policies_2025.1.json",
+        POLICIES / "policy_bindings_2025.1.json",
+    )
+    print(f"catálogo {catalog.version} · {catalog.health}")
+
+    if catalog.health["stale"]:
+        print("  aviso: hay vinculaciones obsoletas; esas políticas no se evalúan")
+
+    perfiles = {p.customer_id: p for p in leer_perfiles()}
+    transacciones = leer_transacciones()
+    blacklist = frozenset(m.merchant_id for m in BLACKLIST)
+    esperado = leer_ground_truth()
+
+    obtenido = evaluar_todo(catalog, perfiles, transacciones, blacklist)
+
+    # --- comparación --------------------------------------------------------
+    tp = defaultdict(int)
+    fp = defaultdict(int)
+    fn = defaultdict(int)
+    señales = defaultdict(int)
+    discrepancias = []
+    decision_mal = 0
+
+    for tid, esp in esperado.items():
+        got_pol, got_dec, got_sig = obtenido[tid]
+        for s in got_sig:
+            señales[s.code] += 1
+
+        for p in set(got_pol) & set(esp["policies"]):
+            tp[p] += 1
+        for p in set(got_pol) - set(esp["policies"]):
+            fp[p] += 1
+        for p in set(esp["policies"]) - set(got_pol):
+            fn[p] += 1
+
+        if got_pol != esp["policies"]:
+            discrepancias.append((tid, esp["policies"], got_pol))
+        if got_dec != esp["decision"]:
+            decision_mal += 1
+
+    # --- reporte ------------------------------------------------------------
+    print(f"\ntransacciones evaluadas : {len(esperado)}")
+    print(f"discrepancias de política: {len(discrepancias)}")
+    print(f"discrepancias de decisión: {decision_mal}")
+
+    print("\npor política:")
+    print(f"  {'ID':7s} {'TP':>5s} {'FP':>5s} {'FN':>5s}  {'prec':>6s} {'rec':>6s} {'F1':>6s}")
+    for p in sorted(set(tp) | set(fp) | set(fn)):
+        prec = tp[p] / (tp[p] + fp[p]) if tp[p] + fp[p] else 0.0
+        rec = tp[p] / (tp[p] + fn[p]) if tp[p] + fn[p] else 0.0
+        f1 = 2 * prec * rec / (prec + rec) if prec + rec else 0.0
+        print(f"  {p:7s} {tp[p]:5d} {fp[p]:5d} {fn[p]:5d}  {prec:6.3f} {rec:6.3f} {f1:6.3f}")
+
+    print("\nseñales emitidas:")
+    for code, n in sorted(señales.items(), key=lambda kv: -kv[1]):
+        print(f"  {code:26s} {n:5d}")
+
+    if args.detalle:
+        for tid, esp, got in discrepancias:
+            print(f"  {tid}: esperado={esp} obtenido={got}")
+
+    if discrepancias or decision_mal:
+        print("\nFALLA: el motor no reproduce el ground truth")
+        return 1
+
+    print("\nOK")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
