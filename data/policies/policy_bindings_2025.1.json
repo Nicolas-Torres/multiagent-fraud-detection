@@ -1,0 +1,221 @@
+{
+  "binding_set_version": "2025.1-b1",
+  "source_catalog": "fraud_policies_2025.1.json",
+  "fingerprint_algorithm": "sha256",
+  "fingerprint_field": "rule",
+  "reference_currency": "USD",
+  "bindings": [
+    {
+      "policy_id": "FP-01",
+      "source_version": "2025.1",
+      "source_fingerprint": "sha256:af39b541ea68a5d8606fcdb77e81f63cc264efd33794680290121c23e55d4f3e",
+      "action": "CHALLENGE",
+      "condition": [
+        {
+          "predicate": "amount_over_avg_multiple",
+          "params": {
+            "factor": 3
+          }
+        },
+        {
+          "predicate": "outside_usual_hours",
+          "params": {}
+        }
+      ],
+      "active": true,
+      "bound_by": "nicolas",
+      "bound_at": "2026-08-03T00:00:00Z"
+    },
+    {
+      "policy_id": "FP-02",
+      "source_version": "2025.1",
+      "source_fingerprint": "sha256:12bf23050e9b1ae4a30e4bb8cb79730a7f111841d8011f2f6f9c911dea41670a",
+      "action": "ESCALATE_TO_HUMAN",
+      "condition": [
+        {
+          "predicate": "country_not_usual",
+          "params": {}
+        },
+        {
+          "predicate": "device_not_usual",
+          "params": {}
+        }
+      ],
+      "active": true,
+      "bound_by": "nicolas",
+      "bound_at": "2026-08-03T00:00:00Z"
+    },
+    {
+      "policy_id": "FP-03",
+      "source_version": "2025.1",
+      "source_fingerprint": "sha256:42d033a7c5679668e9684a5ec039aec5c5bc888cc32e6568ac8af36ec53cd23c",
+      "action": "BLOCK",
+      "condition": [
+        {
+          "predicate": "count_in_window",
+          "params": {
+            "axis": "device",
+            "window_minutes": 5,
+            "min_count": 4
+          }
+        }
+      ],
+      "active": true,
+      "bound_by": "nicolas",
+      "bound_at": "2026-08-03T00:00:00Z"
+    },
+    {
+      "policy_id": "FP-04",
+      "source_version": "2025.1",
+      "source_fingerprint": "sha256:4a145d3031d8b389f9a2f5d73375ee057af7ca44db0995abaeb2042005c23a0c",
+      "action": "BLOCK",
+      "condition": [
+        {
+          "predicate": "preceding_micro_charges",
+          "params": {
+            "min_count": 2,
+            "ceiling_ref": 1.0,
+            "window_minutes": 10
+          }
+        },
+        {
+          "predicate": "amount_over_avg_multiple",
+          "params": {
+            "factor": 2
+          }
+        }
+      ],
+      "active": true,
+      "bound_by": "nicolas",
+      "bound_at": "2026-08-03T00:00:00Z"
+    },
+    {
+      "policy_id": "FP-05",
+      "source_version": "2025.1",
+      "source_fingerprint": "sha256:e7f0d04cfe13d52901dd78e410b231987ab06049ae7afdb152386bd3d72dbb2b",
+      "action": "ESCALATE_TO_HUMAN",
+      "condition": [
+        {
+          "predicate": "distinct_country_in_window",
+          "params": {
+            "window_minutes": 120
+          }
+        }
+      ],
+      "active": true,
+      "bound_by": "nicolas",
+      "bound_at": "2026-08-03T00:00:00Z"
+    },
+    {
+      "policy_id": "FP-06",
+      "source_version": "2025.1",
+      "source_fingerprint": "sha256:77718541510c0b8e100c2a81bf58b394f1385f63229d276ef0bae1f277bf4c09",
+      "action": "CHALLENGE",
+      "condition": [
+        {
+          "predicate": "channel_not_usual",
+          "params": {}
+        },
+        {
+          "predicate": "amount_over_avg_multiple",
+          "params": {
+            "factor": 2
+          }
+        }
+      ],
+      "active": true,
+      "bound_by": "nicolas",
+      "bound_at": "2026-08-03T00:00:00Z"
+    },
+    {
+      "policy_id": "FP-07",
+      "source_version": "2025.1",
+      "source_fingerprint": "sha256:283ec18ca9454ca56cb54dcd1041912d7b388b171469f8a06699e83755dc2551",
+      "action": "ESCALATE_TO_HUMAN",
+      "condition": [
+        {
+          "predicate": "merchant_blacklisted",
+          "params": {}
+        },
+        {
+          "predicate": "amount_over_absolute",
+          "params": {
+            "threshold_ref": 135.0
+          }
+        }
+      ],
+      "active": true,
+      "bound_by": "nicolas",
+      "bound_at": "2026-08-03T00:00:00Z"
+    },
+    {
+      "policy_id": "FP-08",
+      "source_version": "2025.1",
+      "source_fingerprint": "sha256:5312dbc3b861f18471def2641a630736f27cc787a84a5a4d981dd66d0e6956a7",
+      "action": "ESCALATE_TO_HUMAN",
+      "condition": [
+        {
+          "predicate": "account_age_below",
+          "params": {
+            "days": 30
+          }
+        },
+        {
+          "predicate": "amount_over_segment_multiple",
+          "params": {
+            "factor": 5
+          }
+        }
+      ],
+      "active": true,
+      "bound_by": "nicolas",
+      "bound_at": "2026-08-03T00:00:00Z"
+    },
+    {
+      "policy_id": "FP-09",
+      "source_version": "2025.1",
+      "source_fingerprint": "sha256:8efb78907f99c0e36029795b1720e57b151f70fc898ffaa1b3684904637c06a2",
+      "action": "BLOCK",
+      "condition": [
+        {
+          "predicate": "profile_changed_within",
+          "params": {
+            "minutes": 30
+          }
+        }
+      ],
+      "active": true,
+      "bound_by": "nicolas",
+      "bound_at": "2026-08-03T00:00:00Z"
+    },
+    {
+      "policy_id": "FP-10",
+      "source_version": "2025.1",
+      "source_fingerprint": "sha256:53341a6246e030d40bb574391694c858345726af80cb22d011593722356ee48f",
+      "action": "CHALLENGE",
+      "condition": null,
+      "excluded_reason": "ADR-0005: la evidencia es busqueda web real, no reproducible entre corridas. Excluida a proposito, no pendiente de traduccion.",
+      "active": true,
+      "bound_by": "nicolas",
+      "bound_at": "2026-08-03T00:00:00Z"
+    },
+    {
+      "policy_id": "FP-11",
+      "source_version": "2025.1",
+      "source_fingerprint": "sha256:7846fce8a95008fad98dd5e0dfc639ec578edc4f06cead252640337bf36e76c1",
+      "action": "BLOCK",
+      "condition": [
+        {
+          "predicate": "daily_sum_over_limit",
+          "params": {
+            "group_by": "merchant",
+            "min_count": 3
+          }
+        }
+      ],
+      "active": true,
+      "bound_by": "nicolas",
+      "bound_at": "2026-08-03T00:00:00Z"
+    }
+  ]
+}
