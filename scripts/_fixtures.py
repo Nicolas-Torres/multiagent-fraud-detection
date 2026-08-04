@@ -14,7 +14,7 @@ from uuid import UUID
 
 from sqlalchemy import delete
 
-from multiagent_fraud_detection.db.models import Case, Transaction
+from multiagent_fraud_detection.db.models import Case, MerchantBlacklist, Transaction
 from multiagent_fraud_detection.db.session import AsyncSessionLocal
 from multiagent_fraud_detection.enums import CaseStatus, Channel
 from multiagent_fraud_detection.graph.context import GraphContext
@@ -22,6 +22,11 @@ from multiagent_fraud_detection.schemas.transaction import TransactionIn
 
 # El contexto de runtime que el grafo necesita para persistir.
 CONTEXTO = GraphContext(session_factory=AsyncSessionLocal)
+
+# Comercio propio del smoke, no `M-999` del dataset: asi el script no depende de
+# que alguien haya corrido `seed.py`, y su limpieza no puede borrar datos
+# sembrados. Un fixture que ensucia el dataset deja de ser un fixture.
+MERCHANT_SMOKE = "M-SMOKE"
 
 
 def transaccion(tx_id: str) -> TransactionIn:
@@ -35,7 +40,10 @@ def transaccion(tx_id: str) -> TransactionIn:
         channel=Channel.MOBILE,
         device_id="D-02",
         timestamp=datetime(2025, 12, 17, 23, 45, tzinfo=UTC),
-        merchant_id="M-002",
+        # En lista negra a proposito: con un comercio limpio, Transaction Context
+        # no produce ninguna senal y el smoke no podria comprobar que el reducer
+        # acumula entre dos ramas paralelas —que es lo que vino a probar—.
+        merchant_id=MERCHANT_SMOKE,
     )
 
 
@@ -46,6 +54,11 @@ async def limpiar(case_id: UUID, tx_id: str) -> None:
             await session.execute(delete(Case).where(Case.case_id == case_id))
             await session.execute(
                 delete(Transaction).where(Transaction.transaction_id == tx_id)
+            )
+            await session.execute(
+                delete(MerchantBlacklist).where(
+                    MerchantBlacklist.merchant_id == MERCHANT_SMOKE
+                )
             )
 
 
@@ -63,5 +76,12 @@ async def sembrar(case_id: UUID, tx_id: str) -> None:
                     case_id=case_id,
                     transaction_id=tx_id,
                     status=CaseStatus.ANALYZING,
+                )
+            )
+            session.add(
+                MerchantBlacklist(
+                    merchant_id=MERCHANT_SMOKE,
+                    reason="Comercio de prueba del smoke test",
+                    added_by="smoke",
                 )
             )

@@ -79,8 +79,24 @@ async def main() -> None:
     print("  ok - input_schema filtro la clave que no declara")
 
     codigos = [s.code for s in estado["signals"]]
-    assert len(codigos) == 2, f"el reducer no acumulo: {codigos}"
-    print(f"  ok - reducer acumulo {len(codigos)} senales de 2 emisores: {codigos}")
+    emisores = {s.emitted_by for s in estado["signals"]}
+    assert len(emisores) == 2, f"el reducer no acumulo entre ramas: {codigos}"
+    assert len(codigos) == 3, f"senales inesperadas: {codigos}"
+    print(f"  ok - reducer acumulo {len(codigos)} senales de {len(emisores)} emisores")
+
+    # La evidencia consolidada vive en otra clave: `signals` es acumulador con
+    # reducer aditivo y no se puede reemplazar; `evidence` es lo que se archiva.
+    evidencia = [s.code for s in estado["evidence"]]
+    assert evidencia[0] == "MERCHANT_BLACKLISTED", f"orden no determinista: {evidencia}"
+    print(f"  ok - evidencia ordenada por severidad: {evidencia}")
+
+    assert estado["policies"] == ["FP-07"], estado["policies"]
+    assert estado["risk_score"] > 0
+    assert estado["scoring_version"]
+    print(
+        f"  ok - politicas={estado['policies']} risk={estado['risk_score']} "
+        f"conf={estado['base_confidence']}"
+    )
 
     assert estado.get("customer_snapshot") is None
     assert "NO_CUSTOMER_PROFILE" in codigos
@@ -98,9 +114,15 @@ async def main() -> None:
         ).scalar_one()
 
     assert decision.agent_route == estado["agent_route"], "memoria y BD divergen"
-    assert len(decision.signals) == 2
+    assert len(decision.signals) == 3
+    assert decision.matched_policies == ["FP-07"], decision.matched_policies
+    assert decision.policy_catalog_version, "no se sello la version del catalogo"
     assert status is CaseStatus.PENDING_HUMAN
-    print(f"  ok - persistido: {len(decision.signals)} senales, status={status.value}")
+    print(
+        f"  ok - persistido: {len(decision.signals)} senales, "
+        f"politicas={decision.matched_policies}, "
+        f"catalogo={decision.policy_catalog_version}, status={status.value}"
+    )
 
     await limpiar(CASE_ID, TX_ID)
     print("\nclaves del estado final:", sorted(estado))
