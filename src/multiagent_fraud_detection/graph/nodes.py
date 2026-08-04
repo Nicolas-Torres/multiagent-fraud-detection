@@ -16,7 +16,15 @@ from sqlalchemy import delete, update
 
 from multiagent_fraud_detection.db.models import AgentError as AgentErrorRow
 from multiagent_fraud_detection.db.models import Case, Decision, Signal
+from multiagent_fraud_detection.db.repositories.customer_behavior import profile_for
+from multiagent_fraud_detection.db.repositories.transaction_history import (
+    history_for_customer,
+    history_for_device,
+)
 from multiagent_fraud_detection.enums import CaseStatus, DecisionType, Severity
+from multiagent_fraud_detection.domain.catalog import Owner
+from multiagent_fraud_detection.domain.engine import evaluate
+from multiagent_fraud_detection.domain.predicates import EvalContext
 from multiagent_fraud_detection.graph.context import GraphContext
 from multiagent_fraud_detection.graph.state import AgentError, GraphState, WorkingSignal
 
@@ -51,9 +59,13 @@ def degrades(agent: str) -> Callable[[NodeFn], NodeFn]:
 
     def decorator(fn: NodeFn) -> NodeFn:
         @wraps(fn)
-        async def wrapper(state: GraphState) -> dict:
+        async def wrapper(*args, **kwargs) -> dict:
+            # `*args` y no `(state)`: los nodos que necesitan `GraphContext`
+            # reciben tambien `runtime`. `@wraps` preserva `__wrapped__`, asi
+            # que LangGraph inspecciona la firma ORIGINAL para decidir que
+            # pasar; el wrapper solo tiene que reenviarlo.
             try:
-                return await fn(state)
+                return await fn(*args, **kwargs)
             except Exception as exc:  # noqa: BLE001 - el punto es no propagar
                 logger.exception("nodo %s degradado", agent)
                 return {
@@ -75,39 +87,126 @@ def degrades(agent: str) -> Callable[[NodeFn], NodeFn]:
     return decorator
 
 
+def _a_working(señales, emitido_por: str) -> list[WorkingSignal]:
+    """`EmittedSignal` del dominio -> `WorkingSignal` del estado.
+
+    El dominio no conoce el grafo: sus senales no traen `emitted_by`. La
+    procedencia la pone el nodo, que es quien la sabe. `observed` no viaja al
+    estado —es evidencia numerica para el Arbiter y el monitoreo, no parte de
+    `Signal`— pero se conserva en `description`, que si se persiste.
+    """
+    return [
+        WorkingSignal(
+            code=s.code,
+            description=s.description,
+            severity=s.severity,
+            emitted_by=emitido_por,
+        )
+        for s in señales
+    ]
+
+
 # --- Ola 1: independientes entre si ---
 
 
 @degrades(CONTEXT)
-async def transaction_context(state: GraphState) -> dict:
+async def transaction_context(
+    state: GraphState, runtime: Runtime[GraphContext]
+) -> dict:
+    """Senales que no requieren conocer al cliente.
+
+    Es el **piso de evidencia** del sistema: el unico agente que sigue
+    produciendo senales cuando el cliente no tiene perfil —el escenario que el
+    contrato llama "el que mas importa"—. Por eso no consulta el perfil ni el
+    historial: si lo hiciera, dejaria de funcionar justo cuando hace falta.
+
+    Que evalue una sola politica (FP-07) no es un defecto del reparto: es lo que
+    resulta de derivarlo de los insumos que declara cada predicado (ADR-0007).
+    """
+    ctx = EvalContext(
+        transaction=state["transaction"],
+        blacklist=await runtime.context.blacklist.get(runtime.context.session_factory),
+    )
+    resultado = evaluate(runtime.context.catalog, Owner.CONTEXT, ctx)
+
     return {
         "agent_route": [CONTEXT],
-        "signals": [
-            WorkingSignal(
-                code="STUB_ABSOLUTE",
-                description="stub: senal leida de la transaccion sola",
-                severity=Severity.LOW,
-                emitted_by=CONTEXT,
-            )
-        ],
+        "signals": _a_working(resultado.signals, CONTEXT),
+        "matched_policies": list(resultado.matched_policies),
     }
 
 
 @degrades(BEHAVIORAL)
-async def behavioral_pattern(state: GraphState) -> dict:
-    # El stub simula el caso interesante: cliente sin perfil previo.
-    # `customer_snapshot=None` NO comunica eso; la senal si.
-    return {
-        "agent_route": [BEHAVIORAL],
-        "customer_snapshot": None,
-        "signals": [
+async def behavioral_pattern(
+    state: GraphState, runtime: Runtime[GraphContext]
+) -> dict:
+    """Contraste contra el perfil y el historial del cliente.
+
+    Nueve de las diez politicas evaluables. Tres consultas —perfil, historial de
+    la cuenta, historial del dispositivo— y despues aritmetica pura: la logica
+    esta toda en `domain/`, probada sobre las 7 000 transacciones sin base.
+
+    **El `as_of` es el timestamp de la transaccion, jamas `now()`.** Es el punto
+    mas delicado de la etapa: `now()` funciona perfecto en produccion —el futuro
+    no esta en la tabla cuando llega el caso— y solo miente en evaluacion, donde
+    el dataset se carga completo. Fallaria hacia arriba, viendo rafagas enteras
+    desde su primera transaccion e inflando su propio recall. El repositorio hace
+    cumplir el filtro; aca solo hay que pasarle el valor correcto.
+    """
+    transaccion = state["transaction"]
+    as_of = transaccion.timestamp
+
+    async with runtime.context.session_factory() as session:
+        # Secuencial y en una sola sesion, no `asyncio.gather`: una `AsyncSession`
+        # no admite operaciones concurrentes. Las tres consultas usan indice y
+        # cuestan menos que abrir dos sesiones mas.
+        perfil = await profile_for(session, customer_id=transaccion.customer_id)
+        hist_cliente = await history_for_customer(
+            session,
+            customer_id=transaccion.customer_id,
+            as_of=as_of,
+            exclude_transaction_id=transaccion.transaction_id,
+        )
+        hist_dispositivo = await history_for_device(
+            session,
+            device_id=transaccion.device_id,
+            as_of=as_of,
+            exclude_transaction_id=transaccion.transaction_id,
+        )
+
+    ctx = EvalContext(
+        transaction=transaccion,
+        profile=perfil,
+        history_customer=tuple(hist_cliente),
+        history_device=tuple(hist_dispositivo),
+    )
+    resultado = evaluate(runtime.context.catalog, Owner.BEHAVIORAL, ctx)
+    señales = _a_working(resultado.signals, BEHAVIORAL)
+
+    if perfil is None:
+        # La unica senal que no sale de un predicado. No es una observacion
+        # sobre la transaccion sino sobre la **evidencia**: el agente declara
+        # que no pudo comparar. `customer_snapshot=None` no lo comunica —seria
+        # indistinguible de "el nodo no corrio"—; la senal si.
+        señales.insert(
+            0,
             WorkingSignal(
                 code="NO_CUSTOMER_PROFILE",
-                description="stub: el cliente no tiene perfil de comportamiento",
+                description=(
+                    f"El cliente {transaccion.customer_id} no tiene perfil de "
+                    f"comportamiento: {len(resultado.skipped_policies)} politicas "
+                    f"no son evaluables"
+                ),
                 severity=Severity.MEDIUM,
                 emitted_by=BEHAVIORAL,
-            )
-        ],
+            ),
+        )
+
+    return {
+        "agent_route": [BEHAVIORAL],
+        "customer_snapshot": perfil,
+        "signals": señales,
+        "matched_policies": list(resultado.matched_policies),
     }
 
 

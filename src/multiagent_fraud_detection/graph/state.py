@@ -79,6 +79,12 @@ class GraphState(GraphInput, total=False):
     signals: Annotated[list[WorkingSignal], operator.add]
     agent_route: Annotated[list[str], operator.add]
     agent_errors: Annotated[list[AgentError], operator.add]
+    # Las politicas que dispararon completas. Las escriben Context y Behavioral
+    # —cada uno las suyas, ninguna cruza los dos nodos (ADR-0007)—, asi que es
+    # multi-escritor y lleva reducer. Es el vocabulario en el que habla el
+    # ground truth: sin esta clave el harness compara senales atomicas contra
+    # `expected_policies` y no hay comparacion posible.
+    matched_policies: Annotated[list[str], operator.add]
 
     # Zona 3 - un escritor por clave (los nodos de debate corren en paralelo
     # pero escriben claves distintas, por eso no necesitan reducer).
