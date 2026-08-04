@@ -38,6 +38,21 @@ class Decision(Base):
 
     scoring_version: Mapped[str | None] = mapped_column(String(16))
 
+    # Las politicas que dispararon completas. `ARRAY` y no tabla por la regla de
+    # §7.2: escalares homogeneos, se leen siempre completos, no existen sin su
+    # dueno. Mismo caso que `agent_route`.
+    #
+    # Es el vocabulario en el que habla el ground truth (`expected_policies`).
+    # Sin esta columna el harness compara senales atomicas contra politicas, y
+    # esa correspondencia no es reconstruible: una politica es la conjuncion de
+    # dos o tres senales.
+    matched_policies: Mapped[list[str] | None] = mapped_column(ARRAY(String))
+
+    # Que version del catalogo se evaluo. Con las politicas como dato mutable
+    # (ADR-0007), una decision de enero auditada contra el catalogo de marzo no
+    # es auditable. `scoring_version` sella la formula; esto sella la norma.
+    policy_catalog_version: Mapped[str | None] = mapped_column(String(32))
+
     citations_internal: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
 
     citations_external: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)

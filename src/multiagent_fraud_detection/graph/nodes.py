@@ -399,6 +399,8 @@ async def persist_decision(
                     base_confidence=state.get("base_confidence"),
                     confidence_rationale=state.get("confidence_rationale"),
                     scoring_version=state.get("scoring_version"),
+                    matched_policies=state.get("policies", []),
+                    policy_catalog_version=runtime.context.catalog.version,
                     # model_dump(mode="json"): en modo Python, HttpUrl y
                     # datetime no son serializables por psycopg.
                     citations_internal=[
