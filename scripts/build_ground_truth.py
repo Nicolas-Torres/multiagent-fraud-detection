@@ -39,14 +39,15 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
+from multiagent_fraud_detection.domain.params import (
+    CURRENCY_FACTOR,
+    PRECEDENCE,
+    SEGMENT_AVG_REF,
+)
+
 DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 
 BLACKLISTED_MERCHANTS = {"M-999"}
-
-CURRENCY_FACTOR = {
-    "PEN": 3.7, "USD": 1.0, "COP": 4000.0, "EUR": 0.9,
-    "MXN": 18.0, "ARS": 1000.0, "CLP": 900.0,
-}
 
 MICRO_CHARGE_USD = 1.0      # techo del "cobro de centavos" de FP-04
 FP07_THRESHOLD_USD = 135.0  # los "500 soles" de FP-07
@@ -66,10 +67,6 @@ POLICY_ACTION = {
     "FP-11": "BLOCK",
 }
 
-# Cuando dos políticas aplican a la vez gana la más restrictiva. La misma regla
-# tiene que usar el Arbiter, o la comparación contra el ground truth es injusta.
-PRECEDENCE = ["BLOCK", "ESCALATE_TO_HUMAN", "CHALLENGE", "APPROVE"]
-
 
 def _en_ventana(hora, inicio, fin):
     if inicio <= fin:
@@ -86,8 +83,11 @@ def build(tx: pd.DataFrame, cb: pd.DataFrame) -> pd.DataFrame:
 
     # Promedio por segmento en la moneda de cada cuenta: es contra esto que
     # compara FP-08, no contra el promedio del propio cliente.
-    base_usd = cb.usual_amount_avg.astype(float) / cb.currency.map(CURRENCY_FACTOR)
-    seg_avg_usd = base_usd.groupby(cb.segment).mean().to_dict()
+    #
+    # Congelado en `domain.params`, no recalculado desde el CSV: si se derivara
+    # de la población el umbral se movería al agregar un perfil, y las etiquetas
+    # cambiarían sin que nadie tocara una política.
+    seg_avg_usd = SEGMENT_AVG_REF
 
     tx = tx.copy()
     tx["ts_utc"] = pd.to_datetime(tx.timestamp, utc=True, format="ISO8601")
