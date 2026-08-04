@@ -5,10 +5,10 @@ from sqlalchemy import pool
 
 from alembic import context
 
-from agents.src.config.settings import settings
-from agents.src.db.base import Base
+from src.config.settings import settings
+from src.db.base import Base
 # Con esto, target_metadata = Base.metadata ya "ve" Transaction.
-from agents.src.db import models            # noqa: F401 (registra los modelos en Base.metadata)
+from src.db import models            # noqa: F401 (registra los modelos en Base.metadata)
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

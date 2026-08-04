@@ -12,7 +12,7 @@ que escribe el nodo de persistencia, no una bifurcacion del grafo.
 
 from langgraph.graph import END, START, StateGraph
 
-from agents.src.graph.nodes import (
+from src.graph.nodes import (
     AGGREGATE,
     ARBITER,
     BEHAVIORAL,
@@ -34,8 +34,8 @@ from agents.src.graph.nodes import (
     persist_decision,
     transaction_context,
 )
-from agents.src.graph.context import GraphContext
-from agents.src.graph.state import GraphInput, GraphState
+from src.graph.context import GraphContext
+from src.graph.state import GraphInput, GraphState
 
 
 def build_graph():

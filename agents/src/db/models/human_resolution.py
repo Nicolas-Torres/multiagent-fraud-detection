@@ -5,11 +5,11 @@ from uuid import UUID
 from sqlalchemy import DateTime, Enum as SQLEnum, ForeignKey, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from agents.src.db.base import Base
-from agents.src.enums import HumanAction
+from src.db.base import Base
+from src.enums import HumanAction
 
 if TYPE_CHECKING:
-    from agents.src.db.models.case import Case
+    from src.db.models.case import Case
 
 
 class HumanResolution(Base):

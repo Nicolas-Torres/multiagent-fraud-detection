@@ -1,6 +1,6 @@
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
-from agents.src.enums import HumanAction
+from src.enums import HumanAction
 
 
 class HumanResolutionIn(BaseModel):

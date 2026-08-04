@@ -27,19 +27,19 @@ if sys.platform == "win32":
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from db.models import (
+from src.db.models import (
     CustomerBehavior,
     MerchantBlacklist,
     Transaction,
 )
-from db.repositories.transaction_history import (
+from src.db.repositories.transaction_history import (
     history_for_customer,
 )
-from db.session import engine
-from schemas.customer_behavior import CustomerBehaviorRead
-from schemas.transaction import TransactionRead
+from src.db.session import engine
+from src.schemas.customer_behavior import CustomerBehaviorRead
+from src.schemas.transaction import TransactionRead
 
-from agents.scripts.seed import sembrar  # scripts/ está en sys.path al ejecutar este archivo
+from seed import sembrar  # scripts/ está en sys.path al ejecutar este archivo
 
 Session = async_sessionmaker(engine, expire_on_commit=False)
 

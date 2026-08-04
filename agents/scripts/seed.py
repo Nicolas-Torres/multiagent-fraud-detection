@@ -54,15 +54,17 @@ from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from agents.src.db.models import (
+from src.db.models import (
     CustomerBehavior,
     MerchantBlacklist,
     Transaction,
+    WebSearchAllowlist,
 )
-from agents.src.db.session import engine
-from agents.src.schemas.customer_behavior import CustomerBehaviorIn
-from agents.src.schemas.merchant_blacklist import MerchantBlacklistIn
-from agents.src.schemas.transaction import TransactionIn
+from src.db.session import engine
+from src.schemas.customer_behavior import CustomerBehaviorIn
+from src.schemas.merchant_blacklist import MerchantBlacklistIn
+from src.schemas.transaction import TransactionIn
+from src.schemas.web_search_allowlist import WebSearchAllowlistIn
 
 DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 
@@ -164,6 +166,28 @@ BLACKLIST = [
 ]
 
 
+# Dominios permitidos para la búsqueda web gobernada (contrato §4). Conjunto
+# pequeño e ilustrativo: fuentes de referencia sobre fraude financiero. En
+# evaluación el nodo Threat Intel corre en modo offline y no las consulta.
+ALLOWLIST = [
+    WebSearchAllowlistIn(
+        domain="openai.com",
+        reason="Documentación de referencia sobre modelos de lenguaje",
+        added_by="seed",
+    ),
+    WebSearchAllowlistIn(
+        domain="antivirus.comodo.com",
+        reason="Alertas públicas de fraude y phishing",
+        added_by="seed",
+    ),
+    WebSearchAllowlistIn(
+        domain="www.identitytheft.gov",
+        reason="Portal oficial de robo de identidad (EE. UU.)",
+        added_by="seed",
+    ),
+]
+
+
 async def _upsert(session, modelo, filas: list[dict], pk: str) -> None:
     """Inserta o actualiza por lotes. Un reintento sustituye, no acumula."""
     if not filas:
@@ -190,7 +214,8 @@ async def _reset(session) -> None:
     """
     await session.execute(
         text(
-            "TRUNCATE transactions, customer_behaviors, merchant_blacklist CASCADE"
+            "TRUNCATE transactions, customer_behaviors, merchant_blacklist, "
+            "web_search_allowlist CASCADE"
         )
     )
 
@@ -225,6 +250,12 @@ async def sembrar(reset: bool) -> None:
             MerchantBlacklist,
             [b.model_dump() for b in BLACKLIST],
             "merchant_id",
+        )
+        await _upsert(
+            session,
+            WebSearchAllowlist,
+            [a.model_dump() for a in ALLOWLIST],
+            "domain",
         )
 
         # Un solo commit: o queda todo o no queda nada. Un seed a medias es peor

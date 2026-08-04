@@ -5,10 +5,10 @@ from uuid import UUID
 from sqlalchemy import BigInteger, DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from agents.src.db.base import Base
+from src.db.base import Base
 
 if TYPE_CHECKING:
-    from agents.src.db.models.decision import Decision
+    from src.db.models.decision import Decision
 
 class AgentError(Base):
     __tablename__ = "agent_errors"

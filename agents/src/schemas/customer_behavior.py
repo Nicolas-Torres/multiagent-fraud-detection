@@ -2,8 +2,8 @@ from datetime import date
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
-from agents.src.enums import Channel, Segment
-from agents.src.schemas.types import CountryCode, CurrencyCode, Money, TimeZone
+from src.enums import Channel, Segment
+from src.schemas.types import CountryCode, CurrencyCode, Money, TimeZone
 
 
 class CustomerBehaviorIn(BaseModel):

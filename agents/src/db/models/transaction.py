@@ -4,8 +4,8 @@ from decimal import Decimal
 from sqlalchemy import DateTime, Enum as SQLEnum, Index, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
-from agents.src.db.base import Base
-from agents.src.enums import Channel
+from src.db.base import Base
+from src.enums import Channel
 
 
 class Transaction(Base):

@@ -18,14 +18,14 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from agents.src.enums import DecisionType
-from agents.src.schemas.customer_behavior import CustomerBehaviorRead
-from agents.src.schemas.decision import (
+from src.enums import DecisionType
+from src.schemas.customer_behavior import CustomerBehaviorRead
+from src.schemas.decision import (
     ExternalCitation,
     InternalCitation,
     SignalRead,
 )
-from agents.src.schemas.transaction import TransactionIn
+from src.schemas.transaction import TransactionIn
 
 # --- Tipos internos: no cruzan a `schemas/`, que es la frontera publica ---
 
@@ -82,6 +82,11 @@ class GraphState(GraphInput, total=False):
 
     # Zona 3 - un escritor por clave (los nodos de debate corren en paralelo
     # pero escriben claves distintas, por eso no necesitan reducer).
+    # `final_signals` la escribe UN solo nodo —Evidence Aggregation— con la
+    # lista deduplicada y ordenada. No puede volver a `signals` (zona 2, con
+    # reducer): devolver la lista acumulada desde un nodo con reducer duplica
+    # en silencio (repaso 03 §2.2).
+    final_signals: list[WorkingSignal]
     customer_snapshot: CustomerBehaviorRead | None  # None = el nodo no corrio;
     # "cliente sin perfil" es la senal NO_CUSTOMER_PROFILE
     citations_internal: list[InternalCitation]

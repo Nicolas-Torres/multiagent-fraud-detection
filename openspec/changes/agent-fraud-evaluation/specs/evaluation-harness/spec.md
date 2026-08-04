@@ -75,3 +75,30 @@ catálogo de políticas usado.
 - **WHEN** termina una corrida de evaluación
 - **THEN** el evaluador emite el reporte con métricas, tamaño de muestra, enfoques
   comparados y versión del catálogo
+
+### Requirement: Registro de experimentos en MLflow
+El evaluador SHALL registrar cada corrida de evaluación en MLflow, con el
+tracking URI apuntando al servidor remoto propio (`MLFLOW_TRACKING_URI`),
+separado del motor. SHALL registrar como parámetros el enfoque comparado, el
+tamaño de muestra, el seed y la versión del catálogo, y como métricas la
+precisión, recall y F1 por decisión y por política. Si el URI no está
+configurado, SHALL correr sin registrar.
+
+#### Scenario: Corrida registrada en MLflow
+- **WHEN** el evaluador termina una corrida con MLflow configurado
+- **THEN** MLflow almacena los parámetros y métricas de la corrida en un
+  experimento identificado por el enfoque evaluado
+
+#### Scenario: Sin tracking URI configurado
+- **WHEN** `MLFLOW_TRACKING_URI` no está seteado
+- **THEN** el evaluador corre igual y no registra nada en MLflow
+
+### Requirement: Evaluación del retrieval
+El evaluador SHALL medir la calidad del retrieval de políticas —la capacidad del
+RAG de recuperar las políticas relevantes para cada caso— y SHALL incluirla en el
+reporte y en el registro de MLflow.
+
+#### Scenario: Métricas del retrieval
+- **WHEN** el evaluador procesa un caso con retrieval de políticas
+- **THEN** el reporte y MLflow incluyen la métrica de recall@k de políticas
+  relevantes recuperadas

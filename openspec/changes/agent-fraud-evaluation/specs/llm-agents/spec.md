@@ -24,6 +24,29 @@ exigir respaldo interno recuperado.
 - **THEN** devuelve las políticas aplicables con `policy_id`, `version` y el chunk
   que las sustenta
 
+### Requirement: Corpus de políticas indexado en almacén vectorial
+El sistema SHALL mantener el corpus de políticas indexado en una tabla con
+columna vectorial (`policy_chunks`) y recuperar las políticas por similitud
+semántica del embedding, no por coincidencia textual únicamente.
+
+#### Scenario: Política recuperada por similitud
+- **WHEN** una transacción dispara señales cuya consulta semántica coincide con el
+  contenido de una política del catálogo
+- **THEN** el sistema recupera esa política como respaldo, citándola con
+  `policy_id`, `version` y `chunk_id`
+
+### Requirement: Proveedor LLM configurable por entorno
+El sistema SHALL poder ejecutar los agentes con LLM contra un proveedor
+configurable por entorno —dev: API compatible con Anthropic vía opencode;
+despliegue: API de Claude— sin cambiar los prompts ni los esquemas de salida
+estructurada de los agentes.
+
+#### Scenario: Mismo agente, proveedor distinto
+- **WHEN** el sistema se ejecuta con el proveedor de desarrollo y luego con el de
+  despliegue
+- **THEN** ambos entornos producen la misma salida estructurada para el mismo
+  agente, salvo variación natural del modelo
+
 ### Requirement: Inteligencia externa gobernada
 El sistema SHALL consultar fuentes externas de alertas de fraude únicamente dentro
 de la lista permitida gobernada, y SHALL registrar cada fuente consultada con su

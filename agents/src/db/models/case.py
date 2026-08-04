@@ -6,13 +6,13 @@ from sqlalchemy import DateTime, Enum as SQLEnum, ForeignKey, Index, Uuid, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from agents.src.db.base import Base
-from agents.src.enums import CaseStatus
+from src.db.base import Base
+from src.enums import CaseStatus
 
 if TYPE_CHECKING:
-    from agents.src.db.models.decision import Decision
-    from agents.src.db.models.human_resolution import HumanResolution
-    from agents.src.db.models.transaction import Transaction
+    from src.db.models.decision import Decision
+    from src.db.models.human_resolution import HumanResolution
+    from src.db.models.transaction import Transaction
 
 
 class Case(Base):

@@ -9,21 +9,36 @@ authors = [
 requires-python = ">=3.12"
 dependencies = [
     "alembic>=1.18.5",
+    "langchain>=0.3.0",
+    "langchain-anthropic>=0.3.0",
+    "langchain-google-genai>=2.0.0",
+    "langchain-openai>=0.3.0",
     "langgraph>=1.2.10",
+    "langsmith>=0.3.0",
+    "mlflow>=2.20.0",
+    "pgvector>=0.3.0",
     "psycopg[binary]>=3.3.4",
     "pydantic-settings>=2.14.2",
     "sqlalchemy>=2.0.51",
 ]
 
-[project.scripts]
-multiagent-fraud-detection = "multiagent_fraud_detection:main"
-
 [build-system]
 requires = ["uv_build>=0.11.29,<0.12.0"]
 build-backend = "uv_build"
 
+[tool.uv.build-backend]
+module-name = "src"
+module-root = ""
+
 [dependency-groups]
 dev = [
     "numpy>=2.5.1",
-    "pandas>=3.0.5",
+    "pandas>=2.2,<3",
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+

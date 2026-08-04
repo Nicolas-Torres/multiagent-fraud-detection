@@ -58,15 +58,34 @@ Ambos sin autenticación, `200` cuando OK.
 |---|---|
 | `APP_PORT` | `8000` |
 | `DATABASE_URL` | `postgresql+psycopg://user:pass@host:5432/fraud?sslmode=require` |
+| `MLFLOW_TRACKING_URI` | `https://mlflow.chris-co.net` |
+| `LLM_PROVIDER` | `anthropic` |
+| `ANTHROPIC_API_BASE` | `https://opencode.ai/zen/go/v1` (dev) · `https://api.anthropic.com` (despliegue) |
 | `ANTHROPIC_API_KEY` | `sk-ant-...` |
+| `ANTHROPIC_MODEL` | `claude-3.0` / modelo del endpoint de dev |
 | `GEMINI_API_KEY` | `...` |
+| `EMBEDDING_MODEL` | `gemini-embedding-2` |
+| `EMBEDDING_DIM` | `3072` |
 | `LANGSMITH_API_KEY` | `ls-...` |
 | `LANGSMITH_TRACING` | `true` |
 | `LANGSMITH_PROJECT` | `fraud-detection` |
+| `THREAT_INTEL_OFFLINE` | `true` (evaluación) |
 | `LOG_LEVEL` | `INFO` |
 
 > `LOG_LEVEL` gobierna también el echo de SQL de SQLAlchemy: solo en `DEBUG`.
 > El allowlist de búsqueda web **no** es env var → tabla gobernada (§4).
+>
+> `MLFLOW_TRACKING_URI` apunta al **servidor remoto propio** de MLflow
+> (`https://mlflow.chris-co.net`, autohosteado, sin autenticación). No hay base
+> de MLflow local: el servidor gestiona su propio backend, separado del motor.
+> Si no está seteado, el harness corre igual y no registra experimentos.
+>
+> `LLM_PROVIDER` selecciona el adaptador en la factory (D10 del diseño). En **dev**
+> el proveedor apunta al endpoint compatible con la API de Anthropic servido por
+> opencode (`ANTHROPIC_API_BASE=https://opencode.ai/zen/go/v1`); en el **despliegue**
+> se reemplaza por la API real de Claude (`https://api.anthropic.com`). Los prompts
+> y los esquemas de salida estructurada **no cambian** entre entornos: solo cambia
+> el cliente. Los embeddings siempre usan Gemini.
 
 #### Tres entornos, no uno
 

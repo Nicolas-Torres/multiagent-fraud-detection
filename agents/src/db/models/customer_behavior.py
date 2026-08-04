@@ -5,8 +5,8 @@ from sqlalchemy import Date, DateTime, Enum as SQLEnum, Numeric, SmallInteger, S
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column
 
-from agents.src.db.base import Base
-from agents.src.enums import Channel, Segment
+from src.db.base import Base
+from src.enums import Channel, Segment
 
 
 class CustomerBehavior(Base):

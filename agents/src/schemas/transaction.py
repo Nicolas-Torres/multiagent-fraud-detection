@@ -1,7 +1,7 @@
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
-from agents.src.enums import Channel
-from agents.src.schemas.types import CountryCode, CurrencyCode, Money
+from src.enums import Channel
+from src.schemas.types import CountryCode, CurrencyCode, Money
 
 
 class TransactionIn(BaseModel):

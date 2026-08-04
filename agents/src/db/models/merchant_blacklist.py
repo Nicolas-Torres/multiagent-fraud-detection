@@ -3,7 +3,7 @@ from datetime import datetime
 from sqlalchemy import Boolean, DateTime, String, Text, func, text
 from sqlalchemy.orm import Mapped, mapped_column
 
-from agents.src.db.base import Base
+from src.db.base import Base
 
 
 class MerchantBlacklist(Base):

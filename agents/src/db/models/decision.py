@@ -7,13 +7,13 @@ from sqlalchemy import DateTime, Enum as SQLEnum, Float, ForeignKey, String, Tex
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from agents.src.db.base import Base
-from agents.src.enums import DecisionType
+from src.db.base import Base
+from src.enums import DecisionType
 
 if TYPE_CHECKING:
-    from agents.src.db.models.case import Case
-    from agents.src.db.models.signal import Signal
-    from agents.src.db.models.agent_error import AgentError
+    from src.db.models.case import Case
+    from src.db.models.signal import Signal
+    from src.db.models.agent_error import AgentError
 
 
 class Decision(Base):

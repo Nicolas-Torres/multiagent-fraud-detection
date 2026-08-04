@@ -27,11 +27,35 @@ import sys
 
 import sqlalchemy as sa
 
-from agents.src.config.settings import settings
+from src.config.settings import settings
 
 # Base de mantenimiento: existe siempre y no es de nadie. Es el único sitio desde
 # donde se puede crear otra.
 BASE_MANTENIMIENTO = "postgres"
+
+
+def _crear(sa, url: sa.engine.URL, objetivo: str) -> int:
+    """Crea `objetivo` desde la base de mantenimiento. Idempotente."""
+    engine = sa.create_engine(
+        url.set(database=BASE_MANTENIMIENTO), isolation_level="AUTOCOMMIT"
+    )
+
+    with engine.connect() as conn:
+        existe = conn.exec_driver_sql(
+            "SELECT 1 FROM pg_database WHERE datname = %s", (objetivo,)
+        ).fetchone()
+
+        if existe:
+            print(f"'{objetivo}' ya existe en {url.host} — nada que hacer")
+            engine.dispose()
+            return 0
+
+        nombre = sa.sql.quoted_name(objetivo, quote=True)
+        conn.exec_driver_sql(f'CREATE DATABASE "{nombre}"')
+        print(f"creada '{objetivo}' en {url.host}")
+
+    engine.dispose()
+    return 0
 
 
 def main() -> int:
@@ -46,34 +70,13 @@ def main() -> int:
         )
         return 1
 
-    engine = sa.create_engine(
-        url.set(database=BASE_MANTENIMIENTO), isolation_level="AUTOCOMMIT"
-    )
+    rc = _crear(sa, url, objetivo)
 
-    with engine.connect() as conn:
-        existe = conn.exec_driver_sql(
-            "SELECT 1 FROM pg_database WHERE datname = %s", (objetivo,)
-        ).fetchone()
-
-        if existe:
-            # Idempotente: correrlo de nuevo no es un error. `CREATE DATABASE`
-            # no admite `IF NOT EXISTS`, así que la comprobación es explícita.
-            print(f"'{objetivo}' ya existe en {url.host} — nada que hacer")
-            engine.dispose()
-            return 0
-
-        # El nombre viene de nuestra propia configuración, no de entrada
-        # externa, pero se cita igual: `CREATE DATABASE` no acepta parámetros
-        # enlazados y la interpolación a ciegas es un hábito que no conviene
-        # tener.
-        nombre = sa.sql.quoted_name(objetivo, quote=True)
-        conn.exec_driver_sql(f'CREATE DATABASE "{nombre}"')
-        print(f"creada '{objetivo}' en {url.host}")
-
-    engine.dispose()
+    # MLflow corre en un servidor remoto propio (`MLFLOW_TRACKING_URI`), que
+    # gestiona su propio backend: no hay base `mlflow` local que crear (D9).
 
     print("\nsigue:  uv run python scripts/check_database.py")
-    return 0
+    return rc
 
 
 if __name__ == "__main__":

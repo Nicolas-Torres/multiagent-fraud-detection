@@ -3,15 +3,15 @@ from uuid import UUID
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict
 
-from agents.src.enums import CaseStatus, DecisionType
-from agents.src.schemas.customer_behavior import CustomerBehaviorRead
-from agents.src.schemas.decision import DecisionRead
-from agents.src.schemas.human_resolution import HumanResolutionRead
-from agents.src.schemas.transaction import TransactionRead
-from agents.src.schemas.types import Confidence, Money
+from src.enums import CaseStatus, DecisionType
+from src.schemas.customer_behavior import CustomerBehaviorRead
+from src.schemas.decision import DecisionRead
+from src.schemas.human_resolution import HumanResolutionRead
+from src.schemas.transaction import TransactionRead
+from src.schemas.types import Confidence, Money
 
 if TYPE_CHECKING:
-    from agents.src.db.models.case import Case
+    from src.db.models.case import Case
 
 
 class CaseCreated(BaseModel):

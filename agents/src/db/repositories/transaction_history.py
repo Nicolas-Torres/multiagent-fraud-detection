@@ -46,7 +46,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from agents.src.db.models import Transaction
+from src.db.models import Transaction
 
 # Ventana por defecto. La política más ancha es FP-11 ("mismo día"), y un día
 # calendario local nunca supera las 24 h desde `as_of`... salvo en el cambio de

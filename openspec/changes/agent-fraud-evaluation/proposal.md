@@ -27,12 +27,23 @@ entregables 2, 3, 4, 6 y 7 de la rúbrica.
   reporta precisión, recall, F1 por política y por decisión, incluyendo la
   comparación de enfoques Context determinístico vs. Context con LLM que promete
   el ADR-0006.
+- **Experimentación con MLflow**: el harness registra cada corrida de evaluación
+  —métricas por decisión y por política, métricas del retrieval y parámetros de
+  la corrida— en MLflow, apuntando al servidor remoto propio
+  (`https://mlflow.chris-co.net`), sin base de datos local.
 - **Dependencias y configuración**: se agregan `langchain`, el/los proveedor(es)
-  de modelo y `langsmith` a `pyproject.toml`, y las variables de entorno
-  correspondientes (`ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `LANGSMITH_*`).
+  de modelo configurables por entorno, `langsmith` y `mlflow` a `pyproject.toml`,
+  y las variables correspondientes: `ANTHROPIC_API_BASE`, `ANTHROPIC_API_KEY`,
+  `ANTHROPIC_MODEL` (dev → endpoint opencode compatible con Anthropic; despliegue
+  → Claude), `GEMINI_API_KEY`, `EMBEDDING_MODEL`, `EMBEDDING_DIM`,
+  `MLFLOW_TRACKING_URI=https://mlflow.chris-co.net`, `THREAT_INTEL_OFFLINE` y
+  `LANGSMITH_*`.
 
 Fuera de alcance deliberado: API FastAPI, dashboard, contenerización, CI/CD y
 despliegue (frontend, backend e infraestructura se hacen en una etapa posterior).
+El grafo se invoca **una transacción por llamada** —la forma que el flujo
+SQS → Lambda (Docker) requiere—, pero el handler y el empaquetado de esa
+infraestructura quedan fuera de esta etapa.
 
 ## Capabilities
 
@@ -61,10 +72,13 @@ despliegue (frontend, backend e infraestructura se hacen en una etapa posterior)
   `agents/src/llm/` (providers, prompts, esquemas de salida), extensión de
   `agents/src/graph/context.py` (proveedores, vector store, allowlist),
   `agents/src/graph/state.py` (claves nuevas si hicieran falta).
-- **Persistencia**: se consume `web_search_allowlist` (pendiente de modelar) y
-  `merchant_blacklist`; pgvector ya habilitado para el RAG de políticas.
-- **Configuración**: nuevas variables de entorno para claves de API y LangSmith;
-  nuevas dependencias en `pyproject.toml`.
+- **Persistencia**: nueva tabla `policy_chunks` (corpus del RAG con embeddings
+  pgvector a 3072 dims), se modela `web_search_allowlist`, se consume
+  `merchant_blacklist`; el tracking de MLflow apunta al servidor remoto propio.
+- **Configuración**: variables de entorno para proveedor LLM por entorno
+  (`ANTHROPIC_API_BASE/KEY/MODEL`), embeddings (`GEMINI_API_KEY`,
+  `EMBEDDING_MODEL`, `EMBEDDING_DIM`), LangSmith, MLflow (`MLFLOW_TRACKING_URI`)
+  y `THREAT_INTEL_OFFLINE`; nuevas dependencias en `pyproject.toml`.
 - **Repositorios**: se crea `agents/scripts/` harness de evaluación.
 - **Docs**: se actualiza `contrato_de_interfaz.md` y los ADR si el diseño cierra
   decisiones nuevas.

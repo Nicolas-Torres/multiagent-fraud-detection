@@ -23,7 +23,7 @@ import sys
 
 import sqlalchemy as sa
 
-from agents.src.config.settings import settings
+from src.config.settings import settings
 
 # La versión mayor tiene que coincidir entre entornos: mientras difieran, "pasa
 # en local" deja de ser evidencia de "pasa en la nube". La menor puede diferir.

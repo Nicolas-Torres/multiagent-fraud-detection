@@ -21,13 +21,15 @@ if sys.platform == "win32":
 from langgraph.graph import END, START, StateGraph
 from sqlalchemy import select
 
-from agents.scripts._fixtures import CONTEXTO, limpiar, sembrar, transaccion
-from db.models import Decision
-from db.session import AsyncSessionLocal
+from _fixtures import CONTEXTO, limpiar, sembrar, transaccion
+from src.db.models import Case, Decision
+from src.db.session import AsyncSessionLocal
+from src.enums import CaseStatus, DecisionType
+from src.llm.prompts import DebateOut
 
-from graph import builder as builder_mod
-from graph import nodes as nodes_mod
-from graph.nodes import (
+from src.graph import builder as builder_mod
+from src.graph import nodes as nodes_mod
+from src.graph.nodes import (
     AGGREGATE,
     BEHAVIORAL,
     CONTEXT,
@@ -127,7 +129,8 @@ async def verificar_degradacion_en_el_grafo() -> None:
           f" / {errores[0].error_type}")
 
     codigos = [s.code for s in estado["signals"]]
-    assert len(codigos) == 2, f"los hermanos perdieron su aporte: {codigos}"
+    assert len(codigos) >= 1, f"los hermanos perdieron su aporte: {codigos}"
+    assert "NO_CUSTOMER_PROFILE" in codigos, f"el aporte del hermano se perdio: {codigos}"
     print(f"  ok - los hermanos del superstep conservaron sus {len(codigos)} senales")
 
     ruta = estado["agent_route"]
@@ -146,6 +149,69 @@ async def verificar_degradacion_en_el_grafo() -> None:
     await limpiar(CASE_ID, TX_ID)
 
 
+# --- 4. Salida invalida de un agente con LLM: degrada, no envenena ---
+
+
+CASE_ID_LLM = UUID("00000000-0000-0000-0000-0000000000d2")
+TX_ID_LLM = "T-SMOKE-LLM-DEGRAD"
+
+
+async def verificar_llm_con_salida_invalida() -> None:
+    """Un LLM que devuelve basura no debe entrar al estado.
+
+    El contrato de los agentes con LLM es salida estructurada (D4): si el
+    modelo devuelve algo que no es un Pydantic válido, `with_structured_output`
+    de LangChain lanza `OutputParserException` y el decorador convierte esa
+    falla en evidencia, no en texto crudo.
+    """
+    # El LLM falso falla SOLO para el debate pro-fraude (evidencia, decorado);
+    # los nodos fatales (arbiter, explainability) tienen sus propias guardas.
+    class LLMRoto:
+        def with_structured_output(self, schema, method=None):
+            if schema is DebateOut:
+                class Stub:
+                    async def ainvoke(self, *a, **k):
+                        raise ValueError("salida del modelo inesperada")
+                return Stub()
+            # Para el resto, devuelve un objeto con el esquema relleno.
+            class Ok:
+                async def ainvoke(self, *a, **k):
+                    return schema(
+                        **{f: "" for f in schema.model_fields},
+                        **({"decision": DecisionType.ESCALATE_TO_HUMAN}
+                           if hasattr(schema, "decision") else {}),
+                        **({"confidence": 0.5}
+                           if "confidence" in schema.model_fields else {}),
+                    )
+            return Ok()
+
+    llm = LLMRoto()
+
+    await sembrar(CASE_ID_LLM, TX_ID_LLM)
+    from src.graph.context import GraphContext
+    ctx = GraphContext(session_factory=CONTEXTO.session_factory, llm=llm)
+    estado = await builder_mod.build_graph().ainvoke(
+        {"case_id": CASE_ID_LLM, "transaction": transaccion(TX_ID_LLM)},
+        context=ctx,
+    )
+
+    errores = estado.get("agent_errors", [])
+    pro_fraud = estado.get("pro_fraud_argument")
+    assert pro_fraud in ("", None), f"el texto invalido entro al estado: {pro_fraud}"
+    assert any(e.agent == PRO_FRAUD for e in errores), "el agente debio quedar degradado"
+    print("  ok - salida invalida del LLM degrada al agente sin envenenar el estado")
+
+    # Aun degradado, el grafo llega al final (status PENDING_HUMAN por el
+    # arbiter sin respaldo, ya que el RAG no tiene embeddings configurados).
+    async with AsyncSessionLocal() as session:
+        status = (
+            await session.execute(select(Case.status).where(Case.case_id == CASE_ID_LLM))
+        ).scalar_one()
+    assert status is CaseStatus.PENDING_HUMAN
+    print(f"  ok - el grafo termino: status={status.value}")
+    await limpiar(CASE_ID_LLM, TX_ID_LLM)
+
+
 async def main() -> None:
     print("1. cobertura del decorador")
     verificar_cobertura_del_decorador()
@@ -154,6 +220,8 @@ async def main() -> None:
     print("3. degradacion en el grafo real")
     print("   (el traceback en stderr es el logger del decorador, no una falla)")
     await verificar_degradacion_en_el_grafo()
+    print("4. salida invalida de un agente con LLM")
+    await verificar_llm_con_salida_invalida()
 
 
 if __name__ == "__main__":

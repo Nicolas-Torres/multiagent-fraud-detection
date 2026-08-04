@@ -14,11 +14,11 @@ from uuid import UUID
 
 from sqlalchemy import delete
 
-from agents.src.db.models import Case, Transaction
-from agents.src.db.session import AsyncSessionLocal
-from agents.src.enums import CaseStatus, Channel
-from agents.src.graph.context import GraphContext
-from agents.src.schemas.transaction import TransactionIn
+from src.db.models import Case, Transaction
+from src.db.session import AsyncSessionLocal
+from src.enums import CaseStatus, Channel
+from src.graph.context import GraphContext
+from src.schemas.transaction import TransactionIn
 
 # El contexto de runtime que el grafo necesita para persistir.
 CONTEXTO = GraphContext(session_factory=AsyncSessionLocal)

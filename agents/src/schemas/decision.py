@@ -2,8 +2,8 @@ from typing import Annotated
 
 from pydantic import AwareDatetime, BaseModel, Field, HttpUrl, ConfigDict
 
-from agents.src.enums import DecisionType, Severity
-from agents.src.schemas.types import Confidence
+from src.enums import DecisionType, Severity
+from src.schemas.types import Confidence
 
 RiskScore = Annotated[float, Field(ge=0.0, le=1.0)]
 ScoringVersion = Annotated[str, Field(min_length=1, max_length=16)]

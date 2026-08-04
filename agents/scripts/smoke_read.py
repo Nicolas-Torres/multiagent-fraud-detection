@@ -16,16 +16,16 @@ if sys.platform == "win32":
 from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from agents.src.db.models import (
+from src.db.models import (
     Case, Decision, HumanResolution, Signal, Transaction,
 )
-from agents.src.db.session import engine  # <- ajusta si se llama distinto
-from agents.src.enums import (
+from src.db.session import engine  # <- ajusta si se llama distinto
+from src.enums import (
     CaseStatus, Channel, DecisionType, HumanAction, Segment, Severity,
 )
-from agents.src.schemas.case import CaseDetail, CaseSummary
-from agents.src.schemas.customer_behavior import CustomerBehaviorIn
-from agents.src.schemas.decision import ExternalCitation, InternalCitation
+from src.schemas.case import CaseDetail, CaseSummary
+from src.schemas.customer_behavior import CustomerBehaviorIn
+from src.schemas.decision import ExternalCitation, InternalCitation
 
 CASE_A = UUID("00000000-0000-0000-0000-00000000000a")
 CASE_B = UUID("00000000-0000-0000-0000-00000000000b")

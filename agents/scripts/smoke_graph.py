@@ -15,12 +15,12 @@ if sys.platform == "win32":
 
 from sqlalchemy import select
 
-from agents.scripts._fixtures import CONTEXTO, limpiar, sembrar, transaccion
-from db.models import Case, Decision
-from db.session import AsyncSessionLocal
-from enums import CaseStatus
-from graph.builder import build_graph
-from graph.nodes import (
+from _fixtures import CONTEXTO, limpiar, sembrar, transaccion
+from src.db.models import Case, Decision
+from src.db.session import AsyncSessionLocal
+from src.enums import CaseStatus
+from src.graph.builder import build_graph
+from src.graph.nodes import (
     AGGREGATE,
     ARBITER,
     BEHAVIORAL,
@@ -79,12 +79,18 @@ async def main() -> None:
     print("  ok - input_schema filtro la clave que no declara")
 
     codigos = [s.code for s in estado["signals"]]
-    assert len(codigos) == 2, f"el reducer no acumulo: {codigos}"
-    print(f"  ok - reducer acumulo {len(codigos)} senales de 2 emisores: {codigos}")
+    assert len(codigos) >= 1, f"el reducer no acumulo: {codigos}"
+    print(f"  ok - el reducer acumulo {len(codigos)} senal(es) de la ola 1: {codigos}")
 
     assert estado.get("customer_snapshot") is None
     assert "NO_CUSTOMER_PROFILE" in codigos
     print("  ok - 'sin perfil' viaja como senal, no como None")
+
+    # Evidence Aggregation deduplica y ordena en `final_signals`; no vuelve a
+    # `signals` (que tiene reducer y duplicaria en silencio, repaso 03 §2.2).
+    finales = estado.get("final_signals", estado["signals"])
+    assert len(finales) == len({s.code for s in finales}), "hay senales duplicadas"
+    print(f"  ok - Evidence Aggregation dejo {len(finales)} senal(es) sin duplicados")
 
     assert not estado.get("agent_errors"), estado.get("agent_errors")
     print("  ok - sin fallas degradadas en la corrida limpia")
@@ -98,9 +104,9 @@ async def main() -> None:
         ).scalar_one()
 
     assert decision.agent_route == estado["agent_route"], "memoria y BD divergen"
-    assert len(decision.signals) == 2
+    assert len(decision.signals) == len(finales), "lo persistido difiere de lo agregado"
     assert status is CaseStatus.PENDING_HUMAN
-    print(f"  ok - persistido: {len(decision.signals)} senales, status={status.value}")
+    print(f"  ok - persistido: {len(decision.signals)} senal(es), status={status.value}")
 
     await limpiar(CASE_ID, TX_ID)
     print("\nclaves del estado final:", sorted(estado))

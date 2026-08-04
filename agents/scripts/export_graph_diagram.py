@@ -15,7 +15,7 @@ la API de mermaid.ink.
 
 from pathlib import Path
 
-from agents.src.graph.builder import build_graph
+from src.graph.builder import build_graph
 
 # Independiente del directorio desde el que se ejecute el script.
 PNG_PATH = (

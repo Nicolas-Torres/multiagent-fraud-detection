@@ -4,11 +4,11 @@ from uuid import UUID
 from sqlalchemy import BigInteger, Enum as SQLEnum, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from agents.src.db.base import Base
-from agents.src.enums import Severity
+from src.db.base import Base
+from src.enums import Severity
 
 if TYPE_CHECKING:
-    from agents.src.db.models.decision import Decision
+    from src.db.models.decision import Decision
 
 
 class Signal(Base):

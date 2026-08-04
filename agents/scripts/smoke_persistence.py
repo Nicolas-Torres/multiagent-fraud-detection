@@ -18,14 +18,14 @@ if sys.platform == "win32":
 from langgraph.runtime import Runtime
 from sqlalchemy import func, select
 
-from agents.scripts._fixtures import CONTEXTO, limpiar, sembrar
-from db.models import AgentError as AgentErrorRow
-from db.models import Case, Decision, Signal
-from db.session import AsyncSessionLocal
-from enums import CaseStatus, DecisionType, Severity
-from graph.nodes import persist_decision
-from graph.state import AgentError, WorkingSignal
-from schemas.decision import InternalCitation
+from _fixtures import CONTEXTO, limpiar, sembrar
+from src.db.models import AgentError as AgentErrorRow
+from src.db.models import Case, Decision, Signal
+from src.db.session import AsyncSessionLocal
+from src.enums import CaseStatus, DecisionType, Severity
+from src.graph.nodes import persist_decision
+from src.graph.state import AgentError, WorkingSignal
+from src.schemas.decision import InternalCitation
 
 CASE_ID = UUID("00000000-0000-0000-0000-0000000000f1")
 TX_ID = "T-SMOKE-PERSIST"
