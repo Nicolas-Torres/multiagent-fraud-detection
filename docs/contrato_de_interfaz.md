@@ -1,5 +1,5 @@
 # Contrato de Interfaz — Sistema Multi-Agente de Detección de Fraude
-**Versión 0.5 — dataset, seed e invariante temporal**
+**Versión 0.6 — agentes determinísticos y políticas como dato**
 
 > Define las **fronteras** entre el motor de agentes (yo), la infraestructura (mi
 > compañero) y el dashboard del analista. 🔶 = decisión conjunta pendiente.
@@ -186,6 +186,9 @@ mediría la discrepancia de reglas en vez de la calidad del sistema.
 | `GET` | `/api/v1/cases` | Listar/filtrar cola (HITL) | query: `status`, `limit`, `offset` | `Page[CaseSummary]` | `200` |
 | `GET` | `/api/v1/cases/{case_id}` | Detalle completo | — | `CaseDetail` | `200` |
 | `POST` | `/api/v1/cases/{case_id}/resolution` | Acción del analista | `HumanResolutionIn` | `CaseDetail` | `200` |
+| `GET` | `/api/v1/policies` | 🆕 Catálogo con estado de cada política | — | `list[PolicyRead]` | `200` |
+| `POST` | `/api/v1/policies` | 🆕 Alta de política (norma + vinculación opcional) | `PolicyIn` | `PolicyRead` | `201` |
+| `GET` | `/api/v1/predicates` | 🆕 La biblioteca, para el compositor del dashboard | — | `list[PredicateSpec]` | `200` |
 | `GET` | `/health` | Liveness | — | `{status}` | `200` |
 | `GET` | `/ready` | Readiness (Postgres) | — | `{status}` | `200` |
 
@@ -280,6 +283,8 @@ el análisis (§7.4).
 | **`base_confidence`** | `float \| null` (0.0–1.0) | 🆕 la confianza antes del ajuste del Arbiter |
 | **`confidence_rationale`** | `str \| null` | 🆕 justificación del ajuste; `null` = no hubo ajuste |
 | **`scoring_version`** | `str \| null` | 🆕 versión de la fórmula que produjo los scores |
+| **`matched_policies`** | `list[str]` | 🆕 políticas que dispararon **completas**. El vocabulario del ground truth |
+| **`policy_catalog_version`** | `str \| null` | 🆕 qué versión del catálogo se evaluó (ej. `2025.1-b1`) |
 | `signals` | `list[Signal]` | orden determinístico fijado por Evidence Aggregation |
 | `citations_internal` | `list[InternalCitation]` | políticas (RAG) |
 | `citations_external` | `list[ExternalCitation]` | alertas web (gobernada) |
@@ -479,6 +484,27 @@ confianza + explicación de auditoría · explicación al cliente · **acciones*
 
 ---
 
+### 3.3 Vista de políticas 🆕
+
+**Lista**: cada política con su estado —`activa`, `excluida`, `pendiente de
+vinculación`, `vinculación obsoleta`— desde `GET /api/v1/policies`.
+
+**Alta**: formulario en dos secciones.
+
+| Sección | Campos | Obligatoria |
+|---|---|---|
+| Norma | `policy_id`, `version`, texto | sí |
+| Vinculación | `action` + predicados compuestos desde `GET /api/v1/predicates` | **no** |
+
+Dejar la vinculación vacía es un **uso previsto, no un error**: publica la norma
+hoy —el RAG la cita desde ese momento— y la ejecuta cuando alguien la componga.
+
+> Los estados salen de comparar documentos contra vinculaciones y de verificar
+> la huella del texto. *Pendientes* y *obsoletas* son las dos métricas
+> operativas del entregable 6.
+
+---
+
 ## 4. Búsqueda web gobernada — allowlist como tabla
 
 El allowlist es **dato de gobernanza** (mutable, administrado por un humano con
@@ -493,6 +519,36 @@ auditoría), no config de infraestructura. Vive en Postgres, no en env var.
 
 **Regla general reutilizable**: *¿es config de infraestructura (estática, por deploy)
 o dato de gobernanza (mutable, con audit trail)?* Lo primero → env var. Lo segundo → tabla.
+
+### 4.1 Las políticas también son dato de gobernanza 🆕
+
+Por la misma regla, y es el caso más claro de los tres. Se modelan como **dos
+tablas con dueños y ciclos de vida distintos** ([ADR-0007](adr/0007-la-forma-ejecutable-de-una-politica-es-una-vinculacion.md)):
+
+| Tabla | Dueño del dato | Contenido |
+|---|---|---|
+| `fraud_policies` | el banco | `policy_id`, `version`, `text` — lo que indexa el RAG |
+| `policy_bindings` | nosotros | `condition`, `action`, `excluded_reason`, `source_fingerprint`, `bound_by`, `bound_at` |
+
+El documento no se edita: la traducción vive aparte y declara de qué texto se
+derivó. Si el banco cambia la redacción, la huella deja de coincidir y la
+política **se degrada** —deja de evaluarse, sigue citable—. El sistema no puede
+aplicar un umbral distinto del que cita.
+
+> Entran con su consumidor, el RAG. Hasta entonces el catálogo vive en archivos
+> versionados bajo `data/policies/`.
+
+### 4.2 Cachear con TTL, no solo con invalidación 🆕
+
+La versión anterior decía *"se cachea en memoria con invalidación al escribir"*,
+y eso asume **un proceso**. Con N réplicas, invalidar limpia la que recibió la
+escritura; las demás siguen sirviendo la lista vieja sin que nada falle.
+
+Postura: **TTL de 60 s más `invalidate()`**. El TTL da obsolescencia acotada en
+todas las réplicas sin coordinación; el `invalidate()` se conserva para que la
+réplica que atiende un alta desde el dashboard la vea al instante.
+
+Aplica a `merchant_blacklist` —ya implementado— y a `web_search_allowlist`.
 
 > **Pendiente de modelar.** Es la única tabla del contrato que aún no existe en BD.
 
@@ -517,13 +573,17 @@ o dato de gobernanza (mutable, con audit trail)?* Lo primero → env var. Lo seg
 | 13 | 🆕 Errores de agente | **Tabla** `agent_errors` (el sistema los mide); la frontera expone solo `degraded_agents` |
 | 14 | 🆕 Escritura del grafo | **Un solo punto**, con semántica de reemplazo del agregado |
 
+| 10 | 🆕 Forma ejecutable de una política | **Vinculación** al documento normativo, con huella. El documento es del banco |
+| 11 | 🆕 `NO_CUSTOMER_PROFILE` en el riesgo | **No suma**. "No pude comparar" no es "esto es sospechoso" |
+| 12 | 🆕 Caché de datos de gobernanza | **TTL + invalidación**, no solo invalidación (§4.2) |
+
+
 ---
 
 ## 6. Pendiente de cerrar 🔶
 
 - **Migraciones**: postura propuesta = imagen soporta `alembic upgrade head`; el CD lo invoca como Job de pre-deploy.
 - **Convención de tags** de la imagen en GHCR (semver + git SHA).
-- **Zona horaria del perfil** (§2.7): se cierra en la etapa de dataset.
 
 ---
 
@@ -539,7 +599,7 @@ o dato de gobernanza (mutable, con audit trail)?* Lo primero → env var. Lo seg
 | `transactions` | `transaction_id` (natural) | índices compuestos `(customer_id, timestamp)` y `(device_id, timestamp)` |
 | `customer_behaviors` | `customer_id` (natural) | `varchar(2)[]` y `varchar[]` para las listas |
 | `cases` | `case_id` (UUID, surrogate) | FK + **UNIQUE** en `transaction_id`; índice compuesto `(status, created_at)` |
-| `decisions` | `case_id` (**PK = FK** a `cases`) | 1:1 implícito, sin constraint extra |
+| `decisions` | `case_id` (**PK = FK** a `cases`) | `matched_policies varchar[]` y `policy_catalog_version` 🆕 —`ARRAY` por la regla de §7.2: escalares homogéneos, se leen completos, no existen sin su dueño—. 1:1 implícito, sin constraint extra |
 | `signals` | `id` (BIGSERIAL) | FK a `decisions.case_id`; índice en `code` |
 | **`agent_errors`** | `id` (BIGSERIAL) | 🆕 FK a `decisions.case_id`; índice en `agent` |
 | `human_resolutions` | `case_id` (**PK = FK** a `cases`) | 1:1 implícito |
@@ -718,6 +778,7 @@ c558fd490ae6  (pgvector)
 
 ---
 
-**Estado**: v0.5 — dataset, seed e invariante temporal cerrados y verificados
-contra Postgres.
+**Estado**: v0.6 — capa de reglas y agentes determinísticos cerrados. El motor
+reproduce el ground truth en las 7 000 transacciones, en memoria y contra
+Postgres.
 **Valida el compañero**: §1. **Valido yo**: §2–§4, §7.

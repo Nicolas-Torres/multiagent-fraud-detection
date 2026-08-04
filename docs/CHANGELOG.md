@@ -21,6 +21,29 @@ Sin enmiendas acumuladas. Las próximas se anotan en
 
 ---
 
+## [0.6] — Agentes determinísticos y políticas como dato
+
+Seis enmiendas. Cinco salieron de implementar la capa de reglas; la sexta, de
+notar que una postura del contrato no sobrevivía al escalado horizontal.
+
+| # | Enmienda | Toca | Por qué |
+|---|---|---|---|
+| 1 | `Decision` gana **`matched_policies`** | §2.5, §7.1 | El ground truth habla en políticas; `signals` habla en observaciones atómicas. Una política es la conjunción de dos o tres señales y esa correspondencia no es reconstruible desde las señales sueltas: sin el campo, el harness no tiene contra qué comparar. |
+| 2 | `Decision` gana **`policy_catalog_version`** | §2.5, §7.1 | Con las políticas como dato mutable, una decisión de enero auditada contra el catálogo de marzo no es auditable. `scoring_version` sella la fórmula; esto sella la norma. Son dos campos porque cambian a ritmos distintos: la fórmula la toca un ingeniero, el catálogo lo toca el banco. |
+| 3 | §4 gana **dos tablas de gobernanza**, no una | §4.1 | Una política de fraude es dato mutable con audit trail, por la misma regla que ya enunciaba §4. Se parte en documento (del banco) y vinculación (nuestra) porque tienen dueños distintos: agregarle campos ejecutables al documento le atribuiría al banco decisiones que no tomó. |
+| 4 | **TTL** además de invalidación en las cachés | §4.2 | *"Invalidación al escribir"* asume un proceso. Con N réplicas, invalidar limpia la que recibió la escritura y las demás siguen sirviendo la lista vieja sin que nada falle. |
+| 5 | El dashboard gana una **tercera vista** | §3.3, §2.3 | Sin ella, agregar una política sigue siendo editar un JSON a mano — exactamente lo que ADR-0007 existe para evitar. Y hace visible el modelo de gobernanza en la demo. |
+| 6 | §6 pierde la viñeta de **zona horaria** | §6 | Ya estaba cerrada en §2.7 desde v0.5. Al cerrar una etapa hay que revisar §6, no solo agregar a §5. |
+
+**Decisiones cerradas nuevas** (§5): la forma ejecutable de una política es una
+vinculación con huella; `NO_CUSTOMER_PROFILE` no suma al riesgo; las cachés de
+gobernanza llevan TTL.
+
+Detrás: [ADR-0007](adr/0007-la-forma-ejecutable-de-una-politica-es-una-vinculacion.md)
+y el acta [`reviews/05-agentes-deterministicos.md`](reviews/05-agentes-deterministicos.md).
+
+---
+
 ## [0.5] — Dataset, seed e invariante temporal
 
 Diez enmiendas, salidas de convertir el dataset en instrumento de evaluación y de

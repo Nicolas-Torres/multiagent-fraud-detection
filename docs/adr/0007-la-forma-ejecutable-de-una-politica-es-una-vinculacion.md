@@ -1,6 +1,6 @@
 # ADR-0007: la forma ejecutable de una política es una vinculación al documento normativo
 
-- **Estado**: propuesto
+- **Estado**: aceptado
 - **Fecha**: 2026-08-03
 
 ## Contexto
