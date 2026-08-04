@@ -25,6 +25,13 @@ from multiagent_fraud_detection.enums import CaseStatus, DecisionType, Severity
 from multiagent_fraud_detection.domain.catalog import Owner
 from multiagent_fraud_detection.domain.engine import evaluate
 from multiagent_fraud_detection.domain.predicates import EvalContext
+from multiagent_fraud_detection.domain.scoring import (
+    SCORING_VERSION,
+    base_confidence,
+    has_contradiction,
+    risk_score,
+    signal_sort_key,
+)
 from multiagent_fraud_detection.graph.context import GraphContext
 from multiagent_fraud_detection.graph.state import AgentError, GraphState, WorkingSignal
 
@@ -227,11 +234,74 @@ async def internal_policy_rag(state: GraphState) -> dict:
 
 
 @degrades(AGGREGATE)
-async def evidence_aggregation(state: GraphState) -> dict:
-    # Cuatro trabajos reales: deduplicar por `code` usando `emitted_by`,
-    # descartar lo que no paso el allowlist, ORDENAR de forma determinista
-    # (el orden entre ramas paralelas es arbitrario) y calcular el score.
-    return {"agent_route": [AGGREGATE], "base_confidence": 0.5}
+async def evidence_aggregation(
+    state: GraphState, runtime: Runtime[GraphContext]
+) -> dict:
+    """Consolida la evidencia de la ola 1 y produce los scores determinísticos.
+
+    No tiene logica de deteccion: no evalua politicas ni mira la transaccion.
+    Recibe lo que produjeron los agentes y lo deja en una forma unica —sin
+    duplicados, ordenada, medida— para que el Arbiter reciba lo mismo en cada
+    corrida.
+
+    **Sin `@degrades` a proposito.** Los nodos de la ola 1 degradan porque su
+    falla deja evidencia incompleta y el caso puede seguir. Si este fallara no
+    habria nada que consolidar: es el unico camino hacia la decision, y una
+    degradacion silenciosa produciria un caso sin scores que el invariante
+    rechazaria mas adelante, lejos de la causa.
+    """
+    señales = state.get("signals", [])
+    politicas = state.get("matched_policies", [])
+    errores = state.get("agent_errors", [])
+    catalogo = runtime.context.catalog
+
+    # 1. Deduplicar por codigo. Los dos agentes pueden emitir el mismo: hoy no
+    #    ocurre —ninguna politica cruza los nodos— pero eso depende del catalogo,
+    #    que es dato mutable. Gana la primera aparicion.
+    unicas: dict[str, WorkingSignal] = {}
+    for señal in señales:
+        unicas.setdefault(señal.code, señal)
+
+    # 2. Orden deterministico: severidad descendente, luego codigo.
+    ordenadas = sorted(
+        unicas.values(), key=lambda s: signal_sort_key(s.code, s.severity)
+    )
+
+    # 3. Politicas sin duplicar y en orden estable.
+    unicas_politicas = sorted(set(politicas))
+
+    # 4. Los dos scores.
+    #
+    # `NO_CUSTOMER_PROFILE` **no entra en el riesgo**. Es la unica senal que no
+    # sale de un predicado: no describe la transaccion, describe que faltó con
+    # que compararla. Sumarla al riesgo seria el mismo error de categoria que
+    # sumar un agente caido —"no pude evaluar" no es "esto es sospechoso"— y
+    # ademas subiria el riesgo de las ~96 transacciones sin perfil por una razon
+    # que no es de ellas.
+    #
+    # Donde si pesa es en la confianza, y una sola vez: por la penalizacion.
+    sin_perfil = any(s.code == "NO_CUSTOMER_PROFILE" for s in ordenadas)
+    riesgo = risk_score(
+        s.severity for s in ordenadas if s.code != "NO_CUSTOMER_PROFILE"
+    )
+    degradados = sorted({e.agent for e in errores})
+    confianza = base_confidence(
+        riesgo,
+        degraded_agents=degradados,
+        contradiction=has_contradiction(
+            catalogo[pid].action for pid in unicas_politicas
+        ),
+        missing_profile=sin_perfil,
+    )
+
+    return {
+        "agent_route": [AGGREGATE],
+        "evidence": ordenadas,
+        "policies": unicas_politicas,
+        "risk_score": riesgo,
+        "base_confidence": confianza,
+        "scoring_version": SCORING_VERSION,
+    }
 
 
 @degrades(PRO_FRAUD)
@@ -353,7 +423,7 @@ async def persist_decision(
                             description=s.description,
                             severity=s.severity,
                         )
-                        for s in state.get("signals", [])
+                        for s in state.get("evidence", state.get("signals", []))
                     ],
                     agent_errors=[
                         AgentErrorRow(

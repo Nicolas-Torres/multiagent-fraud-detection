@@ -90,6 +90,16 @@ class GraphState(GraphInput, total=False):
     # pero escriben claves distintas, por eso no necesitan reducer).
     customer_snapshot: CustomerBehaviorRead | None  # None = el nodo no corrio;
     # "cliente sin perfil" es la senal NO_CUSTOMER_PROFILE
+    # `signals` y `matched_policies` (zona 2) son **acumuladores**: cada agente
+    # suma lo suyo y nadie puede reemplazar el total, porque su reducer es
+    # aditivo. Evidence Aggregation produce la version consolidada —sin
+    # duplicados y ordenada— y la deja aca, con semantica de ultima escritura.
+    #
+    # Que sean claves distintas no es un rodeo: son cosas distintas. Una es lo
+    # que cada agente vio; la otra, lo que el caso archiva. El persistidor lee
+    # esta; el debate y el Arbiter tambien.
+    evidence: list[WorkingSignal]
+    policies: list[str]
     citations_internal: list[InternalCitation]
     citations_external: list[ExternalCitation]
     pro_fraud_argument: str
