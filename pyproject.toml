@@ -26,4 +26,13 @@ build-backend = "uv_build"
 dev = [
     "numpy>=2.5.1",
     "pandas>=3.0.5",
+    "pytest>=8.4.2",
 ]
+
+[tool.pytest.ini_options]
+# `src` para el paquete, `tests` para que los módulos de test se importen entre
+# sí (`from conftest import utc`). Sin esto haría falta instalar el paquete en
+# modo editable antes de correr la suite.
+pythonpath = ["src", "tests"]
+testpaths = ["tests"]
+addopts = "-q"
