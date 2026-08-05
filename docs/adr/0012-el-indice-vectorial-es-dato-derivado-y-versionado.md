@@ -110,11 +110,58 @@ Once vectores se recorren exactos más rápido de lo que un HNSW los aproxima. S
 declara la ausencia y se documenta que agregarlo, con 1536 dimensiones, es una
 migración de una línea que **no obliga a re-embeber**.
 
-### 5. `chunk_id` no depende del modelo
+### 5. `chunk_id` no depende del modelo, y su redundancia se conserva
 
 `{policy_id}:{version}:{ordinal}`. Re-embeber no cambia la identidad de las citas
 ya persistidas: una decisión de enero sigue resolviendo su `chunk_id` contra el
 índice reconstruido en marzo.
+
+Que lleve `version` —la del **documento**— y no `index_version` es lo que compra
+esa propiedad. Es también el motivo por el que la PK de `policy_chunks` es
+`(index_version, chunk_id)` y no `chunk_id` solo: el mismo chunk existe una vez
+por generación del índice, y eso es lo que hace idempotente la re-indexación.
+
+**La redundancia se conserva.** `chunk_id` contiene `policy_id` y `version`, que
+la tabla ya guarda en columnas propias y que `InternalCitation` ya expone como
+hermanos. Se acepta la duplicación porque el identificador **viaja al auditor**:
+un `chunk_id` legible se depura de un vistazo, y un id opaco obligaría a una
+consulta para saber qué se citó — el mismo argumento que decide el formato de
+`retrieval_index_version` en §3.
+
+El precio es un invariante:
+
+```
+chunk_id == f"{policy_id}:{source_version}:{ordinal}"
+```
+
+Se afirma **en el chunker**, que es escritor único, y se cubre con un test. **No**
+se afirma en el nodo de recuperación —sería una comprobación por consulta de algo
+que ninguna ruta de escritura puede violar— ni con una columna generada o un
+`CHECK`, que son punto ciego de `--autogenerate` y ya quedaron descartados dos
+veces en el proyecto.
+
+### 6. Los índices viejos no se podan, y por eso el filtro es obligatorio
+
+No hay `--prune`. Con once documentos, las generaciones anteriores ocupan nada y
+conservarlas permite comparar un índice nuevo contra el vigente antes de cambiar
+de versión — que es justamente lo que la ablación de ADR-0011 va a querer hacer.
+
+La contrapartida hay que escribirla porque no es obvia: si conviven generaciones,
+
+> `WHERE index_version = <vigente>` deja de ser un filtro y pasa a ser un
+> **invariante de corrección**.
+
+Sin él, la búsqueda mezcla generaciones y devuelve vecinos calculados con un
+modelo viejo. No falla, no lanza, no deja huella: devuelve resultados plausibles
+y peores. Es la misma familia de fallo silencioso que ADR-0011 cierra del lado de
+la citación y ADR-0007 del lado de la evaluación, y por eso el filtro vive en el
+repositorio —una sola función de búsqueda, no un `where` que cada llamador
+recuerda— y se cubre con un test que indexa dos generaciones y afirma que la
+consulta sólo devuelve la vigente.
+
+Cuál es la generación vigente lo dice el **código**, no una bandera en la tabla:
+por la misma razón por la que el modelo no es variable de entorno, una bandera
+mutable permitiría cambiar de índice sin que suba ningún sello.
 
 ## Alternativas descartadas
 
@@ -158,6 +205,14 @@ truth es legible, revisable en un diff y determinista desde un generador
 sembrado. Un vector de 1536 floats no es ninguna de las tres cosas —un diff de
 embeddings no se revisa, se acepta—.
 
+**Podar las generaciones viejas al reindexar.** Deja una sola verdad en la tabla y
+vuelve inofensivo olvidarse del filtro por `index_version`. Se descarta por dos
+motivos: con once documentos el ahorro es nulo, y borrar la generación anterior
+impide comparar índices antes de promover uno — que es el uso que la ablación de
+ADR-0011 necesita. La seguridad que la poda compraba se compra más barato con el
+filtro en el repositorio y su test (§6). **Se reabre** el día que el corpus haga
+que el almacenamiento importe.
+
 ## Consecuencias
 
 **Se gana la reproducibilidad de la única métrica del RAG.** Sobre vectores
@@ -167,6 +222,11 @@ decisión, aquella sería inmedible y el ADR quedaría sin evidencia.
 **Se gana una auditoría de tres ejes** que hoy no existe en ningún sistema del
 proyecto: la decisión dice qué texto citó, qué traducción evaluó y con qué índice
 recuperó.
+
+**Se gana poder comparar dos índices sin destruir el anterior**, porque no hay
+poda. El precio es que la corrección de la búsqueda pasa a depender de un `WHERE`
+(§6): se paga con una función de búsqueda única en el repositorio y un test que la
+vigila.
 
 **Se paga la aparición de dato derivado que puede quedar viejo.** Un documento
 publicado y no indexado es citable por identidad —si tiene vinculación— e
