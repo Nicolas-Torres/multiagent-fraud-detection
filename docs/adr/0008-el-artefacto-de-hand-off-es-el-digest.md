@@ -1,6 +1,6 @@
 # ADR-0008: el artefacto de hand-off es el digest de la imagen, no el tag
 
-- **Estado**: propuesto
+- **Estado**: aceptado
 - **Fecha**: 2026-08-04
 
 ## Contexto

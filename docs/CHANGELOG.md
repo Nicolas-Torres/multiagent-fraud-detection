@@ -6,7 +6,7 @@ vivo tiene siempre la versión vigente; su encabezado dice cuál es.
 Para recuperar el texto completo de una versión anterior:
 
 ```bash
-git show contrato-v0.4:docs/contrato_de_interfaz.md
+git show contrato-v0.6:docs/contrato_de_interfaz.md
 ```
 
 > Las versiones 0.1 y 0.2 son anteriores a que el contrato entrara a control de
@@ -18,6 +18,34 @@ git show contrato-v0.4:docs/contrato_de_interfaz.md
 
 Sin enmiendas acumuladas. Las próximas se anotan en
 [`enmiendas_pendientes.md`](enmiendas_pendientes.md).
+
+---
+
+## [0.7] — RAG de políticas, sellos de auditoría y hand-off por digest
+
+Diez enmiendas. Cuatro cierran la frontera con infraestructura —§1 quedó validado
+por el compañero y **§6 se vació por primera vez desde v0.2**—; seis salieron de
+construir el RAG de políticas de punta a punta.
+
+| # | Enmienda | Toca | Por qué |
+|---|---|---|---|
+| 1 | El hand-off es el **digest**, no el tag | §0, §1.5 | Un tag es mutable: se puede reapuntar, así que "desplegar el tag `1.2.0`" no garantiza qué bytes corren. El digest **es** el contenido. Los tags quedan como etiqueta legible para humanos. |
+| 2 | §1.2 gana un **tercer modo de arranque**: el seed | §1.2 | El catálogo y su índice se instalan con la imagen. La asimetría con la migración es deliberada: aquélla aborta el rollout si falla, ésta no —un seed fallido deja un dashboard vacío, no un servicio roto—. |
+| 3 | §1.2 gana **expand / contract** | §1.2 | Regla sobre cómo se escriben las migraciones, no sobre dónde corren. Durante el rollout conviven la versión vieja y la nueva contra el mismo esquema: una migración que rompe hacia atrás rompe a las réplicas que todavía no se reemplazaron. |
+| 4 | §1.4 gana **`ENVIRONMENT`**; §1.5 explicita el acceso a GHCR | §1.4, §1.5 | `ENVIRONMENT` habilita el guard de `--reset`, y la variable **ausente rechaza**. GHCR es privado por defecto y su fallo de autenticación se lee como "la imagen no existe": treinta segundos ahora, una tarde el día del despliegue. |
+| 5 | §1.6 gana **dos gates determinísticos** | §1.6 | `check_policies` y `export_data_model_diagram --check`. El segundo cierra el hueco que `alembic check` no ve: aquél detecta modelo sin migración, éste modelo sin diagrama. Ninguno necesita servicios. |
+| 6 | El invariante de `citations_internal` se redacta como **contención** | §2.5, §7.3 | La formulación anterior fallaba por los dos lados. Débil: una lista con las citas equivocadas la satisface, así que el sistema podía bloquear citando normas que no aplicó. E insatisfacible para `APPROVE`: ninguna vinculación puede prescribir aprobar, y el 90% del tráfico no dispara nada. |
+| 7 | `Decision` gana **`retrieval_index_version`** | §2.5, §7.1 | Tercer eje de auditoría: con qué generación del índice se recuperó. `null` no es dato faltante — dice que este veredicto **no usó el índice**. |
+| 8 | `Decision` gana **`explanation_prompt_version`** | §2.5, §7.1 | Cuarto eje, y el único que cubre texto generado: editar el prompt sin subir la generación produce mensajes distintos bajo la misma versión, y ninguna consulta lo detecta. |
+| 9 | §3.3 gana una **tercera métrica operativa** | §3.3 | *Chunks pendientes de indexar*. Un documento publicado y no indexado es citable por identidad e invisible por similitud: estado legítimo y silencioso, así que necesita medición. |
+| 10 | §7.1 pasa de **ocho tablas a doce** | §7.1 | Las cuatro del catálogo. De paso repara el encabezado, que decía "las siete" mientras la sección listaba ocho, y la fila huérfana de `merchant_blacklist` que renderizaba como tabla suelta. |
+
+**ADR-0008 a ADR-0010 pasan a aceptados**: §1 quedó validado por el compañero.
+
+**Decisiones cerradas nuevas** (§5): la citación se resuelve por identidad y el
+descubrimiento por similitud; el índice vectorial es dato derivado, versionado y
+sellado; el texto de auditoría sale de plantilla y el del cliente de un LLM que
+nunca ve un `policy_id`, un código de señal ni un umbral.
 
 ---
 

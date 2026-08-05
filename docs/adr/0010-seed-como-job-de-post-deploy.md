@@ -1,6 +1,6 @@
 # ADR-0010: los datos de demostración se siembran con un Job de post-deploy idempotente
 
-- **Estado**: propuesto
+- **Estado**: aceptado
 - **Fecha**: 2026-08-04
 
 ## Contexto

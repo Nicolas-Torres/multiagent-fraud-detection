@@ -1,6 +1,6 @@
 # ADR-0009: las migraciones corren como Job de pre-deploy y son compatibles hacia atrás
 
-- **Estado**: propuesto
+- **Estado**: aceptado
 - **Fecha**: 2026-08-04
 
 ## Contexto
