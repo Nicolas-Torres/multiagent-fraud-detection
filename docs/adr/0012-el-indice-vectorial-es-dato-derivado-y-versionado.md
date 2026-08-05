@@ -69,12 +69,50 @@ acá: tras la primera corrida, el harness completo es offline y determinista.
 |---|---|---|
 | Modelo | `gemini-embedding-2` | **auto-normaliza las dimensiones truncadas**; `-001` obliga a normalizar a mano, y una normalización olvidada no falla: solo empeora el ranking en silencio |
 | `output_dimensionality` | **1536** | por el techo de 2000 de pgvector, no por necesidad actual |
-| `task_type` | `RETRIEVAL_DOCUMENT` al indexar · `RETRIEVAL_QUERY` al consultar | la recuperación es asimétrica; el mismo task_type en ambos lados degrada sin avisar |
+| Instrucción de tarea | **prefijo dentro del prompt**, no parámetro | el modelo 2 no acepta `task_type` — ver abajo |
+| Plantilla de documento | `title: none \| text: {content}` | las políticas no tienen título; poner el `policy_id` ahí inyectaría un identificador que la query nunca va a contener |
+| Plantilla de consulta | `task: search result \| query: {content}` | el lado corto del formato asimétrico de recuperación |
 
 La dimensión se elige **por el índice que todavía no hace falta**. Con once
 documentos ningún ANN aporta, pero cambiar la dimensión más adelante obliga a
 re-embeber el corpus entero, así que la decisión se toma una sola vez y se toma
 mirando el caso real —circulares y manuales, no once líneas—.
+
+#### La instrucción de tarea vive en el texto, no en un argumento
+
+`gemini-embedding-2` **no acepta `task_type`**. Donde `-001` recibía
+`RETRIEVAL_DOCUMENT` / `RETRIEVAL_QUERY` como parámetro, el modelo 2 espera la
+instrucción dentro del propio prompt, en formato asimétrico: prefijo de tarea del
+lado de la consulta, estructura de título y texto del lado del documento.
+
+Esto no es un detalle de API. **Convierte la plantilla en un parámetro de
+derivación**: cambiar el prefijo cambia el vector exactamente igual que cambiar el
+modelo, y por eso §3 la incluye entre las cosas que suben `index_version`. Antes,
+el `task_type` viajaba fuera del texto y no podía contaminarlo; ahora *es* el
+texto.
+
+De ahí también que el tercer segmento de la versión —`doc` en
+`gemini-embedding-2:1536:doc:1`— pase a significar **qué plantilla se aplicó al
+indexar**, y no qué `task_type` se pidió.
+
+#### Una llamada por chunk, no un lote
+
+Con varias entradas pasadas sueltas, el modelo 2 devuelve **un solo embedding
+agregado**, no uno por entrada. Para obtener vectores separados hay que envolver
+cada una en un objeto `Content` o usar la Batch API.
+
+El modo equivocado no falla: escribe once filas apuntando al mismo punto del
+espacio y el ranking devuelve cualquier cosa, con la forma de un índice que
+funciona. Es la misma familia de fallo silencioso que ADR-0011 cierra del lado de
+la citación, mudada al cliente de la API. Con once documentos se resuelve con una
+llamada por chunk: más lento, inequívoco, y verificable con una afirmación sobre
+el largo de la respuesta.
+
+#### Los dos espacios son incompatibles
+
+Un vector de `-001` no se puede comparar con uno de `-2`: migrar entre modelos
+obliga a re-embeber el corpus entero. Es el argumento del puerto de proveedor —y
+de `index_version`— dicho por el proveedor mismo.
 
 ### 3. El índice tiene versión, y la decisión la sella
 
@@ -85,7 +123,8 @@ Versiona **los parámetros de derivación**, no el contenido del corpus:
 
 | Qué cambia | ¿Sube `index_version`? | Quién lo registra si no |
 |---|---|---|
-| modelo, dimensión o `task_type` | **sí** | — |
+| modelo o dimensión | **sí** | — |
+| plantilla de instrucción de tarea | **sí** | — |
 | estrategia o parámetros de chunking | **sí** | — |
 | texto de una política | no | `InternalCitation.version`, por cita |
 | una vinculación | no | `policy_catalog_version` |
@@ -97,6 +136,11 @@ El valor es una cadena **descriptiva**, `gemini-embedding-2:1536:doc:1`, y no un
 identificador opaco: el motivo de sellarla es que alguien la lea dos años después
 sin una tabla de consulta al lado. El último segmento sube por lo que los tres
 primeros no muestran.
+
+La cadena se **compone en código a partir de las mismas constantes que usa el
+indexador**, no se escribe a mano: cambiar el modelo o la dimensión no puede
+dejar la versión mintiendo por olvido. Lo único que queda a criterio humano es el
+último segmento, que es justamente el que registra lo que ningún otro captura.
 
 **El modelo no es variable de entorno.** Por la regla de §4 del contrato —*config
 de infraestructura o dato de gobernanza*— un modelo configurable por `env` podría
@@ -213,6 +257,13 @@ ADR-0011 necesita. La seguridad que la poda compraba se compra más barato con e
 filtro en el repositorio y su test (§6). **Se reabre** el día que el corpus haga
 que el almacenamiento importe.
 
+**Indexar el corpus en una sola llamada.** Es lo natural con once documentos y
+sería más rápido. Se descarta porque el modelo agrega: con varias entradas sueltas
+devuelve un vector único, y el resultado es un índice de once filas idénticas que
+no lanza ningún error. La forma correcta —un `Content` por entrada, o la Batch
+API— existe, pero con este volumen una llamada por chunk es más simple de leer y
+de verificar.
+
 ## Consecuencias
 
 **Se gana la reproducibilidad de la única métrica del RAG.** Sobre vectores
@@ -227,6 +278,13 @@ recuperó.
 poda. El precio es que la corrección de la búsqueda pasa a depender de un `WHERE`
 (§6): se paga con una función de búsqueda única en el repositorio y un test que la
 vigila.
+
+**Se paga que la plantilla del prompt entra al perímetro versionado.** Con el
+`task_type` fuera del texto, el prompt era el documento y nada más. Ahora la
+instrucción viaja adentro, así que una plantilla editada sin subir la generación
+produce vectores nuevos bajo una versión vieja — y ninguna consulta lo detecta.
+Por eso la plantilla vive junto a las constantes del modelo, en el mismo módulo
+que compone `index_version`.
 
 **Se paga la aparición de dato derivado que puede quedar viejo.** Un documento
 publicado y no indexado es citable por identidad —si tiene vinculación— e
