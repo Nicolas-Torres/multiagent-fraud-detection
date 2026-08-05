@@ -1,8 +1,8 @@
 # Contrato de Interfaz — Sistema Multi-Agente de Detección de Fraude
-**Versión 0.6 — agentes determinísticos y políticas como dato**
+**Versión 0.7 — RAG de políticas, sellos de auditoría y hand-off por digest**
 
 > Define las **fronteras** entre el motor de agentes (yo), la infraestructura (mi
-> compañero) y el dashboard del analista. 🔶 = decisión conjunta pendiente.
+> compañero) y el dashboard del analista.
 >
 > Qué cambió respecto de versiones anteriores: [`CHANGELOG.md`](CHANGELOG.md).
 
@@ -14,7 +14,7 @@
 |---|---|---|
 | **Frontera con** | Infraestructura (compañero) | Dashboard |
 | **Qué define** | Cómo se empaqueta, ejecuta y configura | Endpoints y schemas |
-| **Punto de hand-off** | **La imagen en GHCR** (tag inmutable) | El API HTTP |
+| **Punto de hand-off** | **La imagen en GHCR**, por **digest** | El API HTTP |
 | **Quién valida** | Compañero | Yo |
 
 ---
@@ -30,18 +30,51 @@
 
 La costura no es el código ni los schemas: **es la imagen versionada en GHCR**.
 
-### 1.2 Ejecución: una imagen, dos modos de arranque
+### 1.2 Ejecución: una imagen, tres modos de arranque
 
 ```
 # Modo servir (proceso principal)
 uvicorn app.main:app --host 0.0.0.0 --port ${APP_PORT}
 
-# Modo migrar (Job de pre-deploy, lo invoca el CD ANTES del rollout)
+# Modo migrar (Job de PRE-deploy, con el digest que se va a desplegar,
+# en UNA sola instancia; si falla, ABORTA el rollout)
 alembic upgrade head
+
+# Modo sembrar (Job de POST-deploy, idempotente, sin --reset;
+# si falla, NO aborta el rollout)
+python scripts/seed.py
 ```
 
 > **No** va `alembic upgrade head` en el entrypoint normal: con N réplicas tendrías
-> N migraciones concurrentes → race conditions y locks. 🔶 Cerrar en reunión.
+> N migraciones concurrentes → race conditions y locks.
+> ([ADR-0009](adr/0009-migraciones-como-job-de-pre-deploy.md))
+
+**La asimetría entre los dos Jobs es deliberada.** La migración es obligatoria
+para que la aplicación arranque, así que su falla aborta el rollout. El seed carga
+datos y el sistema funciona sin ellos: un seed fallido deja un dashboard vacío, no
+un servicio roto ([ADR-0010](adr/0010-seed-como-job-de-post-deploy.md)).
+
+> ⚠️ `seed.py --reset` ejecuta `TRUNCATE ... CASCADE` y **arrastra casos,
+> decisiones y resoluciones humanas** —la evidencia del entregable 8—. Es
+> herramienta de desarrollo local y de runbook: **no aparece en ningún pipeline**,
+> y el propio script lo rechaza salvo con `ENVIRONMENT=local`.
+
+El seed **también construye el índice vectorial** de políticas. Sin
+`GEMINI_API_KEY` lo omite con aviso en vez de fallar: el resultado es un estado
+previsto y medido —*chunks pendientes de indexar*, §3.3—, no una caída.
+
+#### Expand / contract
+
+Regla sobre **cómo se escriben** las migraciones, no sobre dónde corren:
+
+- Toda columna nueva nace **nullable**.
+- Retirar algo cuesta **dos releases**: primero dejar de escribirlo, después
+  quitarlo.
+- **Nunca un `DROP COLUMN` en la misma release que deja de usar la columna.**
+
+El motivo es el rollout: durante unos minutos conviven la versión vieja y la
+nueva contra el mismo esquema. Una migración que rompe hacia atrás rompe a las
+réplicas que todavía no se reemplazaron.
 
 ### 1.3 Health y Readiness
 
@@ -64,8 +97,19 @@ Ambos sin autenticación, `200` cuando OK.
 | `LANGSMITH_TRACING` | `true` |
 | `LANGSMITH_PROJECT` | `fraud-detection` |
 | `LOG_LEVEL` | `INFO` |
+| **`ENVIRONMENT`** | `local` \| `staging` \| `production` 🆕 |
 
 > `LOG_LEVEL` gobierna también el echo de SQL de SQLAlchemy: solo en `DEBUG`.
+>
+> **`ENVIRONMENT` hay que inyectarla en todos los ambientes**, incluidos los Jobs
+> de migración y de seed. Habilita el guard de `seed.py --reset`, que solo permite
+> la operación destructiva con `local`: la variable **ausente rechaza**, que es el
+> default seguro. Si falta, la aplicación funciona igual.
+>
+> `ANTHROPIC_API_KEY` y `GEMINI_API_KEY` son las **únicas** variables de los
+> proveedores. El modelo, la dimensión y las plantillas de prompt viven en código:
+> configurables por `env` podrían cambiarse sin que suban las versiones selladas
+> en `decisions`, y los cuatro sellos de §2.5 mentirían a la vez.
 > El allowlist de búsqueda web **no** es env var → tabla gobernada (§4).
 
 #### Tres entornos, no uno
@@ -113,18 +157,56 @@ local" deja de ser evidencia de "pasa en la nube". La versión menor puede difer
 ### 1.5 Empaquetado
 
 - Build reproducible: `uv sync --frozen`.
-- Tags inmutables: semver + git SHA. **Nunca `latest`** para CD. 🔶
 - Plataforma `linux/amd64`. Usuario no-root. `.dockerignore` excluyendo `.git`, `.venv`, `.env`.
+
+#### El artefacto de hand-off es el **digest**
+
+El CD despliega por digest, no por tag ([ADR-0008](adr/0008-el-artefacto-de-hand-off-es-el-digest.md)).
+Un tag es una etiqueta **mutable**: se puede reapuntar, así que "desplegar el tag
+`1.2.0`" no garantiza qué bytes corren. El digest es el contenido.
+
+| Evento | Qué produce | Qué usa el CD |
+|---|---|---|
+| push a `main` | imagen + tags legibles (`sha-abc1234`, semver) | — |
+| release | tag semver adicional | — |
+| deploy | — | **`ghcr.io/…@sha256:…`** |
+
+Los tags siguen existiendo porque un humano necesita leer qué es cada imagen.
+**Nunca `latest`** para CD.
+
+**El tag de git es la fuente de verdad de la versión.** `pyproject.toml` deja de
+ser autoridad sobre el número: uno solo puede quedar desactualizado, y el que se
+puede firmar es el de git.
+
+#### Acceso a GHCR
+
+El paquete queda **privado**; el CD se autentica con un token con
+`read:packages`. Se escribe porque GHCR es privado por defecto y el `docker pull`
+falla con un error de autenticación que se lee como *"la imagen no existe"*.
 
 ### 1.6 Pipeline de CI
 
 ```
-lint → pytest → alembic upgrade head → alembic check → build → push a GHCR
+lint → pytest → check_policies → export_data_model_diagram --check
+     → alembic upgrade head → alembic check → build → push a GHCR
 ```
 
-> `alembic check` retorna distinto de cero si un modelo cambió sin migración
-> correspondiente. Exige que la base esté en `head`, por eso el `upgrade` va
-> antes. Requiere Postgres como `services:` en el job.
+| Gate | Qué detecta | ¿Necesita servicios? |
+|---|---|---|
+| `pytest` | regresión de lógica | no |
+| `check_policies.py` | el motor deja de reproducir el ground truth (7 000 filas) | no |
+| `export_data_model_diagram.py --check` | modelo cambiado **sin diagrama** | no |
+| `alembic check` | modelo cambiado **sin migración** | Postgres |
+
+> `alembic check` exige que la base esté en `head`, por eso el `upgrade` va antes.
+> Requiere Postgres como `services:` en el job.
+>
+> Los dos gates del medio no necesitan red ni base: cubren los dos desfases
+> posibles del modelo —sin migración y sin diagrama— y corren en segundos.
+>
+> **`check_retrieval.py` no entra**: mide la recuperación semántica y necesita el
+> índice vectorial poblado más los embeddings de las queries, cuyo caché vive en
+> el proceso. Corre contra una base sembrada, no en el job de PR.
 
 ---
 
@@ -284,7 +366,9 @@ el análisis (§7.4).
 | **`confidence_rationale`** | `str \| null` | 🆕 justificación del ajuste; `null` = no hubo ajuste |
 | **`scoring_version`** | `str \| null` | 🆕 versión de la fórmula que produjo los scores |
 | **`matched_policies`** | `list[str]` | 🆕 políticas que dispararon **completas**. El vocabulario del ground truth |
-| **`policy_catalog_version`** | `str \| null` | 🆕 qué versión del catálogo se evaluó (ej. `2025.1-b1`) |
+| **`policy_catalog_version`** | `str \| null` | qué versión del catálogo se evaluó (ej. `2025.1-b1`) |
+| **`retrieval_index_version`** | `str \| null` | 🆕 con qué generación del índice se recuperó (`gemini-embedding-2:1536:doc:1`). `null` = **no hubo recuperación** |
+| **`explanation_prompt_version`** | `str \| null` | 🆕 con qué modelo y prompt se redactó `explanation_customer`. `null` = **ningún modelo participó** |
 | `signals` | `list[Signal]` | orden determinístico fijado por Evidence Aggregation |
 | `citations_internal` | `list[InternalCitation]` | políticas (RAG) |
 | `citations_external` | `list[ExternalCitation]` | alertas web (gobernada) |
@@ -340,12 +424,32 @@ De ahí el invariante, que es estructural y no de calidad:
 > **Ningún veredicto autónomo sin respaldo interno y sin score determinístico.**
 > Diferir a un humano no es un veredicto.
 
-Formalmente, cuando `decision != ESCALATE_TO_HUMAN`:
-`citations_internal` es no vacío **y** `base_confidence` no es `null`.
+Formalmente, cuando `decision != ESCALATE_TO_HUMAN`: `citations_internal`
+contiene una cita por **cada** `policy_id` de `matched_policies`, **y**
+`base_confidence` no es `null`.
 
-`ESCALATE_TO_HUMAN` queda exento: sin la excepción, un caso sin políticas
-recuperadas no tendría ninguna salida posible —no podría aprobar, ni bloquear,
-ni escalar—. La ausencia de respaldo *es* la razón para llamar al humano.
+**Contención, no "lista no vacía".** La formulación anterior fallaba por los dos
+lados. Era **débil**: una lista con las citas equivocadas la satisface, así que el
+sistema podía bloquear citando normas que no aplicó. Y era **insatisfacible para
+`APPROVE`**: el catálogo rechaza al cargar cualquier vinculación con
+`action: APPROVE`, así que ninguna cita puede respaldar una aprobación —y el 90%
+del tráfico no dispara ninguna política—.
+
+**La obligación nace de la evidencia, no del veredicto.** Si alguna política
+disparó, tiene que estar citada; si no disparó ninguna, no hay nada que exigir y
+la condición se cumple vacíamente. Por eso `APPROVE` no necesita exención.
+
+**Contiene, no iguala**: la búsqueda por similitud agrega políticas relacionadas
+que no dispararon, y eso es aporte al Arbiter, no violación.
+
+`ESCALATE_TO_HUMAN` queda exento: la ausencia de respaldo *es* la razón para
+llamar al humano.
+
+> **Cómo se cumple.** La citación se resuelve **por identidad** —lookup por
+> `policy_id` contra el catálogo— y no por búsqueda vectorial
+> ([ADR-0011](adr/0011-citacion-por-identidad-descubrimiento-por-similitud.md)).
+> Ese camino no consulta el índice ni la red, así que tiene recall 1.0 por
+> construcción y sobrevive a que el proveedor de embeddings se caiga.
 
 **El dashboard puede asumirlo**: en todo caso `DECIDED`, las citas internas no
 están vacías.
@@ -500,8 +604,17 @@ Dejar la vinculación vacía es un **uso previsto, no un error**: publica la nor
 hoy —el RAG la cita desde ese momento— y la ejecuta cuando alguien la componga.
 
 > Los estados salen de comparar documentos contra vinculaciones y de verificar
-> la huella del texto. *Pendientes* y *obsoletas* son las dos métricas
+> la huella del texto. *Pendientes* y *obsoletas* son dos de las tres métricas
 > operativas del entregable 6.
+
+**Tercera métrica: chunks pendientes de indexar.** Un documento publicado y no
+indexado es **citable por identidad e invisible por similitud**: si dispara, se
+cita igual —esa vía no consulta el índice—; si no dispara, no hay forma de que
+aparezca. Estado legítimo y **silencioso**: nada falla.
+
+Las tres son la misma clase de cosa —desincronizaciones entre artefactos con
+dueños distintos—. La norma sin vinculación no se evalúa; la norma sin chunk no
+se descubre; la huella rota deja de evaluarse sin dejar de citarse.
 
 ---
 
@@ -580,10 +693,19 @@ Aplica a `merchant_blacklist` —ya implementado— y a `web_search_allowlist`.
 
 ---
 
-## 6. Pendiente de cerrar 🔶
+## 6. Pendiente de cerrar
 
-- **Migraciones**: postura propuesta = imagen soporta `alembic upgrade head`; el CD lo invoca como Job de pre-deploy.
-- **Convención de tags** de la imagen en GHCR (semver + git SHA).
+*(nada)*
+
+Las dos viñetas que llevaban abiertas desde v0.2 quedaron cerradas y
+documentadas:
+
+| Pendiente | Resolución |
+|---|---|
+| Convención de tags | [ADR-0008](adr/0008-el-artefacto-de-hand-off-es-el-digest.md): el hand-off es el **digest**; los tags son etiquetas legibles |
+| Migraciones | [ADR-0009](adr/0009-migraciones-como-job-de-pre-deploy.md): Job de pre-deploy, mismo digest, una instancia, compatible hacia atrás |
+
+**§6 queda vacío por primera vez desde v0.2.**
 
 ---
 
@@ -592,7 +714,7 @@ Aplica a `merchant_blacklist` —ya implementado— y a `web_search_allowlist`.
 > Frontera **interna**: no la ve el dashboard. Se documenta porque es donde se
 > resuelve el "JSONB vs relacional" y dónde viven las garantías que §2 promete.
 
-### 7.1 Las siete tablas
+### 7.1 Las doce tablas
 
 | Tabla | PK | Notas |
 |---|---|---|
@@ -603,12 +725,32 @@ Aplica a `merchant_blacklist` —ya implementado— y a `web_search_allowlist`.
 | `signals` | `id` (BIGSERIAL) | FK a `decisions.case_id`; índice en `code` |
 | **`agent_errors`** | `id` (BIGSERIAL) | 🆕 FK a `decisions.case_id`; índice en `agent` |
 | `human_resolutions` | `case_id` (**PK = FK** a `cases`) | 1:1 implícito |
-
-| **`merchant_blacklist`** | `merchant_id` (natural) | 🆕 gobernanza; baja lógica con `active` |
+| `merchant_blacklist` | `merchant_id` (natural) | gobernanza; baja lógica con `active` |
+| **`fraud_policies`** | `(policy_id, version)` compuesta | 🆕 documento normativo; append-only por versión. **Sin `active`**: el estado se deriva |
+| **`binding_sets`** | `version` (`2025.1-b1`) | 🆕 encabezado del set de vinculaciones; a lo sumo uno activo, por **índice parcial único** |
+| **`policy_bindings`** | `(binding_set_version, policy_id)` | 🆕 FK **compuesta** a `fraud_policies(policy_id, version)`; `condition` JSONB nullable |
+| **`policy_chunks`** | `(index_version, chunk_id)` | 🆕 `embedding vector(1536)`; **ningún índice extra**: la PK ya sirve el filtro por generación |
 
 Los hijos llevan `ON DELETE CASCADE` a nivel BD.
 
 **Falta**: `web_search_allowlist` (§4).
+
+> **Por qué `fraud_policies` no lleva `active`.** El patrón de
+> `merchant_blacklist` invita a copiarla, pero ahí la bandera **es** el dato. En
+> el catálogo los cuatro estados son **derivados** (ADR-0007: derivar, nunca
+> escribir), y una columna `active` sería una segunda fuente de verdad sobre
+> *¿esta política aplica?*. El retiro ya es expresable:
+> `policy_bindings.active = false`, o no publicar vinculación para la versión
+> nueva.
+>
+> **La FK compuesta de `policy_bindings`** convierte en **estructura** una
+> validación que era código: una vinculación no puede apuntar a un documento
+> inexistente porque la base no la deja entrar.
+>
+> **`policy_chunks` acumula generaciones**: no hay poda. Por eso
+> `WHERE index_version = <vigente>` no es un filtro sino un **invariante de
+> corrección** —sin él la búsqueda mezcla generaciones y devuelve vecinos de otro
+> modelo, sin fallar— ([ADR-0012](adr/0012-el-indice-vectorial-es-dato-derivado-y-versionado.md)).
 
 > `merchant_blacklist` es la primera tabla de **gobernanza** —dato mutable,
 > administrado por un humano, con audit trail—, la categoría que §4 definió para
@@ -679,7 +821,7 @@ entregable 7.
 
 **Guardas en W2**, que hacen cumplir lo que §2.5 promete:
 
-1. `decision != ESCALATE_TO_HUMAN` ⟹ `citations_internal` no vacío.
+1. `decision != ESCALATE_TO_HUMAN` ⟹ `citations_internal` **contiene una cita por cada** `policy_id` de `matched_policies`.
 2. `decision != ESCALATE_TO_HUMAN` ⟹ `base_confidence` no es `null`.
 3. `base_confidence` no `null` **y** `confidence != base_confidence` ⟹ hay `confidence_rationale`.
 
@@ -778,7 +920,10 @@ c558fd490ae6  (pgvector)
 
 ---
 
-**Estado**: v0.6 — capa de reglas y agentes determinísticos cerrados. El motor
-reproduce el ground truth en las 7 000 transacciones, en memoria y contra
-Postgres.
-**Valida el compañero**: §1. **Valido yo**: §2–§4, §7.
+**Estado**: v0.7 — RAG de políticas cerrado y sin decisiones conjuntas
+pendientes. El motor reproduce el ground truth en las 7 000 transacciones, en
+memoria y contra Postgres; los casos llegan a `DECIDED` con respaldo interno
+verificable, y cada decisión sella los cuatro ejes de auditoría.
+
+**§1 validado por el compañero.** ADR-0008 a ADR-0010 pasan a **aceptados**.
+**Valido yo**: §2–§4, §7.

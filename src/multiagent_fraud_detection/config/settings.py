@@ -24,6 +24,25 @@ class Settings(BaseSettings):
     # produce el comportamiento seguro sin necesidad de fallar.
     environment: str = "unknown"
 
+    # La UNICA variable del proveedor de embeddings. El modelo, la dimension y
+    # las plantillas viven en codigo (ADR-0012): configurables por `env`
+    # podrian cambiarse sin que suba `retrieval_index_version`, y entonces los
+    # tres sellos de la decision mentirian a la vez.
+    #
+    # Opcional porque el sistema funciona sin ella: sin clave no hay indice, y
+    # eso deja el descubrimiento vacio pero no el servicio roto. El estado tiene
+    # nombre y metrica —chunks pendientes de indexar, entregable 6— asi que
+    # fallar al arrancar seria convertir un estado previsto en una caida.
+    gemini_api_key: str | None = None
+
+    # El segundo proveedor: generacion. `gemini_api_key` cubre recuperacion.
+    # Misma regla que aquella —el modelo y el prompt viven en codigo, porque
+    # cambiarlos por `env` haria mentir a `explanation_prompt_version`— y misma
+    # nulabilidad: sin clave, la explicacion al cliente cae a plantilla y el
+    # sistema sigue decidiendo. Fallar al arrancar convertiria una degradacion
+    # prevista en una caida.
+    anthropic_api_key: str | None = None
+
     @property
     def permite_operaciones_destructivas(self) -> bool:
         """Lista blanca: solo `local`.

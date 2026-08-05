@@ -109,6 +109,16 @@ class GraphState(GraphInput, total=False):
     risk_score: float
     base_confidence: float
     scoring_version: str
+    # Con que generacion del indice se recupero. Ausente cuando el
+    # descubrimiento no corrio —sin senales utilizables, o proveedor caido—, y
+    # esa ausencia es informacion: el veredicto no uso el indice. Es el tercer
+    # eje de auditoria, junto a `scoring_version` (la formula) y
+    # `policy_catalog_version` (la norma).
+    retrieval_index_version: str
+    # Con que prompt y modelo se redacto la explicacion al cliente. Ausente
+    # cuando el texto salio de la plantilla de respaldo, y esa ausencia dice que
+    # ningun modelo participo.
+    explanation_prompt_version: str
     decision: DecisionType
     confidence: float
     confidence_rationale: str

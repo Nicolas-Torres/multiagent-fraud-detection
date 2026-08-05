@@ -6,6 +6,10 @@ from multiagent_fraud_detection.db.models.human_resolution import HumanResolutio
 from multiagent_fraud_detection.db.models.signal import Signal
 from multiagent_fraud_detection.db.models.agent_error import AgentError
 from multiagent_fraud_detection.db.models.merchant_blacklist import MerchantBlacklist
+from multiagent_fraud_detection.db.models.fraud_policy import FraudPolicy
+from multiagent_fraud_detection.db.models.binding_set import BindingSet
+from multiagent_fraud_detection.db.models.policy_binding import PolicyBinding
+from multiagent_fraud_detection.db.models.policy_chunk import PolicyChunk
 
 __all__ = [
     "Case",
@@ -16,4 +20,8 @@ __all__ = [
     "Transaction",
     "AgentError",
     "MerchantBlacklist",
+    "FraudPolicy",
+    "BindingSet",
+    "PolicyBinding",
+    "PolicyChunk",
 ]
