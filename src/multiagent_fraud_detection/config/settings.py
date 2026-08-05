@@ -35,6 +35,14 @@ class Settings(BaseSettings):
     # fallar al arrancar seria convertir un estado previsto en una caida.
     gemini_api_key: str | None = None
 
+    # El segundo proveedor: generacion. `gemini_api_key` cubre recuperacion.
+    # Misma regla que aquella —el modelo y el prompt viven en codigo, porque
+    # cambiarlos por `env` haria mentir a `explanation_prompt_version`— y misma
+    # nulabilidad: sin clave, la explicacion al cliente cae a plantilla y el
+    # sistema sigue decidiendo. Fallar al arrancar convertiria una degradacion
+    # prevista en una caida.
+    anthropic_api_key: str | None = None
+
     @property
     def permite_operaciones_destructivas(self) -> bool:
         """Lista blanca: solo `local`.

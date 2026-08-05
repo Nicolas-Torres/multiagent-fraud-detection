@@ -34,6 +34,14 @@ from multiagent_fraud_detection.domain.scoring import (
     risk_score,
     signal_sort_key,
 )
+from multiagent_fraud_detection.explain.audit import build_audit_explanation
+from multiagent_fraud_detection.explain.customer import (
+    PROMPT_VERSION,
+    SYSTEM_PROMPT,
+    build_prompt,
+    fallback_explanation,
+    safe_themes,
+)
 from multiagent_fraud_detection.graph.context import GraphContext
 from multiagent_fraud_detection.graph.state import (
     AgentError,
@@ -484,12 +492,66 @@ async def decision_arbiter(
     }
 
 
-async def explainability(state: GraphState) -> dict:
-    return {
-        "agent_route": [EXPLAIN],
-        "explanation_customer": "stub",
-        "explanation_audit": "stub",
-    }
+@degrades(EXPLAIN)
+async def explainability(
+    state: GraphState, runtime: Runtime[GraphContext]
+) -> dict:
+    """Dos textos por caminos distintos, y ninguno puede faltar.
+
+    `explanation_audit` sale de una plantilla: **es** el registro de la decision
+    y tiene que ser reproducible, o el diff del harness deja de significar algo.
+    Nunca depende del proveedor.
+
+    `explanation_customer` sale de un LLM, que redacta a partir de **temas
+    seguros** ya traducidos: nunca ve un `policy_id`, un codigo de senal ni un
+    umbral. Explicarle la regla al titular es entregarsela a quien quizas sea el
+    defraudador, y un modelo con permiso de nombrar politicas reintroduciria en
+    el texto del cliente el fallo que ADR-0011 cerro en las citas.
+
+    Si el proveedor falla, cae a plantilla. El contrato tipa los dos campos como
+    `str` no nulables: un caso sin explicacion no es representable, asi que la
+    degradacion es a un texto peor, nunca a la ausencia.
+    """
+    decision: DecisionType = state["decision"]
+    temas = safe_themes([s.code for s in state.get("signals", [])])
+
+    salida: dict = {"agent_route": [EXPLAIN]}
+
+    try:
+        # `to_thread` por el mismo motivo que en el RAG: el cliente del proveedor
+        # es sincrono y bloquearia el event loop durante toda la latencia.
+        salida["explanation_customer"] = await asyncio.to_thread(
+            runtime.context.narrator.narrate,
+            SYSTEM_PROMPT,
+            build_prompt(decision, temas),
+        )
+        salida["explanation_prompt_version"] = PROMPT_VERSION
+    except Exception as exc:  # noqa: BLE001 - degradar el texto, no el caso
+        logger.exception("narracion degradada; se usa la plantilla")
+        salida["explanation_customer"] = fallback_explanation(decision)
+        salida["agent_errors"] = [
+            AgentError(
+                agent=EXPLAIN,
+                error_type=type(exc).__name__,
+                message=f"narracion no disponible: {exc}",
+            )
+        ]
+
+    # Se arma al final y con `salida` ya aplicada: el parrafo de auditoria
+    # menciona el sello del prompt y la degradacion, asi que tiene que ver lo que
+    # este mismo nodo acaba de producir.
+    salida["explanation_audit"] = build_audit_explanation(
+        {
+            **state,
+            **salida,
+            "agent_errors": [
+                *state.get("agent_errors", []),
+                *salida.get("agent_errors", []),
+            ],
+        }
+    )
+
+    return salida
 
 
 def _verificar_invariantes(state: GraphState) -> None:
@@ -590,6 +652,9 @@ async def persist_decision(
                     debate_pro_fraud=state.get("pro_fraud_argument", ""),
                     debate_pro_customer=state.get("pro_customer_argument", ""),
                     agent_route=state.get("agent_route", []),
+                    explanation_prompt_version=state.get(
+                        "explanation_prompt_version"
+                    ),
                     explanation_customer=state.get("explanation_customer", ""),
                     explanation_audit=state.get("explanation_audit", ""),
                     signals=[

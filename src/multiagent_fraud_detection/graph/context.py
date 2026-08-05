@@ -9,6 +9,17 @@ Se inyecta al invocar:
 
 El nodo persistidor no puede usar la sesion del request: ese ya devolvio 202 y
 el grafo corre en segundo plano. Necesita su propia sesion y su propio commit.
+
+## Los dos proveedores
+
+| Puerto | Proveedor | Rol | Sello en la decision |
+|---|---|---|---|
+| `embedder` | Gemini | recuperacion | `retrieval_index_version` |
+| `narrator` | Anthropic | generacion | `explanation_prompt_version` |
+
+Los dos se inyectan para que un test pueda pasar un doble sin red ni clave, y
+para que cambiar de proveedor sea un adaptador y una version nueva en vez de una
+reescritura.
 """
 
 from dataclasses import dataclass, field
@@ -18,6 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from multiagent_fraud_detection.db.repositories.merchant_blacklist import BlacklistCache
 from multiagent_fraud_detection.domain.catalog import PolicyCatalog, load_catalog
+from multiagent_fraud_detection.explain.narrator import AnthropicNarrator, Narrator
 from multiagent_fraud_detection.retrieval.embeddings import Embedder, GeminiEmbedder
 from multiagent_fraud_detection.retrieval.query import QueryCache, code_vocabulary
 
@@ -46,10 +58,12 @@ class GraphContext:
     # Cache por proceso: una instancia por contexto, no un global de modulo.
     blacklist: BlacklistCache = field(default_factory=BlacklistCache)
 
-    # El proveedor de embeddings, detras del puerto. Se inyecta para que un
-    # test pueda pasar `FakeEmbedder()` sin red ni clave, y para que cambiar de
-    # proveedor sea un adaptador y una version de indice nueva (ADR-0012).
+    # El proveedor de embeddings, detras del puerto. Construirlo no llama a la
+    # API ni exige clave: el cliente se crea perezoso en el primer `embed`.
     embedder: Embedder = field(default_factory=GeminiEmbedder)
+
+    # El proveedor de generacion. Mismo patron, misma pereza.
+    narrator: Narrator = field(default_factory=AnthropicNarrator)
 
     # Embeddings de query por combinacion de codigos de senal. Sin TTL, a
     # diferencia del de la lista negra: la entrada no puede quedar obsoleta por
@@ -68,3 +82,4 @@ class GraphContext:
 
     def __post_init__(self) -> None:
         self.vocabulary = code_vocabulary(self.catalog)
+    

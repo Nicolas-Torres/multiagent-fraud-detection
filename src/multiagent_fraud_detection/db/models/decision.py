@@ -71,6 +71,15 @@ class Decision(Base):
     # tuvieron indice.
     retrieval_index_version: Mapped[str | None] = mapped_column(String(64))
 
+    # Con que prompt y modelo se redacto `explanation_customer`. Cuarto sello,
+    # y el unico que cubre texto generado: editar el prompt sin subir la
+    # generacion produce mensajes distintos bajo la misma version, y ninguna
+    # consulta lo detecta.
+    #
+    # `null` cuando la explicacion salio de la plantilla de respaldo —proveedor
+    # caido o sin clave—. No es dato faltante: dice que ningun modelo participo.
+    explanation_prompt_version: Mapped[str | None] = mapped_column(String(64))
+
     citations_internal: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
 
     citations_external: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)

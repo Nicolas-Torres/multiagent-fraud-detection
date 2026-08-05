@@ -115,6 +115,10 @@ class GraphState(GraphInput, total=False):
     # eje de auditoria, junto a `scoring_version` (la formula) y
     # `policy_catalog_version` (la norma).
     retrieval_index_version: str
+    # Con que prompt y modelo se redacto la explicacion al cliente. Ausente
+    # cuando el texto salio de la plantilla de respaldo, y esa ausencia dice que
+    # ningun modelo participo.
+    explanation_prompt_version: str
     decision: DecisionType
     confidence: float
     confidence_rationale: str
