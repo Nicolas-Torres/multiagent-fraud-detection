@@ -25,6 +25,33 @@ La distinción es deliberada. Un catálogo mal formado es culpa nuestra y tiene 
 frenar el arranque. Que el banco edite un texto no puede dejar el motor fuera de
 servicio: la política se degrada —deja de evaluarse, sigue siendo citable— igual
 que un agente que falla degrada la decisión en vez de abortarla.
+
+## El puerto de origen
+
+La carga está partida en dos por la fase 3 de ADR-0007, que muda el catálogo de
+archivos versionados a tablas:
+
+- **`CatalogSource`** trae los registros **crudos**, con la forma exacta en que el
+  banco entrega el catálogo. Hay dos implementaciones: `FileCatalogSource` acá, y
+  `DbCatalogSource` en `db/repositories/`.
+- **`build_catalog`** valida y deriva. Es **una sola** implementación, compartida
+  por las dos fuentes.
+
+El corte va ahí y no después a propósito. Si el puerto devolviera `Policy` ya
+construidas, cada fuente tendría que reimplementar los cuatro estados y los
+cuatro derivados, y el test que afirma que ambas producen el mismo `PolicyCatalog`
+estaría comparando dos copias del mismo bug.
+
+Que lo crudo sean `dict` y no un tercer schema tipado también es deliberado: esa
+forma **es** el formato de entrega, y las columnas de las tablas la espejan una a
+una. Tipar un intermedio que se consume dos líneas después sería una tercera
+fuente de verdad para la misma forma.
+
+**El puerto es síncrono.** El catálogo se lee una vez por proceso, no por caso, y
+`GraphContext.catalog` lo toma desde un `default_factory`, que no puede esperar
+una corrutina. `DbCatalogSource` usa engine síncrono por el mismo motivo por el
+que lo usa `migrations/env.py`: psycopg3 da sync y async con la misma URL, y el
+async se paga solo donde hay concurrencia real.
 """
 
 from __future__ import annotations
@@ -34,7 +61,7 @@ import json
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 from multiagent_fraud_detection.domain.predicates import (
     LIBRARY,
@@ -138,7 +165,61 @@ class PolicyCatalog:
 
 
 # --------------------------------------------------------------------------- #
-# Carga
+# El puerto de origen
+# --------------------------------------------------------------------------- #
+
+
+@dataclass(frozen=True, slots=True)
+class RawCatalog:
+    """Los registros crudos, antes de validar y derivar.
+
+    Espeja el formato de entrega: `documents` es el arreglo del JSON normativo,
+    `header` son los metadatos del sobre de vinculación y `bindings` su lista.
+    Las tablas de la fase 3 tienen la misma partición —`fraud_policies`,
+    `binding_sets`, `policy_bindings`—, así que reconstruir esta forma desde
+    Postgres es una proyección, no una traducción.
+    """
+
+    documents: list[dict[str, Any]]
+    header: dict[str, Any]
+    bindings: list[dict[str, Any]]
+
+
+class CatalogSource(Protocol):
+    """De dónde salen los registros crudos.
+
+    Deliberadamente mínimo: una sola operación, sin parámetros. Quién es el
+    catálogo vigente lo decide la construcción de la fuente, no el llamador.
+    """
+
+    def fetch(self) -> RawCatalog: ...
+
+
+@dataclass(frozen=True, slots=True)
+class FileCatalogSource:
+    """Los dos JSON versionados en `data/policies/`. Fase 2 de ADR-0007.
+
+    Es la fuente del gate offline: `check_policies.py` corre en CI sin Postgres
+    levantado, y ese gate deja de existir el día que la única fuente sea la base.
+    """
+
+    documents_path: Path
+    bindings_path: Path
+
+    def fetch(self) -> RawCatalog:
+        documentos = json.loads(self.documents_path.read_text(encoding="utf-8"))
+        sobre = json.loads(self.bindings_path.read_text(encoding="utf-8"))
+
+        header = {k: v for k, v in sobre.items() if k != "bindings"}
+        return RawCatalog(
+            documents=documentos,
+            header=header,
+            bindings=sobre["bindings"],
+        )
+
+
+# --------------------------------------------------------------------------- #
+# Validación y derivación
 # --------------------------------------------------------------------------- #
 
 
@@ -153,9 +234,15 @@ def fingerprint(text: str, *, algorithm: str = "sha256") -> str:
     return f"{algorithm}:{digest}"
 
 
-def load_catalog(documents_path: Path, bindings_path: Path) -> PolicyCatalog:
-    documentos = json.loads(documents_path.read_text(encoding="utf-8"))
-    sobre = json.loads(bindings_path.read_text(encoding="utf-8"))
+def build_catalog(raw: RawCatalog) -> PolicyCatalog:
+    """Valida los registros crudos y deriva la vista unificada.
+
+    Una sola implementación para todas las fuentes. Es lo que hace que el test
+    "archivo y base producen el mismo catálogo" pruebe algo sobre los **datos** y
+    no sobre dos copias de la misma lógica.
+    """
+    documentos = raw.documents
+    sobre = raw.header
 
     algoritmo = sobre.get("fingerprint_algorithm", "sha256")
     campo = sobre.get("fingerprint_field", "rule")
@@ -166,7 +253,7 @@ def load_catalog(documents_path: Path, bindings_path: Path) -> PolicyCatalog:
         problems.append("hay `policy_id` duplicados en el catálogo de documentos")
 
     vinculaciones: dict[str, dict] = {}
-    for v in sobre["bindings"]:
+    for v in raw.bindings:
         pid = v["policy_id"]
         if pid in vinculaciones:
             problems.append(f"{pid}: vinculación duplicada")
@@ -266,6 +353,16 @@ def load_catalog(documents_path: Path, bindings_path: Path) -> PolicyCatalog:
         reference_currency=sobre.get("reference_currency", "USD"),
         policies=tuple(sorted(politicas, key=lambda p: p.policy_id)),
     )
+
+
+def load_catalog(documents_path: Path, bindings_path: Path) -> PolicyCatalog:
+    """Atajo para la fuente de archivos.
+
+    Existe porque es la firma que ya usan `check_policies.py`, `GraphContext` y
+    catorce casos de `test_catalog.py`. Extraer el puerto no tiene por qué
+    hacerles pagar nada.
+    """
+    return build_catalog(FileCatalogSource(documents_path, bindings_path).fetch())
 
 
 # --------------------------------------------------------------------------- #
