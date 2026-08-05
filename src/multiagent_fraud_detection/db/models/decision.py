@@ -53,6 +53,24 @@ class Decision(Base):
     # es auditable. `scoring_version` sella la formula; esto sella la norma.
     policy_catalog_version: Mapped[str | None] = mapped_column(String(32))
 
+    # Como se derivo el vector con el que se recupero: modelo, dimension,
+    # task_type y generacion (`gemini-embedding-2:1536:doc:1`). ADR-0012.
+    #
+    # Con los otros dos sellos cierra la auditoria en tres ejes independientes:
+    # `InternalCitation.version` dice que texto se cito,
+    # `policy_catalog_version` que traduccion se evaluo, y esto como se derivo
+    # el vector. Los tres son necesarios porque los tres artefactos cambian por
+    # separado y ninguno registra los cambios de los otros.
+    #
+    # Cadena descriptiva y no id opaco: el motivo de sellarla es que alguien la
+    # lea dos anos despues. Por lo mismo el modelo no es variable de entorno —un
+    # modelo cambiable sin que suba esta version haria mentir a los tres sellos
+    # a la vez—.
+    #
+    # Nullable por expand/contract y porque las decisiones ya persistidas no
+    # tuvieron indice.
+    retrieval_index_version: Mapped[str | None] = mapped_column(String(64))
+
     citations_internal: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
 
     citations_external: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
