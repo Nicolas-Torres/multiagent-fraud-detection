@@ -62,8 +62,6 @@ documento publicado y sin indexar, y a que el proveedor de embeddings no
 responda. Verificado: con el proveedor caído, el mismo caso sigue en `BLOCK`
 citando FP-03, con la confianza degradada de 0.4 a 0.25.
 
-![Cómo se arma una cita interna](./docs/diagrams/citacion-interna.png)
-
 ---
 
 ## Topología del grafo

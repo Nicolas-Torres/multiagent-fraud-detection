@@ -4,7 +4,7 @@
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
-        <mxCell id="title" parent="1" style="text;html=1;fontSize=20;fontStyle=1;align=left;verticalAlign=middle;" value="C4 — Vista Container · estado al cerrar feature/domain-models" vertex="1">
+        <mxCell id="title" parent="1" style="text;html=1;fontSize=20;fontStyle=1;align=left;verticalAlign=middle;" value="C4 — Vista Container · estado al cerrar &lt;b&gt;feature/policy-rag&lt;/b&gt;" vertex="1">
           <mxGeometry height="30" width="900" x="-79" y="23" as="geometry" />
         </mxCell>
         <mxCell id="subtitle" parent="1" style="text;html=1;fontSize=12;fontStyle=2;align=left;verticalAlign=middle;" value="Verde = construido y verificado · Gris discontinuo = pendiente · Azul = externo" vertex="1">
@@ -25,22 +25,24 @@
         <mxCell id="c_graph" parent="sys" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=none;strokeColor=#999999;dashed=1;fontColor=#666666;" value="Grafo de agentes (LangGraph)&#xa;&#xa;Context · Behavioral · Policy RAG&#xa;Threat Intel · Aggregation&#xa;Debate · Arbiter · Explainability&#xa;+ checkpointer (HITL)" vertex="1">
           <mxGeometry height="100" width="280" x="526" y="50" as="geometry" />
         </mxCell>
-        <mxCell id="c_alembic" parent="sys" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#d5e8d4;strokeColor=#82b366;" value="Alembic&#xa;&#xa;sync&#xa;4 migraciones" vertex="1">
+        <mxCell id="c_alembic" parent="sys" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#d5e8d4;strokeColor=#82b366;" value="&lt;b&gt;Alembic&lt;/b&gt;&lt;br&gt;sync · 12 migraciones" vertex="1">
           <mxGeometry height="100" width="140" x="742" y="432" as="geometry" />
         </mxCell>
-        <mxCell id="c_dom" parent="sys" style="swimlane;startSize=28;html=1;fontSize=11;fontStyle=1;fillColor=#e8f5e9;strokeColor=#82b366;" value="Capa de dominio — CERRADA en esta etapa" vertex="1">
+        <mxCell id="c_seed" value="&lt;b&gt;Job de seed&lt;/b&gt;&lt;br&gt;post-deploy · idempotente&lt;br&gt;dataset + catálogo + índice&lt;br&gt;&lt;i&gt;no aborta el rollout&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="sys"><mxGeometry x="742" y="292" width="140" height="110" as="geometry"/></mxCell>
+        <mxCell id="e_seed_db" value="seed.py (sin --reset)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;dashed=1;" edge="1" parent="sys" source="c_seed" target="c_db"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="c_dom" parent="sys" style="swimlane;startSize=28;html=1;fontSize=11;fontStyle=1;fillColor=#e8f5e9;strokeColor=#82b366;" value="Dominio · recuperación · explicabilidad" vertex="1">
           <mxGeometry height="188" width="823" x="49" y="232" as="geometry" />
         </mxCell>
         <mxCell id="d_pyd" parent="c_dom" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#d5e8d4;strokeColor=#82b366;align=left;spacingLeft=8;" value="schemas Pydantic (frontera)&#xa;&#xa;types.py: CountryCode · Money · Confidence&#xa;TransactionIn/Read · CustomerBehaviorIn/Read&#xa;DecisionRead · SignalRead · CaseDetail&#xa;CaseSummary · CaseCreated · Page[T]&#xa;HumanResolutionIn/Read" vertex="1">
           <mxGeometry height="120" width="320" x="49" y="49" as="geometry" />
         </mxCell>
-        <mxCell id="d_orm" parent="c_dom" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#d5e8d4;strokeColor=#82b366;align=left;spacingLeft=8;" value="modelos ORM (SQLAlchemy 2.0 async)&#xa;&#xa;Transaction · CustomerBehavior&#xa;Case · Decision · Signal · HumanResolution&#xa;lazy=selectin en todas las relaciones&#xa;properties: Decision.debate · Case.customer" vertex="1">
+        <mxCell id="d_orm" parent="c_dom" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#d5e8d4;strokeColor=#82b366;align=left;spacingLeft=8;" value="&lt;b&gt;modelos ORM (SQLAlchemy 2.0 async)&lt;/b&gt;&lt;br&gt;12 tablas · el diagrama se genera&lt;br&gt;desde Base.metadata (data_model.png)" vertex="1">
           <mxGeometry height="120" width="320" x="457" y="49" as="geometry" />
         </mxCell>
-        <mxCell id="c_db" parent="sys" style="shape=cylinder3;boundedLbl=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#d5e8d4;strokeColor=#82b366;verticalAlign=middle;" value="PostgreSQL 17 + pgvector&#xa;&#xa;CONSTRUIDO: transactions · customer_behaviors · cases · decisions · signals · human_resolutions&#xa;PENDIENTE: web_search_allowlist · checkpointer · embeddings de políticas" vertex="1">
+        <mxCell id="c_db" parent="sys" style="shape=cylinder3;boundedLbl=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#d5e8d4;strokeColor=#82b366;verticalAlign=middle;" value="&lt;b&gt;PostgreSQL 18 + pgvector&lt;/b&gt;&lt;br&gt;transacciones · casos · decisiones · señales · errores&lt;br&gt;gobernanza: merchant_blacklist · catálogo de políticas&lt;br&gt;&lt;b&gt;índice vectorial&lt;/b&gt; policy_chunks — sin poda: la búsqueda filtra por index_version&lt;br&gt;PENDIENTE: web_search_allowlist · checkpointer" vertex="1">
           <mxGeometry height="130" width="700" x="91.5" y="611" as="geometry" />
         </mxCell>
-        <mxCell id="x_llm" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=none;strokeColor=#999999;dashed=1;fontColor=#666666;" value="LLMs&#xa;&#xa;Anthropic Claude (Arbiter)&#xa;Google Gemini (análisis)" vertex="1">
+        <mxCell id="x_llm" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=none;strokeColor=#999999;dashed=1;fontColor=#666666;" value="&lt;b&gt;Proveedores&lt;/b&gt;&lt;br&gt;Gemini · embeddings&lt;br&gt;(retrieval_index_version)&lt;br&gt;Anthropic · explicación&lt;br&gt;(explanation_prompt_version)" vertex="1">
           <mxGeometry height="90" width="200" x="1421" y="185" as="geometry" />
         </mxCell>
         <mxCell id="x_web" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=none;strokeColor=#999999;dashed=1;fontColor=#666666;" value="Fuentes web externas&#xa;&#xa;búsqueda gobernada por&#xa;allowlist en tabla" vertex="1">
@@ -116,10 +118,10 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="ci" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=none;strokeColor=#999999;dashed=1;fontColor=#666666;" value="CI — mío&#xa;lint → pytest → alembic check → build" vertex="1">
+        <mxCell id="ci" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=none;strokeColor=#999999;dashed=1;fontColor=#666666;" value="&lt;b&gt;CI — mío&lt;/b&gt;&lt;br&gt;lint → pytest → check_policies&lt;br&gt;→ diagrama --check → alembic check&lt;br&gt;→ build → push" vertex="1">
           <mxGeometry height="70" width="290" x="192" y="971" as="geometry" />
         </mxCell>
-        <mxCell id="ghcr" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;" value="GHCR&#xa;imagen con tag inmutable&#xa;PUNTO DE HAND-OFF" vertex="1">
+        <mxCell id="ghcr" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;" value="&lt;b&gt;GHCR&lt;/b&gt;&lt;br&gt;tags legibles (semver, sha)&lt;br&gt;&lt;b&gt;EL HAND-OFF ES EL DIGEST&lt;/b&gt;" vertex="1">
           <mxGeometry height="70" width="220" x="639" y="971" as="geometry" />
         </mxCell>
         <mxCell id="cd" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=none;strokeColor=#999999;dashed=1;fontColor=#666666;" value="CD — compañero&#xa;Terraform · rollout · secretos · migración" vertex="1">
@@ -131,13 +133,13 @@
             <Array as="points" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="e_cd" edge="1" parent="1" source="ghcr" style="fontSize=10;strokeWidth=2;dashed=1;strokeColor=#999999;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="cd" value="pull de un tag concreto">
+        <mxCell id="e_cd" edge="1" parent="1" source="ghcr" style="fontSize=10;strokeWidth=2;dashed=1;strokeColor=#999999;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="cd" value="pull por &lt;b&gt;digest&lt;/b&gt;&lt;br&gt;ghcr.io/…@sha256:…">
           <mxGeometry relative="1" x="0.0246" y="18" as="geometry">
             <mxPoint as="offset" />
             <Array as="points" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="n_next" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;align=left;spacingLeft=10;fillColor=#fff2cc;strokeColor=#d6b656;verticalAlign=middle;" value="SIGUIENTE ETAPA: el State del grafo&#xa;State ≠ CaseDetail. Memoria de trabajo interna vs. frontera pública.&#xa;Lo persiste el checkpointer, no la sesión de SQLAlchemy.&#xa;Un null en CaseDetail = &quot;no aplica&quot;; en State = &quot;todavía no&quot;." vertex="1">
+        <mxCell id="n_next" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;align=left;spacingLeft=10;fillColor=#fff2cc;strokeColor=#d6b656;verticalAlign=middle;" value="&lt;b&gt;SIGUIENTE ETAPA: agentes con LLM&lt;/b&gt;&lt;br&gt;&lt;br&gt;Debate ×2 y Arbiter agéntico. El determinístico ya es el brazo de control (ADR-0006).&lt;br&gt;&lt;br&gt;Decidir primero: &lt;b&gt;qué hace el Arbiter con LLM que el determinístico no hace&lt;/b&gt;. Si sólo lo imita, no hay nada que medir.&lt;br&gt;&lt;br&gt;Y el muestreo: 4 llamadas por caso no corren sobre 7 000." vertex="1">
           <mxGeometry height="220" width="200" x="-99" y="512" as="geometry" />
         </mxCell>
       </root>
