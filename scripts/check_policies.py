@@ -1,11 +1,22 @@
 """Corre el motor determinístico sobre el dataset y lo compara con el ground truth.
 
-    uv run python scripts/check_policies.py           →  resumen + código de salida
-    uv run python scripts/check_policies.py --detalle →  además, cada discrepancia
+    uv run python scripts/check_policies.py                →  resumen + código de salida
+    uv run python scripts/check_policies.py --detalle       →  además, cada discrepancia
+    uv run python scripts/check_policies.py --source=db     →  el catálogo desde Postgres
 
-**Sin base de datos, sin red, sin LLM.** Las 7 000 transacciones en segundos. Por
-eso es un gate de CI y no un smoke test: corre en cada push, no cuando alguien se
-acuerda.
+**Sin red, sin LLM.** Las 7 000 transacciones en segundos. Por eso es un gate de CI
+y no un smoke test: corre en cada push, no cuando alguien se acuerda.
+
+## Las dos fuentes del catálogo
+
+`--source=file` (default) lee los JSON versionados: **sin base de datos**, que es
+lo que permite correrlo en CI sin Postgres levantado. `--source=db` lee las tablas
+de la fase 3 de ADR-0007.
+
+El mismo gate contra las dos fuentes es la prueba de la migración del catálogo a
+Postgres: si mudarlo cambió una sola de las 7 000 filas, el número lo dice. No
+hace falta escribir una prueba nueva para la migración de datos — ya existe y es
+más fuerte que cualquiera que se escribiera a propósito.
 
 ## Qué prueba, y por qué eso vale
 
@@ -35,7 +46,12 @@ import sys
 from collections import defaultdict
 from datetime import timedelta
 
-from multiagent_fraud_detection.domain.catalog import Owner, load_catalog
+from multiagent_fraud_detection.domain.catalog import (
+    CatalogSource,
+    FileCatalogSource,
+    Owner,
+    build_catalog,
+)
 from multiagent_fraud_detection.domain.engine import evaluate, prescribed_action
 from multiagent_fraud_detection.domain.predicates import EvalContext
 
@@ -52,6 +68,26 @@ from _dataset import (
 WINDOW = timedelta(hours=26)
 
 POLICIES = DATA_DIR / "policies"
+
+
+def elegir_fuente(nombre: str) -> CatalogSource:
+    """Construye la fuente pedida.
+
+    El import de `DbCatalogSource` es perezoso a propósito: el gate offline no
+    debería poder fallar por un error de importación de la capa de base de datos,
+    que es lo único que no necesita.
+    """
+    if nombre == "db":
+        from multiagent_fraud_detection.db.repositories.policy_catalog import (
+            DbCatalogSource,
+        )
+
+        return DbCatalogSource()
+
+    return FileCatalogSource(
+        POLICIES / "fraud_policies_2025.1.json",
+        POLICIES / "policy_bindings_2025.1.json",
+    )
 
 
 def evaluar_todo(catalog, perfiles, transacciones, blacklist):
@@ -102,13 +138,16 @@ def evaluar_todo(catalog, perfiles, transacciones, blacklist):
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--detalle", action="store_true", help="lista cada discrepancia")
+    ap.add_argument(
+        "--source",
+        choices=("file", "db"),
+        default="file",
+        help="de dónde sale el catálogo (default: file, sin base de datos)",
+    )
     args = ap.parse_args()
 
-    catalog = load_catalog(
-        POLICIES / "fraud_policies_2025.1.json",
-        POLICIES / "policy_bindings_2025.1.json",
-    )
-    print(f"catálogo {catalog.version} · {catalog.health}")
+    catalog = build_catalog(elegir_fuente(args.source).fetch())
+    print(f"fuente {args.source} · catálogo {catalog.version} · {catalog.health}")
 
     if catalog.health["stale"]:
         print("  aviso: hay vinculaciones obsoletas; esas políticas no se evalúan")
