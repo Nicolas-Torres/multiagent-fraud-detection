@@ -61,7 +61,7 @@ filas. Eso es ground truth de *information retrieval* clásico, y su métrica es
 offline gracias a ADR-0012, y con la misma convención de código de salida que los
 dos gates que ya existen.
 
-Es la métrica que ADR-0011 dejó definida como ablación de la pierna semántica.
+Es la métrica que ADR-0011 dejó definida como ablación de el bloque semántica.
 
 ### 3. Juicio: DeepEval
 

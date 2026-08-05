@@ -130,7 +130,7 @@ async def unindexed_policies(
 
     Ésta en particular describe un estado legítimo y silencioso: un documento
     publicado y no indexado sigue siendo **citable por identidad** —si disparó, la
-    pierna de autorización lo cita igual, porque esa pierna no consulta el
+    bloque de autorización lo cita igual, porque esa bloque no consulta el
     índice— e **invisible por similitud**. Nada falla; simplemente el
     descubrimiento no puede alcanzarlo.
     """

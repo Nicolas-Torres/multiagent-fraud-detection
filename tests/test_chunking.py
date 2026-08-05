@@ -101,7 +101,7 @@ def test_se_indexan_tambien_las_politicas_no_evaluables():
     """Son las que **sólo** pueden llegar a un caso por descubrimiento.
 
     Una `PENDING` o una `EXCLUDED` nunca aparece en `matched_policies`, así que
-    la pierna de autorización no puede citarla. Filtrarlas del índice las dejaría
+    el bloque de autorización no puede citarla. Filtrarlas del índice las dejaría
     incitables por las dos vías.
     """
     catalogo = [

@@ -49,7 +49,7 @@ satisface.
 `citations_internal` tiene **dos orígenes con garantías distintas**, y lo que se
 persiste es su unión.
 
-| Pierna | Cómo se resuelve | Qué aporta | Garantía |
+| bloque | Cómo se resuelve | Qué aporta | Garantía |
 |---|---|---|---|
 | **Autorización** | lookup por `policy_id` de cada elemento de `matched_policies` | toda política que disparó completa | **total**: no depende del índice ni del modelo |
 | **Descubrimiento** | búsqueda vectorial con la query armada desde los códigos de señal | políticas relacionadas que **no** dispararon | **ninguna**: es aproximada por diseño |
@@ -64,7 +64,7 @@ Es un `assert`, no una métrica. Se cumple por construcción y su violación es 
 defecto, no un resultado — mismo criterio que las tres guardas de W2 (§7.3), que
 **levantan y no reparan**.
 
-**La distinción entre ambas piernas no se modela.** El Arbiter necesita saber qué
+**La distinción entre ambas bloques no se modela.** El Arbiter necesita saber qué
 política disparó y cuál solo se parece, y el contrato ya se lo dice: `Decision`
 expone `matched_policies` y `citations_internal` como campos separados, y la
 intersección es una operación de conjuntos. Agregarle un `retrieved_by` a
@@ -94,7 +94,7 @@ no disparó y sin embargo importa, que el acta 05 §9.4 identifica como evidenci
 para el Arbiter.
 
 **Similitud con verificación posterior**: recuperar por índice y fallar si alguna
-política disparada no aparece. Mantiene una sola pierna y el fallo deja de ser
+política disparada no aparece. Mantiene una sola bloque y el fallo deja de ser
 silencioso. Se descarta porque convierte una recuperación incompleta en un caso
 `FAILED` cuando la información para citar bien estaba disponible **sin consultar
 el índice**. Es construir la detección de un problema que se podía no tener.
@@ -106,7 +106,7 @@ garantizar nada: un umbral alto reduce las citas espurias y aumenta las
 ausencias, que es el lado caro del error.
 
 **Reranker sobre el resultado del índice.** Sube el recall efectivo y es una
-mejora legítima. No se descarta como mejora de la **pierna de descubrimiento**;
+mejora legítima. No se descarta como mejora de la **bloque de descubrimiento**;
 se descarta como sustituto de la de autorización, porque sube la probabilidad y
 no la garantía, y agrega una llamada más al camino crítico.
 
@@ -130,27 +130,27 @@ ground truth habla de políticas disparadas y no de políticas recuperadas*—
 disolviéndola. `expected_policies` no es un proxy pobre del conjunto relevante:
 es la respuesta exacta a *qué citas son obligatorias*, y no dice nada sobre cuáles
 están permitidas. Define recall con precisión total y precision en absoluto. Como
-la pierna de autorización tiene recall 1.0 por construcción, el ground truth pasa
-a medir una **ablación de la pierna semántica**, no un gate.
+el bloque de autorización tiene recall 1.0 por construcción, el ground truth pasa
+a medir una **ablación de el bloque semántica**, no un gate.
 
 **Se paga:**
 
 - **El nodo tiene dos caminos** y los dos necesitan prueba, incluido el caso en
-  que ambas piernas devuelven el mismo documento y hay que deduplicar por
+  que ambas bloques devuelven el mismo documento y hay que deduplicar por
   `chunk_id`.
 - **La ablación va a producir un número incómodo y hay que publicarlo.** Si la
-  pierna semántica sola recupera el 93% de las políticas disparadas, ese 7% es la
+  bloque semántica sola recupera el 93% de las políticas disparadas, ese 7% es la
   proporción de veredictos autónomos que habrían citado mal. Es la evidencia
   empírica de este ADR; leído fuera de contexto parece una métrica de un sistema
   que no funciona.
 - **Hay una objeción previsible** —*"entonces el RAG no decide nada"*— que **tiene
-  que estar contestada en el informe**, no implícita en el código: la pierna de
+  que estar contestada en el informe**, no implícita en el código: el bloque de
   descubrimiento alimenta al Arbiter, FP-10 solo es alcanzable por ella, y con
   circulares y manuales reales en vez de once líneas es la que hace el trabajo,
   mientras la de identidad sigue siendo un lookup. Mismo riesgo de rúbrica que
   ADR-0006 registró para el reparto determinístico: argumentado suma, no
   argumentado resta.
-- **El corpus de once líneas sobredimensiona la pierna de identidad.** Es una
+- **El corpus de once líneas sobredimensiona el bloque de identidad.** Es una
   limitación del dataset y no del diseño, y va declarada como tal.
 
 **No toca ADR-0006**: el nodo sigue del lado del LLM —la recuperación semántica y

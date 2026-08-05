@@ -19,7 +19,7 @@ el escenario 2.
 | 3 | Dispara FP-03 y el proveedor de embeddings está caído | Que el veredicto sobrevive sin descubrimiento |
 
 El tercero es el que justifica el diseño del nodo. Si `@degrades` fuera la única
-red, una caída del proveedor se llevaría también la pierna de autorización y
+red, una caída del proveedor se llevaría también el bloque de autorización y
 todos los casos escalarían — lo contrario de lo que ADR-0011 promete. Correrlo
 sobre el mismo caso que el escenario 2 prueba de paso la semántica de reemplazo
 del agregado: un reintento sustituye, no acumula.
@@ -245,7 +245,7 @@ async def main() -> int:
             )
         if "FP-03" not in citadas:
             problemas.append(
-                "la pierna de autorización no sobrevivió a la caída: es lo que "
+                "el bloque de autorización no sobrevivió a la caída: es lo que "
                 "el `try` interno del nodo existe para evitar"
             )
         if citadas != {"FP-03"}:

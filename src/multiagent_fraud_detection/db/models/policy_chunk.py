@@ -23,8 +23,8 @@ EMBEDDING_DIMENSIONS = 1536
 class PolicyChunk(Base):
     """El índice vectorial: dato derivado, versionado y sellado. ADR-0012.
 
-    Alimenta la **pierna de descubrimiento** del RAG (ADR-0011) —las políticas
-    relacionadas que *no* dispararon—. La pierna de autorización no pasa por acá:
+    Alimenta la **bloque de descubrimiento** del RAG (ADR-0011) —las políticas
+    relacionadas que *no* dispararon—. el bloque de autorización no pasa por acá:
     ésa resuelve por identidad, con un lookup por `policy_id`, y por eso el
     veredicto sobrevive a que el proveedor de embeddings se caiga.
 

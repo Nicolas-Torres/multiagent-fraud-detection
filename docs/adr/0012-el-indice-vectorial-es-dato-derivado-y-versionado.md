@@ -7,7 +7,7 @@
 
 pgvector está habilitado desde la primera migración (`c558fd490ae6`) y no se usó
 nunca. [ADR-0011](0011-citacion-por-identidad-descubrimiento-por-similitud.md) le
-da su primer consumidor: la pierna de descubrimiento del RAG de políticas.
+da su primer consumidor: el bloque de descubrimiento del RAG de políticas.
 
 [ADR-0007](0007-la-forma-ejecutable-de-una-politica-es-una-vinculacion.md) ya
 había dicho, pero **contra una alternativa** y no como decisión propia:
@@ -32,7 +32,7 @@ evaluable:
 > Una política cuya evidencia no es reproducible no es evaluable en un harness.
 
 Y la ablación que ADR-0011 propone como única métrica del RAG —recall de la
-pierna semántica contra `expected_policies`— sería la primera víctima: dos
+bloque semántica contra `expected_policies`— sería la primera víctima: dos
 corridas darían números distintos sin que nada haya cambiado en el repositorio.
 
 Hay además tres restricciones concretas que empujan la forma de la solución:
@@ -304,6 +304,6 @@ en cada despliegue como parte del seed, y una segunda corrida que duplique chunk
 envenena el ranking sin que nada falle.
 
 **No toca ADR-0001** —sigue siendo una sola base— ni **ADR-0011**, al que le da la
-infraestructura que su pierna de descubrimiento necesita. **Refuerza ADR-0005**:
+infraestructura que su bloque de descubrimiento necesita. **Refuerza ADR-0005**:
 la reproducibilidad del harness se protege igual cuando la evidencia la produce un
 tercero, y el mecanismo es congelarla, no confiar en ella.

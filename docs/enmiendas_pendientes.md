@@ -135,7 +135,7 @@ recibe de la propia forma del enunciado. Y la exigencia de `base_confidence` no 
 toca — una aprobación sin score determinístico sí sería un veredicto sin
 fundamento.
 
-**Contiene, no iguala.** La pierna de descubrimiento agrega políticas relacionadas
+**Contiene, no iguala.** el bloque de descubrimiento agrega políticas relacionadas
 que no dispararon; eso es aporte al Arbiter, no violación.
 
 La guarda 1 de §7.3 se endurece con el mismo texto. Sigue **levantando, no
@@ -190,7 +190,7 @@ Hoy §3.3 declara dos —*pendiente de vinculación* y *vinculación obsoleta*�
 suma **chunks pendientes de indexar**.
 
 Un documento publicado y no indexado es **citable por identidad e invisible por
-similitud**: si dispara, la pierna de autorización lo cita igual —esa pierna no
+similitud**: si dispara, el bloque de autorización lo cita igual —esa bloque no
 consulta el índice—; si no dispara, no hay forma de que aparezca. Es un estado
 legítimo —publicar la norma hoy y componer la vinculación después es uso previsto,
 y §3.3 ya lo declara así— y **silencioso**: nada falla.
@@ -289,7 +289,7 @@ Van al repaso de etapa. Se anotan acá para no perderlos.
   texto: en el smoke, FP-03 salió primera de la búsqueda hecha con la señal que
   ella misma produce. El recall@k va a ser alto por construcción, no por mérito.
   Es la contracara del límite ya declarado —*el corpus de once líneas
-  sobredimensiona la pierna de identidad*—: también sobredimensiona la otra.
+  sobredimensiona el bloque de identidad*—: también sobredimensiona la otra.
 
 - **Una prueba que no puede fallar es peor que no tenerla.** La primera versión
   de `smoke_retrieval.py` comparaba conjuntos de `chunk_id` entre generaciones

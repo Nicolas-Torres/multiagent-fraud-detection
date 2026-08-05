@@ -1,8 +1,8 @@
 """Cómo se arma una cita interna. ADR-0011.
 
-Dos piernas, y lo que se persiste es su unión:
+Dos bloques, y lo que se persiste es su unión:
 
-| Pierna | Cómo | Aporta | Garantía |
+| bloque | Cómo | Aporta | Garantía |
 |---|---|---|---|
 | **Autorización** | lookup por `policy_id` de `matched_policies` | toda política que disparó | **total** |
 | **Descubrimiento** | búsqueda vectorial desde los códigos de señal | políticas relacionadas que **no** dispararon | ninguna |
@@ -20,7 +20,7 @@ el constructor de `chunk_id`. Tres consecuencias, y las tres son el punto:
 2. **Sobrevive a que el índice no exista.** Un documento publicado y no indexado
    sigue siendo citable por identidad e invisible por similitud — el estado que
    ADR-0012 declara legítimo y que la tercera métrica del entregable 6 mide. Si
-   esta pierna consultara `policy_chunks`, ese estado dejaría de ser legítimo y
+   esta bloque consultara `policy_chunks`, ese estado dejaría de ser legítimo y
    pasaría a escalar el caso.
 3. **Sobrevive a que el proveedor de embeddings se caiga.** No hay llamada de red
    en este camino.
@@ -80,7 +80,7 @@ def authorization_citations(
 def merge_citations(
     authorized: Iterable[InternalCitation], discovered: Iterable[InternalCitation]
 ) -> list[InternalCitation]:
-    """La unión de las dos piernas, sin repetir, autorización primero.
+    """La unión de las dos bloques, sin repetir, autorización primero.
 
     Se deduplica por `chunk_id`, que identifica el fragmento dentro de una
     versión del documento. Una política puede llegar por las dos vías —disparó y

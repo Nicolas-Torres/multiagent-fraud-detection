@@ -1,0 +1,132 @@
+erDiagram
+    binding_sets {
+        VARCHAR_32 version PK
+        VARCHAR source_catalog
+        VARCHAR_16 fingerprint_algorithm
+        VARCHAR_32 fingerprint_field
+        VARCHAR_3 reference_currency
+        BOOLEAN active
+        DATETIME created_at
+    }
+    customer_behaviors {
+        VARCHAR customer_id PK
+        NUMERIC_12_2 usual_amount_avg
+        SMALLINT usual_hour_start
+        SMALLINT usual_hour_end
+        ARRAY usual_countries
+        ARRAY usual_devices
+        VARCHAR_6 usual_channel
+        DATE account_creation_date
+        DATETIME last_profile_update
+        NUMERIC_12_2 daily_limit
+        VARCHAR_3 currency
+        VARCHAR_64 timezone
+        VARCHAR_8 segment
+    }
+    fraud_policies {
+        VARCHAR_16 policy_id PK
+        VARCHAR_32 version PK
+        TEXT text
+        VARCHAR created_by
+        DATETIME created_at
+    }
+    merchant_blacklist {
+        VARCHAR merchant_id PK
+        BOOLEAN active
+        TEXT reason
+        VARCHAR added_by
+        DATETIME added_at
+    }
+    transactions {
+        VARCHAR transaction_id PK
+        VARCHAR customer_id
+        NUMERIC_12_2 amount
+        VARCHAR_3 currency
+        VARCHAR_2 country
+        VARCHAR_6 channel
+        VARCHAR device_id
+        DATETIME timestamp
+        VARCHAR merchant_id
+    }
+    cases {
+        CHAR_32 case_id PK
+        VARCHAR transaction_id FK, UK
+        VARCHAR_13 status
+        JSONB customer_snapshot "NULL"
+        DATETIME created_at
+        DATETIME updated_at
+    }
+    policy_bindings {
+        VARCHAR_32 binding_set_version PK, FK
+        VARCHAR_16 policy_id PK, FK
+        VARCHAR_32 source_version FK
+        VARCHAR source_fingerprint
+        VARCHAR_17 action
+        JSONB condition "NULL"
+        TEXT excluded_reason "NULL"
+        BOOLEAN active
+        VARCHAR bound_by
+        DATETIME bound_at
+    }
+    policy_chunks {
+        VARCHAR_64 index_version PK
+        VARCHAR_64 chunk_id PK
+        VARCHAR_16 policy_id FK
+        VARCHAR_32 source_version FK
+        INTEGER ordinal
+        TEXT content
+        VECTOR_1536 embedding
+        DATETIME embedded_at
+    }
+    decisions {
+        CHAR_32 case_id PK, FK
+        VARCHAR_17 decision
+        FLOAT confidence
+        FLOAT risk_score "NULL"
+        FLOAT base_confidence "NULL"
+        TEXT confidence_rationale "NULL"
+        VARCHAR_16 scoring_version "NULL"
+        ARRAY matched_policies "NULL"
+        VARCHAR_32 policy_catalog_version "NULL"
+        VARCHAR_64 retrieval_index_version "NULL"
+        VARCHAR_64 explanation_prompt_version "NULL"
+        JSONB citations_internal
+        JSONB citations_external
+        TEXT debate_pro_fraud
+        TEXT debate_pro_customer
+        ARRAY agent_route
+        TEXT explanation_customer
+        TEXT explanation_audit
+        DATETIME decided_at
+    }
+    human_resolutions {
+        CHAR_32 case_id PK, FK
+        VARCHAR_7 action
+        VARCHAR analyst_id
+        TEXT notes "NULL"
+        DATETIME resolved_at
+    }
+    agent_errors {
+        BIGINT id PK
+        CHAR_32 case_id FK
+        VARCHAR_64 agent
+        VARCHAR_64 error_type
+        TEXT message
+        DATETIME occurred_at
+    }
+    signals {
+        BIGINT id PK
+        CHAR_32 case_id FK
+        VARCHAR_64 code
+        TEXT description
+        VARCHAR_6 severity
+    }
+
+    transactions ||--o{ cases : "transaction_id"
+    binding_sets ||--o{ policy_bindings : "binding_set_version"
+    fraud_policies ||--o{ policy_bindings : "policy_id, source_version"
+    fraud_policies ||--o{ policy_chunks : "policy_id, source_version"
+    cases ||--|| decisions : "case_id"
+    cases ||--|| human_resolutions : "case_id"
+    decisions ||--o{ agent_errors : "case_id"
+    decisions ||--o{ signals : "case_id"

@@ -1,4 +1,4 @@
-"""La citación por identidad y la unión de las dos piernas. Sin red, sin base.
+"""La citación por identidad y la unión de las dos bloques. Sin red, sin base.
 
 Lo que se prueba acá es lo que ADR-0011 declara invariante. El nodo completo
 —que además consulta el índice— se verifica en `scripts/smoke_decision.py`.
@@ -46,7 +46,7 @@ def cita(policy_id="FP-99", chunk_id="FP-99:2025.1:0", version="2025.1"):
 
 
 def test_cita_toda_politica_que_disparo():
-    """Recall 1.0 por construcción: es lo que la pierna promete."""
+    """Recall 1.0 por construcción: es lo que el bloque promete."""
     citas = authorization_citations(catalogo(), ["FP-03", "FP-01"])
     assert [c.policy_id for c in citas] == ["FP-01", "FP-03"]
     assert missing_authorization(citas, ["FP-01", "FP-03"]) == ()
@@ -103,7 +103,7 @@ def test_llegar_por_las_dos_vias_no_son_dos_citas():
 def test_el_descubrimiento_solo_no_satisface_el_invariante():
     """El fallo silencioso que ADR-0011 cierra.
 
-    El motor dispara FP-03 y el índice devuelve FP-05 y FP-02: sin la pierna de
+    El motor dispara FP-03 y el índice devuelve FP-05 y FP-02: sin el bloque de
     autorización el caso se decide `BLOCK` citando normas que no aplicó, y una
     guarda de "lista no vacía" lo deja pasar.
     """

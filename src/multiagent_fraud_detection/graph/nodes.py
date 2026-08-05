@@ -72,7 +72,7 @@ ARBITER = "decision_arbiter"
 EXPLAIN = "explainability"
 PERSIST = "persist_decision"
 
-# Cuantos fragmentos trae la pierna de descubrimiento. Con once documentos, cinco
+# Cuantos fragmentos trae el bloque de descubrimiento. Con once documentos, cinco
 # es casi la mitad del corpus: lo que recupere de mas lo filtra el Arbiter, y lo
 # que recupere de menos no lo recupera nadie. El numero se revisa cuando el
 # corpus deje de ser once lineas, y el paso de ablacion es el que lo va a decir.
@@ -256,7 +256,7 @@ async def external_threat_intel(state: GraphState) -> dict:
 async def _descubrir(
     state: GraphState, runtime: Runtime[GraphContext]
 ) -> list[RetrievedChunk]:
-    """La pierna de descubrimiento: politicas relacionadas que NO dispararon.
+    """el bloque de descubrimiento: politicas relacionadas que NO dispararon.
 
     Sin garantia por definicion: es recuperacion aproximada. Su valor es lo que
     la autorizacion no puede dar —contexto para el Arbiter, y la unica via por la
@@ -299,7 +299,7 @@ async def _descubrir(
 async def internal_policy_rag(
     state: GraphState, runtime: Runtime[GraphContext]
 ) -> dict:
-    """Las dos piernas de ADR-0011. Lo que se persiste es su union.
+    """Las dos bloques de ADR-0011. Lo que se persiste es su union.
 
     **`@degrades` solo no alcanza, y es lo mas importante de este nodo.** Si el
     proveedor de embeddings se cae y la excepcion llega al decorador, el nodo
@@ -319,7 +319,7 @@ async def internal_policy_rag(
 
     try:
         chunks = await _descubrir(state, runtime)
-    except Exception as exc:  # noqa: BLE001 - degradar la pierna, no el nodo
+    except Exception as exc:  # noqa: BLE001 - degradar el bloque, no el nodo
         logger.exception("descubrimiento degradado; la autorizacion sobrevive")
         errores.append(
             AgentError(

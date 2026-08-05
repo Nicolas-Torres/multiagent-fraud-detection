@@ -1,4 +1,4 @@
-"""Ablación de la pierna de descubrimiento. Paso 5 de la etapa.
+"""Ablación de el bloque de descubrimiento. Paso 5 de la etapa.
 
     uv run python scripts/check_retrieval.py            # la corrida completa
     uv run python scripts/check_retrieval.py --dry-run  # cuántas llamadas costaría
@@ -11,7 +11,7 @@ con `expected_policies`. Mide lo que pasaría si `citations_internal` saliera
 
 ## Por qué esto no es un gate de calidad del RAG
 
-La pierna de autorización tiene recall 1.0 **por construcción**: no consulta el
+el bloque de autorización tiene recall 1.0 **por construcción**: no consulta el
 índice, resuelve por identidad contra el catálogo. Así que este número no mide si
 el sistema cita bien —eso ya está garantizado— sino **cuánto valdría el índice si
 fuera la única fuente**. Si da 0.93, ese 7% es la proporción de veredictos que
@@ -38,7 +38,7 @@ La query se arma con las `description` de los predicados, y con un chunk por
 documento el índice contiene casi ese mismo texto. Buscar la política que produjo
 la señal es casi buscar el texto por sí mismo. **El recall va a salir alto por
 construcción, no por mérito**, y el informe tiene que decirlo — igual que dice que
-el corpus de once líneas sobredimensiona la pierna de identidad.
+el corpus de once líneas sobredimensiona el bloque de identidad.
 
 ## Costo
 
