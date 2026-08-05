@@ -65,6 +65,10 @@ deja un dashboard vacío, no un servicio roto.
 > y resoluciones humanas** — la evidencia del entregable 8. Es herramienta de
 > desarrollo local y del runbook: **no aparece en ningún pipeline.**
 
+> El seed también **construye el índice vectorial** ([ADR-0012](adr/0012-el-indice-vectorial-es-dato-derivado-y-versionado.md)),
+> y sin `GEMINI_API_KEY` lo omite con aviso en vez de abortar: el resultado es un
+> estado previsto y medido —*chunks pendientes de indexar*, §1.7—, no una falla.
+
 ### 1.3 §1.5 explicita el acceso a GHCR
 
 **Toca**: §1.5.
@@ -93,35 +97,59 @@ Consecuencia para el CD: hay que inyectarla en todos los ambientes, incluidos
 los Jobs de migración y de seed. Si falta, la aplicación funciona igual; lo único
 que cambia es que `--reset` queda bloqueado, que es el comportamiento deseado.
 
-### 1.5 §2.5 — el invariante de `citations_internal` se redacta fuerte
+### 1.5 §2.5 — el invariante de `citations_internal` se redacta como contención
 
 **Toca**: §2.5, §7.3 (guarda 1).
 
 La formulación vigente pide, cuando `decision != ESCALATE_TO_HUMAN`, que
-`citations_internal` sea **no vacío**. Una lista con las citas equivocadas la
-satisface: el motor dispara FP-03, el índice devuelve FP-05 y FP-02, el caso se
-decide `BLOCK` —correctamente— y **cita normas que no aplicó**. No hay excepción,
-el invariante se cumple, y el auditor recibe una explicación coherente y falsa.
-Ninguna huella lo detecta: los dos artefactos están intactos, lo que falló fue el
-emparejamiento.
+`citations_internal` sea **no vacío**. Está mal por dos lados opuestos.
+
+**Es demasiado débil.** Una lista con las citas equivocadas la satisface: el motor
+dispara FP-03, el índice devuelve FP-05 y FP-02, el caso se decide `BLOCK`
+—correctamente— y **cita normas que no aplicó**. No hay excepción, el invariante
+se cumple, y el auditor recibe una explicación coherente y falsa. Ninguna huella
+lo detecta: los dos artefactos están intactos, lo que falló fue el emparejamiento.
+
+No es hipotético. En el smoke de la etapa, un `BLOCK` disparado por FP-03 recuperó
+además FP-09, FP-04, FP-11 y FP-01, **ninguna de las cuales disparó**. Con la
+formulación débil, ese conjunto habría alcanzado para respaldar el veredicto.
+
+**Y es insatisfacible para `APPROVE`.** El catálogo rechaza al cargar cualquier
+vinculación con `action: APPROVE` —*"`action` no puede ser APPROVE"*—: ninguna
+norma prescribe aprobar. Entonces ninguna cita puede respaldar una aprobación, y
+como el 90% del tráfico no dispara ninguna política, la redacción vigente mandaría
+a la cola humana a casi todo el volumen.
 
 Con [ADR-0011](adr/0011-citacion-por-identidad-descubrimiento-por-similitud.md)
-la citación se resuelve por identidad, así que el invariante puede afirmar algo
-más fuerte:
+la citación se resuelve por identidad, así que el invariante puede afirmar lo
+correcto sin exceptuar ningún veredicto:
 
 > Cuando `decision != ESCALATE_TO_HUMAN`: `citations_internal` contiene una cita
 > por **cada** `policy_id` de `matched_policies`, y `base_confidence` no es
 > `null`.
 
-**Contiene, no iguala.** La pierna de descubrimiento agrega políticas
-relacionadas que no dispararon; eso es aporte al Arbiter, no violación.
+**La obligación nace de la evidencia, no del veredicto.** Si alguna política
+disparó, tiene que estar citada; si no disparó ninguna, no hay nada que exigir y
+la condición se cumple vacíamente. Por eso `APPROVE` no necesita una exención: la
+recibe de la propia forma del enunciado. Y la exigencia de `base_confidence` no se
+toca — una aprobación sin score determinístico sí sería un veredicto sin
+fundamento.
+
+**Contiene, no iguala.** La pierna de descubrimiento agrega políticas relacionadas
+que no dispararon; eso es aporte al Arbiter, no violación.
 
 La guarda 1 de §7.3 se endurece con el mismo texto. Sigue **levantando, no
-reparando**: llegar a W2 en violación es un defecto del Arbiter, y una guarda que
-repara lo esconde.
+reparando**: el Arbiter degrada a `ESCALATE_TO_HUMAN` antes de que pueda
+dispararse —la ausencia de respaldo es la razón de llamar a un humano, no un error
+del sistema—, así que llegar a W2 en violación es un defecto del Arbiter.
 
 **Cambio de texto, no de esquema.** Lo que cambia es lo que el dashboard puede
 asumir: en todo caso `DECIDED`, cada política que disparó tiene su cita.
+
+> **Queda fuera, deliberadamente**: la cláusula recíproca —*aprobar exige que no
+> haya disparado nada*—. Convertiría en error el override pro-cliente que un
+> Arbiter con LLM podría querer hacer con justificación. Se decide en la rama del
+> Arbiter, con el caso real a la vista en vez de prohibido de antemano.
 
 ### 1.6 §2.5 y §7.1 — `decisions.retrieval_index_version`
 
@@ -129,7 +157,7 @@ asumir: en todo caso `DECIDED`, cada política que disparó tiene su cita.
 
 | Campo | Tipo | Notas |
 |---|---|---|
-| **`retrieval_index_version`** | `str \| null` | 🆕 cómo se derivó el vector: modelo, dimensión, `task_type` y generación (`gemini-embedding-2:1536:doc:1`) |
+| **`retrieval_index_version`** | `str \| null` | 🆕 con qué generación del índice se recuperó: modelo, dimensión, plantilla y generación (`gemini-embedding-2:1536:doc:1`) |
 
 Junto a `scoring_version` y `policy_catalog_version` cierra la auditoría en tres
 ejes ([ADR-0012](adr/0012-el-indice-vectorial-es-dato-derivado-y-versionado.md)):
@@ -138,15 +166,21 @@ ejes ([ADR-0012](adr/0012-el-indice-vectorial-es-dato-derivado-y-versionado.md))
 |---|---|
 | Qué texto se citó | `InternalCitation.version` |
 | Qué traducción se evaluó | `policy_catalog_version` |
-| Cómo se derivó el vector | **`retrieval_index_version`** |
+| Con qué índice se recuperó | **`retrieval_index_version`** |
 
-**Nullable** por *expand / contract* (§1.2) y porque las decisiones ya
-persistidas no tuvieron índice.
+**El `null` significa algo y el dashboard puede leerlo.** No es dato faltante: es
+*"este veredicto no usó el índice"*. Ocurre en dos casos previstos —una
+transacción sin señales utilizables no tiene nada que preguntar, y un caso con el
+proveedor de embeddings caído recupera nada—. Sellar la versión igual afirmaría
+que un índice participó en una decisión donde no participó.
 
 **Cadena descriptiva, no id opaco**: el motivo de sellarla es que alguien la lea.
 Por lo mismo el modelo **no** es configurable por `env`: cambiarlo sin subir la
 versión sellada haría mentir a los tres sellos a la vez. Por `env` viaja sólo
 `GEMINI_API_KEY`, ya en §1.4.
+
+Nullable también por *expand / contract* (§1.2): las decisiones ya persistidas no
+tuvieron índice.
 
 ### 1.7 §3.3 — tercera métrica operativa del entregable 6
 
@@ -156,10 +190,10 @@ Hoy §3.3 declara dos —*pendiente de vinculación* y *vinculación obsoleta*�
 suma **chunks pendientes de indexar**.
 
 Un documento publicado y no indexado es **citable por identidad e invisible por
-similitud**: si dispara, la pierna de autorización lo cita igual; si no dispara,
-no hay forma de que aparezca. Es un estado legítimo —publicar la norma hoy y
-componer la vinculación después es uso previsto, y §3.3 ya lo declara así— y
-**silencioso**: nada falla.
+similitud**: si dispara, la pierna de autorización lo cita igual —esa pierna no
+consulta el índice—; si no dispara, no hay forma de que aparezca. Es un estado
+legítimo —publicar la norma hoy y componer la vinculación después es uso previsto,
+y §3.3 ya lo declara así— y **silencioso**: nada falla.
 
 Las tres métricas son la misma clase de cosa: desincronizaciones entre artefactos
 con dueños distintos. La norma sin vinculación no se evalúa; la norma sin chunk
@@ -183,7 +217,7 @@ nunca se actualizó. Se repara al reescribir la sección.
 | **`fraud_policies`** | `(policy_id, version)` compuesta | 🆕 documento normativo; append-only por versión. **Sin `active`**: el estado se deriva |
 | **`binding_sets`** | `version` (`2025.1-b1`) | 🆕 encabezado del set; a lo sumo uno activo, por **índice parcial único** |
 | **`policy_bindings`** | `(binding_set_version, policy_id)` | 🆕 FK compuesta a `fraud_policies(policy_id, version)`; `condition` JSONB nullable |
-| **`policy_chunks`** | `(index_version, chunk_id)` | 🆕 `embedding vector(1536)`; B-tree en `index_version`, **ningún ANN** |
+| **`policy_chunks`** | `(index_version, chunk_id)` | 🆕 `embedding vector(1536)`; **ningún índice extra**: la PK ya sirve el filtro por generación |
 
 Total: **doce**. Sigue faltando `web_search_allowlist` (§4), que espera a su
 consumidor.
@@ -240,3 +274,27 @@ Van al repaso de etapa. Se anotan acá para no perderlos.
 - **El guard de `--reset` por variable de entorno ya existe** (`ef59b38`):
   `settings.permite_operaciones_destructivas` y el rechazo explícito en
   `seed.py`. La variable entró como enmienda §1.4. Hallazgo cerrado.
+
+### 3.b — Hallazgos de la etapa → acta 06
+
+- **El árbitro determinístico se adelantó.** El plan lo ponía al final de la rama
+  y marcado como *"lo primero que se corta"*. Se adelantó porque sin él ningún
+  caso llega a `DECIDED`, las tres guardas de W2 no se ejercitan y el paso de
+  ablación no tiene de dónde sacar *"cuántos casos salen de
+  `ESCALATE_TO_HUMAN`"*. Es el brazo de control que ADR-0006 prometió.
+
+- **La ablación va a estar sesgada a favor del descubrimiento, y hay que
+  publicarlo con el número.** La query se arma con las `description` de los
+  predicados, y con un chunk por documento el índice contiene casi ese mismo
+  texto: en el smoke, FP-03 salió primera de la búsqueda hecha con la señal que
+  ella misma produce. El recall@k va a ser alto por construcción, no por mérito.
+  Es la contracara del límite ya declarado —*el corpus de once líneas
+  sobredimensiona la pierna de identidad*—: también sobredimensiona la otra.
+
+- **Una prueba que no puede fallar es peor que no tenerla.** La primera versión
+  de `smoke_retrieval.py` comparaba conjuntos de `chunk_id` entre generaciones
+  para verificar el filtro por `index_version`. No prueba nada: una fila se
+  identifica por `(index_version, chunk_id)` y el `chunk_id` es idéntico entre
+  generaciones **por diseño**. Una de las dos comprobaciones dio falso positivo
+  —se notó— y la otra habría dado verde para siempre. Lo que discrimina es el
+  conteo y la distancia.
