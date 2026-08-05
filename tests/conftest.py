@@ -9,6 +9,16 @@ Los objetos son los mismos schemas de la frontera (`TransactionIn`,
 schema real valida distinto, el test miente.
 """
 
+import os
+
+# `config/settings.py` instancia `Settings()` al importarse, asi que cualquier
+# test que toque ese modulo exige `DATABASE_URL`. Sin esto, la suite dependeria
+# de que exista un `.env` —falla en un clon limpio y en CI antes de levantar
+# Postgres—. El valor no se usa: ningun test abre una conexion.
+os.environ.setdefault(
+    "DATABASE_URL", "postgresql+psycopg://test:test@localhost:5432/test"
+)
+
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
