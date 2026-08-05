@@ -46,7 +46,7 @@ from multiagent_fraud_detection.retrieval.citations import (
     merge_citations,
     missing_authorization,
 )
-from multiagent_fraud_detection.retrieval.embeddings import format_query
+from multiagent_fraud_detection.retrieval.embeddings import INDEX_VERSION, format_query
 from multiagent_fraud_detection.retrieval.query import build_query, query_codes
 
 logger = logging.getLogger(__name__)
@@ -328,12 +328,21 @@ async def internal_policy_rag(
     faltantes = missing_authorization(citas, politicas)
     assert not faltantes, f"politicas sin cita de autorizacion: {faltantes}"
 
-    return {
+    salida = {
         "agent_route": [POLICY_RAG],
         "citations_internal": citas,
         "rag_chunks": chunks,
         "agent_errors": errores,
     }
+
+    # El sello solo se pone si hubo recuperacion. Su ausencia no es un dato que
+    # falta: dice que este veredicto no uso el indice —porque no habia senales
+    # que preguntar, o porque el proveedor no respondio—. Sellar una version
+    # que no se uso seria peor que no sellar nada.
+    if not errores and chunks:
+        salida["retrieval_index_version"] = INDEX_VERSION
+
+    return salida
 
 
 @degrades(AGGREGATE)
@@ -561,6 +570,11 @@ async def persist_decision(
                     base_confidence=state.get("base_confidence"),
                     confidence_rationale=state.get("confidence_rationale"),
                     scoring_version=state.get("scoring_version"),
+                    # El tercer eje de auditoria (ADR-0012): con que generacion
+                    # del indice se recupero. Lo decide el nodo del RAG y aqui
+                    # solo se transcribe —`null` cuando no hubo recuperacion, que
+                    # no es dato faltante sino "este veredicto no uso el indice"—.
+                    retrieval_index_version=state.get("retrieval_index_version"),
                     matched_policies=state.get("policies", []),
                     policy_catalog_version=runtime.context.catalog.version,
                     # model_dump(mode="json"): en modo Python, HttpUrl y
