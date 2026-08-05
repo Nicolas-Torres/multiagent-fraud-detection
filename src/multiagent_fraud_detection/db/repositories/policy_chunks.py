@@ -18,6 +18,11 @@ consultar sin el filtro**. `index_version` tiene default —el vigente, que lo d
 el código— y no admite `None`. Se puede elegir otra generación, que es lo que
 hace comparable un índice candidato; no se puede consultar todas.
 
+> Corolario para quien escriba pruebas: una fila se identifica por
+> `(index_version, chunk_id)`. El `chunk_id` es **idéntico** entre generaciones
+> por diseño, así que comparar conjuntos de `chunk_id` no prueba nada sobre el
+> filtro. Lo que discrimina es el conteo y la distancia.
+
 ## Por qué es asincrónico
 
 A diferencia de `policy_catalog.py`, que se lee una vez por proceso, esto corre
@@ -43,8 +48,13 @@ from multiagent_fraud_detection.retrieval.embeddings import INDEX_VERSION
 
 
 @dataclass(frozen=True, slots=True)
-class RetrievedChunk:
+class ChunkMatch:
     """Un fragmento recuperado, con su distancia.
+
+    **`ChunkMatch` y no `RetrievedChunk`**: ese nombre ya lo usa el estado del
+    grafo para el objeto en vuelo, que es un modelo Pydantic con `score` y hereda
+    de `InternalCitation`. Dos clases con el mismo nombre y forma parecida en el
+    mismo proyecto son una trampa para la próxima persona que lea un import.
 
     Es un objeto plano y no un `PolicyChunk`: el vector de 1536 floats no tiene
     nada que hacer viajando al grafo, y devolver la entidad ORM ataría los nodos
@@ -57,6 +67,17 @@ class RetrievedChunk:
     content: str
     distance: float
 
+    @property
+    def score(self) -> float:
+        """Parecido en `[0, 1]`, que es lo que el estado del grafo espera.
+
+        Con vectores normalizados la distancia coseno vive en `[0, 2]`, pero los
+        embeddings de texto rara vez son opuestos: en la práctica queda en
+        `[0, 1]` y se acota para que un caso extremo no produzca un score
+        negativo en la frontera.
+        """
+        return max(0.0, 1.0 - self.distance)
+
 
 async def search_similar(
     session: AsyncSession,
@@ -64,7 +85,7 @@ async def search_similar(
     *,
     limit: int = 5,
     index_version: str = INDEX_VERSION,
-) -> tuple[RetrievedChunk, ...]:
+) -> tuple[ChunkMatch, ...]:
     """Los `limit` fragmentos más parecidos, dentro de **una** generación.
 
     `index_version` es argumento con default y no opcional a propósito: elegir
@@ -87,7 +108,7 @@ async def search_similar(
     )
 
     return tuple(
-        RetrievedChunk(
+        ChunkMatch(
             chunk_id=f.chunk_id,
             policy_id=f.policy_id,
             source_version=f.source_version,
@@ -109,11 +130,10 @@ async def unindexed_policies(
 
     Ésta en particular describe un estado legítimo y silencioso: un documento
     publicado y no indexado sigue siendo **citable por identidad** —si disparó, la
-    pierna de autorización lo cita igual— e **invisible por similitud**. Nada
-    falla; simplemente el descubrimiento no puede alcanzarlo.
+    pierna de autorización lo cita igual, porque esa pierna no consulta el
+    índice— e **invisible por similitud**. Nada falla; simplemente el
+    descubrimiento no puede alcanzarlo.
     """
-    publicadas = select(distinct(FraudPolicy.policy_id)).scalar_subquery()
-
     indexadas = (
         select(distinct(PolicyChunk.policy_id))
         .where(PolicyChunk.index_version == index_version)
@@ -122,7 +142,6 @@ async def unindexed_policies(
 
     faltantes = await session.scalars(
         select(distinct(FraudPolicy.policy_id))
-        .where(FraudPolicy.policy_id.in_(publicadas))
         .where(FraudPolicy.policy_id.notin_(indexadas))
         .order_by(FraudPolicy.policy_id)
     )

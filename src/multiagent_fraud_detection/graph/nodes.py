@@ -7,6 +7,7 @@ Un nodo devuelve SOLO las claves que escribe. Para las claves con reducer
 (zona 2 del estado) devuelve solo su aporte, nunca la lista acumulada.
 """
 
+import asyncio
 import logging
 from collections.abc import Awaitable, Callable
 from functools import wraps
@@ -17,13 +18,14 @@ from sqlalchemy import delete, update
 from multiagent_fraud_detection.db.models import AgentError as AgentErrorRow
 from multiagent_fraud_detection.db.models import Case, Decision, Signal
 from multiagent_fraud_detection.db.repositories.customer_behavior import profile_for
+from multiagent_fraud_detection.db.repositories.policy_chunks import search_similar
 from multiagent_fraud_detection.db.repositories.transaction_history import (
     history_for_customer,
     history_for_device,
 )
 from multiagent_fraud_detection.enums import CaseStatus, DecisionType, Severity
 from multiagent_fraud_detection.domain.catalog import Owner
-from multiagent_fraud_detection.domain.engine import evaluate
+from multiagent_fraud_detection.domain.engine import evaluate, prescribed_action
 from multiagent_fraud_detection.domain.predicates import EvalContext
 from multiagent_fraud_detection.domain.scoring import (
     SCORING_VERSION,
@@ -33,7 +35,19 @@ from multiagent_fraud_detection.domain.scoring import (
     signal_sort_key,
 )
 from multiagent_fraud_detection.graph.context import GraphContext
-from multiagent_fraud_detection.graph.state import AgentError, GraphState, WorkingSignal
+from multiagent_fraud_detection.graph.state import (
+    AgentError,
+    GraphState,
+    RetrievedChunk,
+    WorkingSignal,
+)
+from multiagent_fraud_detection.retrieval.citations import (
+    authorization_citations,
+    merge_citations,
+    missing_authorization,
+)
+from multiagent_fraud_detection.retrieval.embeddings import format_query
+from multiagent_fraud_detection.retrieval.query import build_query, query_codes
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +63,12 @@ PRO_CUSTOMER = "debate_pro_customer"
 ARBITER = "decision_arbiter"
 EXPLAIN = "explainability"
 PERSIST = "persist_decision"
+
+# Cuantos fragmentos trae la pierna de descubrimiento. Con once documentos, cinco
+# es casi la mitad del corpus: lo que recupere de mas lo filtra el Arbiter, y lo
+# que recupere de menos no lo recupera nadie. El numero se revisa cuando el
+# corpus deje de ser once lineas, y el paso de ablacion es el que lo va a decir.
+RAG_TOP_K = 5
 
 NodeFn = Callable[[GraphState], Awaitable[dict]]
 
@@ -225,12 +245,95 @@ async def external_threat_intel(state: GraphState) -> dict:
 # --- Ola 2 ---
 
 
+async def _descubrir(
+    state: GraphState, runtime: Runtime[GraphContext]
+) -> list[RetrievedChunk]:
+    """La pierna de descubrimiento: politicas relacionadas que NO dispararon.
+
+    Sin garantia por definicion: es recuperacion aproximada. Su valor es lo que
+    la autorizacion no puede dar —contexto para el Arbiter, y la unica via por la
+    que una politica no evaluable llega a un caso—.
+    """
+    codigos = query_codes(s.code for s in state.get("signals", []))
+    if not codigos:
+        # Sin senales no hay nada que preguntar. Una query vacia recuperaria los
+        # k documentos mas cercanos al vector de la cadena vacia, que es ruido
+        # con forma de evidencia.
+        return []
+
+    ctx = runtime.context
+    vector = ctx.query_cache.get(codigos)
+
+    if vector is None:
+        texto = format_query(build_query(codigos, ctx.vocabulary))
+        # `to_thread` porque el cliente del proveedor es sincrono: llamarlo
+        # directo bloquearia el event loop durante toda la latencia de red, y
+        # con el las ramas hermanas del superstep.
+        vector = await asyncio.to_thread(ctx.embedder.embed, texto)
+        ctx.query_cache.put(codigos, vector)
+
+    async with ctx.session_factory() as session:
+        matches = await search_similar(session, vector, limit=RAG_TOP_K)
+
+    return [
+        RetrievedChunk(
+            policy_id=m.policy_id,
+            chunk_id=m.chunk_id,
+            version=m.source_version,
+            content=m.content,
+            score=m.score,
+        )
+        for m in matches
+    ]
+
+
 @degrades(POLICY_RAG)
-async def internal_policy_rag(state: GraphState) -> dict:
-    # Aqui se arma la query hibrida: senales ya detectadas + descriptor minimo
-    # de la transaccion. Por eso este nodo va despues de la ola 1.
-    _ = state.get("signals", [])
-    return {"agent_route": [POLICY_RAG], "citations_internal": [], "rag_chunks": []}
+async def internal_policy_rag(
+    state: GraphState, runtime: Runtime[GraphContext]
+) -> dict:
+    """Las dos piernas de ADR-0011. Lo que se persiste es su union.
+
+    **`@degrades` solo no alcanza, y es lo mas importante de este nodo.** Si el
+    proveedor de embeddings se cae y la excepcion llega al decorador, el nodo
+    devuelve cero citas: se pierde tambien la autorizacion y todo caso escala.
+    Exactamente lo contrario de lo que el ADR promete. Por eso el descubrimiento
+    lleva su **propio** `try` y registra el error a mano, mientras la
+    autorizacion sigue su camino. El decorador queda como red para lo imprevisto.
+
+    La autorizacion no consulta el indice ni la red: sale del catalogo. Ver
+    `retrieval/citations.py`.
+    """
+    politicas = sorted(set(state.get("matched_policies", [])))
+    autorizadas = authorization_citations(runtime.context.catalog, politicas)
+
+    chunks: list[RetrievedChunk] = []
+    errores: list[AgentError] = []
+
+    try:
+        chunks = await _descubrir(state, runtime)
+    except Exception as exc:  # noqa: BLE001 - degradar la pierna, no el nodo
+        logger.exception("descubrimiento degradado; la autorizacion sobrevive")
+        errores.append(
+            AgentError(
+                agent=POLICY_RAG,
+                error_type=type(exc).__name__,
+                message=f"descubrimiento no disponible: {exc}",
+            )
+        )
+
+    citas = merge_citations(autorizadas, chunks)
+
+    # Invariante estructural de ADR-0011, afirmado donde se produce. No es una
+    # metrica: si esto falla, el codigo de arriba tiene un bug, no el catalogo.
+    faltantes = missing_authorization(citas, politicas)
+    assert not faltantes, f"politicas sin cita de autorizacion: {faltantes}"
+
+    return {
+        "agent_route": [POLICY_RAG],
+        "citations_internal": citas,
+        "rag_chunks": chunks,
+        "agent_errors": errores,
+    }
 
 
 @degrades(AGGREGATE)
@@ -317,14 +420,58 @@ async def debate_pro_customer(state: GraphState) -> dict:
 # --- Nodos fatales: si fallan no hay caso, asi que lanzan ---
 
 
-async def decision_arbiter(state: GraphState) -> dict:
-    # Sin `citations_internal` no puede emitir veredicto autonomo: degrada a
-    # ESCALATE_TO_HUMAN. La ausencia de respaldo es la razon para llamar al humano.
+async def decision_arbiter(
+    state: GraphState, runtime: Runtime[GraphContext]
+) -> dict:
+    """Linea base deterministica: el veredicto que el catalogo prescribe.
+
+    **No es el Arbiter final.** Es el brazo de control que ADR-0006 prometio para
+    la comparacion del entregable 7: el mismo calculo con el que se construyo
+    `expected_decision`, de modo que el enfoque agentico se mida contra algo y no
+    contra nada. El Arbiter con LLM lo reemplaza y puede apartarse con
+    justificacion auditable.
+
+    No ajusta la confianza: `confidence == base_confidence` y no hay
+    `confidence_rationale`. Un ajuste sin justificacion es justo lo que la tercera
+    guarda de W2 prohibe, y este arbitro no tiene con que justificar.
+
+    ## Las dos degradaciones
+
+    Degrada a `ESCALATE_TO_HUMAN` **antes** de que las guardas puedan dispararse.
+    Que una guarda levante significa `FAILED`, y la ausencia de respaldo no es un
+    error del sistema: es la razon por la que existe la cola humana.
+    """
+    politicas = state.get("policies", sorted(set(state.get("matched_policies", []))))
+    citas = state.get("citations_internal", [])
+    base = state.get("base_confidence")
+
+    faltantes = missing_authorization(citas, politicas)
+    if faltantes:
+        # No deberia ocurrir: la autorizacion no consulta el indice ni la red. Si
+        # ocurre, el nodo del RAG fallo entero y su red exterior lo trago. Emitir
+        # un veredicto aqui seria bloquear sin poder decir bajo que norma.
+        return {
+            "agent_route": [ARBITER],
+            "decision": DecisionType.ESCALATE_TO_HUMAN,
+            "confidence": base if base is not None else 0.0,
+            "confidence_rationale": (
+                f"sin respaldo interno para {', '.join(faltantes)}: "
+                f"la evidencia esta incompleta"
+            ),
+        }
+
+    if base is None:
+        return {
+            "agent_route": [ARBITER],
+            "decision": DecisionType.ESCALATE_TO_HUMAN,
+            "confidence": 0.0,
+            "confidence_rationale": "sin score deterministico: no hubo consolidacion",
+        }
+
     return {
         "agent_route": [ARBITER],
-        "decision": DecisionType.ESCALATE_TO_HUMAN,
-        "confidence": state.get("base_confidence", 0.0),
-        "confidence_rationale": "stub",
+        "decision": prescribed_action(runtime.context.catalog, tuple(politicas)),
+        "confidence": base,
     }
 
 
@@ -348,8 +495,23 @@ def _verificar_invariantes(state: GraphState) -> None:
     if decision is not DecisionType.ESCALATE_TO_HUMAN:
         # Diferir a un humano no es un veredicto: por eso queda exento. Sin la
         # excepcion, un caso sin citas no tendria ninguna salida posible.
-        if not state.get("citations_internal"):
-            raise ValueError("veredicto autonomo sin respaldo interno")
+
+        # **Contencion, no "lista no vacia".** La formulacion anterior era falsa
+        # por dos lados. Debil: una lista con las citas equivocadas la satisface,
+        # y el sistema puede bloquear citando normas que no aplico. E imposible:
+        # ninguna vinculacion puede prescribir APPROVE —el catalogo lo rechaza al
+        # cargar—, asi que ninguna cita puede respaldar una aprobacion y el 90%
+        # del trafico, que no dispara nada, no tendria salida.
+        #
+        # La obligacion nace de la evidencia: si una politica disparo, tiene que
+        # estar citada. Si no disparo ninguna, no hay nada que exigir.
+        faltantes = missing_authorization(
+            state.get("citations_internal", []), state.get("policies", [])
+        )
+        if faltantes:
+            raise ValueError(
+                f"veredicto autonomo sin respaldo para {', '.join(faltantes)}"
+            )
         if base is None:
             raise ValueError("veredicto autonomo sin score deterministico")
 

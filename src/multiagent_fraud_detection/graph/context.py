@@ -18,6 +18,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from multiagent_fraud_detection.db.repositories.merchant_blacklist import BlacklistCache
 from multiagent_fraud_detection.domain.catalog import PolicyCatalog, load_catalog
+from multiagent_fraud_detection.retrieval.embeddings import Embedder, GeminiEmbedder
+from multiagent_fraud_detection.retrieval.query import QueryCache, code_vocabulary
 
 # Fase 2 de ADR-0007: el catalogo se lee de archivos versionados. La fase 3 lo
 # mueve a las tablas `fraud_policies` / `policy_bindings`, y entonces esto pasa a
@@ -43,3 +45,26 @@ class GraphContext:
 
     # Cache por proceso: una instancia por contexto, no un global de modulo.
     blacklist: BlacklistCache = field(default_factory=BlacklistCache)
+
+    # El proveedor de embeddings, detras del puerto. Se inyecta para que un
+    # test pueda pasar `FakeEmbedder()` sin red ni clave, y para que cambiar de
+    # proveedor sea un adaptador y una version de indice nueva (ADR-0012).
+    embedder: Embedder = field(default_factory=GeminiEmbedder)
+
+    # Embeddings de query por combinacion de codigos de senal. Sin TTL, a
+    # diferencia del de la lista negra: la entrada no puede quedar obsoleta por
+    # una escritura de otra replica, porque depende solo del vocabulario y de
+    # `INDEX_VERSION`, y los dos son constantes del proceso.
+    query_cache: QueryCache = field(default_factory=QueryCache)
+
+    # `codigo de senal -> frase del predicado`, derivado del catalogo activo. Se
+    # calcula una vez porque recorre las once politicas y sus condiciones.
+    #
+    # `init=False`: depende de `catalog`, asi que no puede ser un
+    # `default_factory` —no recibiria el catalogo que se acaba de construir— y
+    # tampoco tiene sentido que el llamador lo pase por separado, porque
+    # entonces podrian no corresponderse.
+    vocabulary: dict[str, str] = field(init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        self.vocabulary = code_vocabulary(self.catalog)
