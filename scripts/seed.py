@@ -54,6 +54,7 @@ from multiagent_fraud_detection.db.models import (
     MerchantBlacklist,
     Transaction,
 )
+from multiagent_fraud_detection.config.settings import settings
 from multiagent_fraud_detection.db.session import engine
 
 from _dataset import BLACKLIST, leer_perfiles, leer_transacciones
@@ -148,9 +149,23 @@ def main() -> int:
     parser.add_argument(
         "--reset",
         action="store_true",
-        help="vacía las tablas antes de cargar (arrastra cases por CASCADE)",
+        help="vacía las tablas antes de cargar (arrastra cases por CASCADE); "
+             "solo con ENVIRONMENT=local",
     )
     args = parser.parse_args()
+
+    # El guard corre ANTES de tocar la base y antes de leer los CSV: si la
+    # operación no está permitida, el proceso termina sin haber abierto una
+    # conexión (ADR-0010).
+    if args.reset and not settings.permite_operaciones_destructivas:
+        print(
+            f"--reset está bloqueado con ENVIRONMENT={settings.environment!r}.\n"
+            f"Vacía las tablas de casos y resoluciones humanas por CASCADE, así "
+            f"que solo se permite con ENVIRONMENT=local.\n"
+            f"Sin --reset la carga es idempotente y no toca los casos existentes.",
+            file=sys.stderr,
+        )
+        return 2
 
     asyncio.run(sembrar(args.reset))
     return 0

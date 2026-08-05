@@ -95,5 +95,19 @@ sigue siendo válido contra el esquema nuevo.
   bloquea el despliegue completo, y una que falla lo aborta. Es el
   comportamiento correcto, pero convierte a la base en punto único de fallo del
   pipeline.
+
+  Dos parámetros del Job acotan el daño, y van juntos:
+
+  | Parámetro | Por qué |
+  |---|---|
+  | `activeDeadlineSeconds` | Una migración esperando un lock de tabla cuelga el pipeline **indefinidamente**. El valor se deriva de la migración más lenta esperada con margen, no de un número redondo: muy corto mata un índice legítimo a mitad de construcción |
+  | `backoffLimit: 0` | Sin esto, el Job **reintenta** tras el timeout y aparecen dos `alembic upgrade head` sucesivos —o solapados—, contradiciendo el "exactamente una instancia" de esta decisión |
+
+  > **Una excepción a "matar el Job es inocuo".** PostgreSQL tiene DDL
+  > transaccional, así que un Job muerto hace rollback limpio. `CREATE INDEX
+  > CONCURRENTLY` **no puede correr en transacción**: si se lo mata, deja un
+  > índice `INVALID` que hay que dropear a mano. Hoy no se usa; es exactamente
+  > lo que va a hacer falta el día que se agregue un índice sobre `transactions`
+  > sin bloquear escrituras.
 - **Forward-only exige disciplina en el diseño**, porque un error de esquema no
   se revierte: se corrige con otra migración hacia adelante, en caliente.

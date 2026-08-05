@@ -75,8 +75,29 @@ commit.
 
 - **Legibilidad operativa.** `@sha256:9f2c1a…` no se lee ni se recuerda. Un
   incidente a las tres de la mañana es más incómodo con digests que con `1.2.0`.
-  Se mitiga publicando el digest junto al tag en el resumen del job de CI, pero
-  la incomodidad queda.
+
+  Se mitiga en dos lugares. CI publica el digest junto al tag en el resumen del
+  job. Y el CD lleva la versión legible como **label** en la plantilla del pod,
+  no como anotación: los labels se consultan en lote y las anotaciones obligan a
+  ir pod por pod.
+
+  ```yaml
+  metadata:
+    labels:
+      app.kubernetes.io/version: "1.2.0"     # legible, consultable
+  spec:
+    containers:
+      - image: ghcr.io/org/repo@sha256:9f2c1a…   # la referencia real
+  ```
+
+  ```bash
+  kubectl get pods -L app.kubernetes.io/version
+  ```
+
+  > El label es **metadato sin verificar**: nada garantiza que corresponda a ese
+  > digest, y editarlo a mano lo vuelve mentira. Si divergen, **manda el
+  > digest**. Es comodidad de lectura, no una segunda fuente de verdad — el día
+  > que alguien decida un rollback mirando el label, se equivoca.
 - **El CD necesita leer una salida de CI**, no solo pegar un string. Es
   acoplamiento entre los dos pipelines —chico, pero real— justo en la costura que
   el contrato quería mantener delgada.

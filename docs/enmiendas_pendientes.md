@@ -1,6 +1,6 @@
 # Enmiendas pendientes — Contrato de Interfaz
 
-**Estado**: 3 enmiendas acumuladas hacia **v0.7**. Vigente: **v0.6**.
+**Estado**: 4 enmiendas acumuladas hacia **v0.7**. Vigente: **v0.6**.
 
 > Documento de trabajo: se **vacía** al publicar una versión, no se archiva.
 > Nunca hay dos.
@@ -75,6 +75,23 @@ El paquete queda **privado** y el CD se autentica con un token con
 **Por qué se escribe**: GHCR es privado por defecto y el `docker pull` falla con
 un error de autenticación que se lee como "la imagen no existe". Es el tipo de
 detalle que cuesta una tarde el día del despliegue y treinta segundos ahora.
+
+### 1.4 §1.4 gana la variable `ENVIRONMENT`
+
+**Toca**: §1.4 (tabla de variables de entorno).
+
+| Variable | Ejemplo |
+|---|---|
+| `ENVIRONMENT` | `local` \| `staging` \| `production` |
+
+**Por qué**: es lo que habilita el guard de `--reset`
+([ADR-0010](adr/0010-seed-como-job-de-post-deploy.md)). El script solo permite la
+operación destructiva con `ENVIRONMENT=local`, así que la variable **ausente
+rechaza** — el default seguro.
+
+Consecuencia para el CD: hay que inyectarla en todos los ambientes, incluidos
+los Jobs de migración y de seed. Si falta, la aplicación funciona igual; lo único
+que cambia es que `--reset` queda bloqueado, que es el comportamiento deseado.
 
 ---
 
