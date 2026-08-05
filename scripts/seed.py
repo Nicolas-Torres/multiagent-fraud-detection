@@ -1,7 +1,8 @@
-"""Carga el dataset sintético y el catálogo de políticas en Postgres.
+"""Carga el dataset, el catálogo de políticas y su índice vectorial en Postgres.
 
-    uv run python scripts/seed.py            # upsert (idempotente)
-    uv run python scripts/seed.py --reset    # borra y recarga
+    uv run python scripts/seed.py                # upsert + indexación (idempotente)
+    uv run python scripts/seed.py --skip-index   # sin tocar el proveedor de embeddings
+    uv run python scripts/seed.py --reset        # borra y recarga
 
 Carga **historial**, no casos. Sembrar transacciones y perfiles no crea ningún
 `case`: crear un caso es correr el pipeline, y eso lo hace el `POST /cases` o el
@@ -48,6 +49,23 @@ existe para evitar.
 `--reset` existe para el caso en que el dataset nuevo tenga *menos* filas que el
 viejo: el upsert no borra huérfanas. Arrastra `cases` por el FK, y por eso es
 explícito y no el comportamiento por defecto.
+
+## La indexación va acá dentro
+
+ADR-0012 §1: el índice se construye dentro del Job de seed, no como un cuarto
+modo de arranque. Un índice sin construir deja el descubrimiento vacío, no el
+servicio roto — la misma asimetría que justifica que el seed sea post-deploy.
+
+**Sin `GEMINI_API_KEY` el seed no falla**: avisa y sigue. El resultado es un
+estado previsto, con nombre y con métrica —*chunks pendientes de indexar*,
+entregable 6—: las políticas quedan citables por identidad e invisibles por
+similitud. Abortar convertiría un estado declarado en una caída.
+
+La indexación abre su **propia sesión sincrónica** después de que la carga async
+commiteó. La costura es fea y es deliberada: los modelos se escriben async
+porque el resto de la app lo es, y `DbCatalogSource` es sync porque el catálogo
+se lee una vez por proceso desde un `default_factory`. Mezclar acá, en un
+script, es más barato que duplicar cualquiera de las dos.
 """
 
 import argparse
@@ -58,9 +76,10 @@ from collections.abc import Sequence
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
-from sqlalchemy import text
+from sqlalchemy import create_engine, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import async_sessionmaker
+from sqlalchemy.orm import Session as SyncSession
 
 from multiagent_fraud_detection.db.models import (
     BindingSet,
@@ -73,6 +92,8 @@ from multiagent_fraud_detection.db.models import (
 from multiagent_fraud_detection.config.settings import settings
 from multiagent_fraud_detection.db.session import engine
 from multiagent_fraud_detection.domain.catalog import FileCatalogSource
+from multiagent_fraud_detection.retrieval.embeddings import INDEX_VERSION, GeminiEmbedder
+from multiagent_fraud_detection.retrieval.indexing import index_catalog, index_size
 
 from _dataset import BLACKLIST, DATA_DIR, leer_perfiles, leer_transacciones
 
@@ -208,6 +229,36 @@ def _catalogo() -> tuple[list[dict], dict, list[dict]]:
     return documentos, sobre, vinculaciones
 
 
+def _indexar() -> None:
+    """Construye el índice vectorial. Sesión propia, sincrónica.
+
+    Corre **después** del commit del catálogo: los chunks tienen FK compuesta a
+    `fraud_policies`, así que indexar antes fallaría por integridad referencial.
+    """
+    if not settings.gemini_api_key:
+        print(
+            "  sin GEMINI_API_KEY: se omite la indexación.\n"
+            "  Las políticas quedan citables por identidad e invisibles por "
+            "similitud —un estado previsto, medido como *chunks pendientes de "
+            "indexar*—."
+        )
+        return
+
+    sync_engine = create_engine(settings.database_url)
+    try:
+        with SyncSession(sync_engine) as session:
+            indexados, salteados = index_catalog(
+                session, GeminiEmbedder(), INDEX_VERSION, report=lambda _: None
+            )
+            session.commit()
+            total = index_size(session, INDEX_VERSION)
+    finally:
+        sync_engine.dispose()
+
+    print(f"  {total} chunks en {INDEX_VERSION} "
+          f"({indexados} nuevos, {salteados} sin cambios)")
+
+
 async def sembrar(reset: bool) -> None:
     print("Leyendo y normalizando el dataset...")
     perfiles = leer_perfiles()
@@ -279,6 +330,11 @@ def main() -> int:
         help="vacía las tablas antes de cargar (arrastra cases por CASCADE); "
              "solo con ENVIRONMENT=local",
     )
+    parser.add_argument(
+        "--skip-index",
+        action="store_true",
+        help="no construye el índice vectorial (no llama al proveedor)",
+    )
     args = parser.parse_args()
 
     # El guard corre ANTES de tocar la base y antes de leer los CSV: si la
@@ -295,6 +351,12 @@ def main() -> int:
         return 2
 
     asyncio.run(sembrar(args.reset))
+
+    if args.skip_index:
+        print("  --skip-index: no se construyó el índice vectorial")
+    else:
+        _indexar()
+
     return 0
 
 
