@@ -17,7 +17,7 @@ Leer los dos antes de tocar código: acá está el orden, no el porqué.
 | 1 | Tabla `threat_indicators` | ✅ migración aplicada (`alembic current` = head) |
 | 2 | Enforcement del allowlist | ✅ 15 tests verdes |
 | 3 | Puerto `Searcher` | ✅ 18 tests verdes |
-| 4 | `web_search_allowlist` + `issuer_bank` | ⬜ |
+| 4 | `web_search_allowlist` + `issuer_bank` | ✅ migración aplicada, gates verdes |
 | 5 | Caché de indicadores en `GraphContext` | ⬜ |
 | 6 | `fetch_threat_intel.py` | ⬜ |
 | 7 | Predicado y vinculación de FP-10 | ⬜ |

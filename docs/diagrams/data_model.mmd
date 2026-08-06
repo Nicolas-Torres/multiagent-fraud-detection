@@ -60,6 +60,14 @@ erDiagram
         VARCHAR device_id
         DATETIME timestamp
         VARCHAR merchant_id
+        VARCHAR_16 issuer_bank "NULL"
+    }
+    web_search_allowlist {
+        VARCHAR domain PK
+        BOOLEAN active
+        TEXT reason
+        VARCHAR added_by
+        DATETIME added_at
     }
     cases {
         CHAR_32 case_id PK
