@@ -18,11 +18,11 @@ evidencia que lo cubre en el repo, y declara los desvíos frente a
 | # | Ítem | Evidencia | Estado |
 |---|---|---|---|
 | 1 | Descripción del caso de uso | `README.md`, `requisitos/reto_de_aplicacion.md` | 🟡 falta el informe |
-| 2 | Selección de modelo y datos | ADR-0003 (dataset sintético), ADR-0012 (índice versionado), `data/README.md`, dos proveedores tras puerto (`Embedder`, `Narrator`) | ✅ |
-| 3 | Ingeniería de prompts y adaptación | `explain/customer.py` (`PROMPT_VERSION`), `retrieval/` (RAG sobre pgvector), ADR-0011, ADR-0012 | 🟡 ver desvío D-04 |
+| 2 | Selección de modelo y datos | ADR-0003 (dataset sintético), ADR-0012 (índice versionado), `data/README.md`, tres proveedores tras puerto (`Embedder`, `Narrator`, `Searcher`) | ✅ |
+| 3 | Ingeniería de prompts y adaptación | `explain/customer.py` (`PROMPT_VERSION`), `intel/snapshot.py` (`QUERY_TEMPLATE`), `retrieval/` (RAG sobre pgvector), ADR-0011, ADR-0012, ADR-0014 | 🟡 ver desvío D-04 |
 | 4 | Implementación de la aplicación | `graph/`, `domain/`, `db/`, `diagrams/c4-container.drawio`, `contrato_de_interfaz.md` | 🟡 falta API + dashboard |
 | 5 | Orquestación y despliegue | ADR-0008 (digest), ADR-0009 (migraciones), ADR-0010 (seed), contrato §1 | ⬜ |
-| 6 | Monitoreo y mantenimiento | LangSmith, contrato §3.3 (métricas operativas), cuatro sellos de auditoría en `decisions` | 🟡 |
+| 6 | Monitoreo y mantenimiento | LangSmith, contrato §3.3 (cuatro métricas operativas), cinco sellos de auditoría en `decisions` | 🟡 |
 | 7 | Evaluación de la aplicación | `check_policies.py` 7000/7000, ADR-0006 (brazo de control), ADR-0013 (métricas duras vs LLM-as-judge), `ground_truth.csv` | 🟡 |
 | 8 | Resultados y demostración | `smoke_decision.py`, `smoke_retrieval.py` | ⬜ falta demo/video |
 | 9 | Conclusiones | `docs/reviews/` — la materia prima ya está escrita | ⬜ |

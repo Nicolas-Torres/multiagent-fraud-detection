@@ -20,7 +20,7 @@ que no alcanzan confianza suficiente pasan a una cola de revisión humana.
 | Capa | Estado |
 |---|---|
 | Infraestructura local (Postgres + pgvector, migraciones) | ✅ |
-| Modelo de dominio: 12 tablas, schemas de frontera | ✅ |
+| Modelo de dominio: 14 tablas, schemas de frontera | ✅ |
 | Esqueleto del grafo: estado, topología, degradación | ✅ |
 | Persistencia de la decisión | ✅ |
 | Dataset sintético y ground truth | ✅ |
@@ -31,8 +31,8 @@ que no alcanzan confianza suficiente pasan a una cola de revisión humana.
 | RAG de políticas internas: autorización + descubrimiento | ✅ |
 | Arbiter determinístico (brazo de control del entregable 7) | ✅ |
 | Explicabilidad: auditoría por plantilla, cliente por LLM | ✅ |
-| Tabla `web_search_allowlist` | ⬜ |
-| Búsqueda web gobernada + Threat Intel Agent | ⬜ |
+| Tabla `web_search_allowlist` | ✅ |
+| Búsqueda web gobernada + Threat Intel Agent | ✅ |
 | Agentes con LLM (Debate x2, Arbiter agéntico) | ⬜ |
 | API FastAPI + HITL | ⬜ |
 | CI, imagen y despliegue | ⬜ |
@@ -97,7 +97,7 @@ El diagrama se genera desde el grafo compilado
 
 ![Modelo de datos](./docs/diagrams/data_model.png)
 
-Doce tablas. También se **genera** desde `Base.metadata`
+Catorce tablas. También se **genera** desde `Base.metadata`
 (`scripts/export_data_model_diagram.py`), por el mismo motivo por el que se
 genera la topología: el diagrama dibujado a mano se había atrasado dos etapas sin
 que nadie lo notara.
@@ -112,10 +112,10 @@ sin diagrama.
 
 ---
 
-## Auditoría en cuatro ejes
+## Auditoría en cinco ejes
 
-Cada decisión sella con qué se produjo. Ninguno de los cuatro se puede derivar de
-los otros, porque los cuatro artefactos cambian por separado:
+Cada decisión sella con qué se produjo. Ninguno de los cinco se puede derivar de
+los otros, porque los cinco artefactos cambian por separado:
 
 | Eje | Sello | `null` significa |
 |---|---|---|
@@ -123,12 +123,14 @@ los otros, porque los cuatro artefactos cambian por separado:
 | Qué traducción se evaluó | `policy_catalog_version` | — |
 | Con qué índice se recuperó | `retrieval_index_version` | no hubo recuperación |
 | Con qué prompt se redactó | `explanation_prompt_version` | ningún modelo participó |
+| Con qué snapshot se consultó | `threat_intel_version` | no se consultó inteligencia externa |
 
 Las cadenas son descriptivas y no identificadores opacos
 (`gemini-embedding-2:1536:doc:1`): el motivo de sellarlas es que alguien las lea.
 Por lo mismo, **el modelo no es variable de entorno** — uno configurable por
-`env` podría cambiarse sin que suba la versión sellada, y los cuatro sellos
-mentirían a la vez ([ADR-0012](docs/adr/0012-el-indice-vectorial-es-dato-derivado-y-versionado.md)).
+`env` podría cambiarse sin que suba la versión sellada, y los cinco sellos
+mentirían a la vez ([ADR-0012](docs/adr/0012-el-indice-vectorial-es-dato-derivado-y-versionado.md),
+[ADR-0014](docs/adr/0014-la-inteligencia-externa-se-recoge-en-build-y-se-consulta-congelada.md)).
 
 ---
 
@@ -144,8 +146,9 @@ mentirían a la vez ([ADR-0012](docs/adr/0012-el-indice-vectorial-es-dato-deriva
 | LangGraph | Orquestación del grafo de agentes |
 | Gemini (`gemini-embedding-2`) | Embeddings: recuperación |
 | Anthropic (`claude-sonnet-5`) | Generación: explicación al cliente |
+| Anthropic (`claude-sonnet-4-6`) | Inteligencia externa: búsqueda web gobernada, sólo en build ([ADR-0014](docs/adr/0014-la-inteligencia-externa-se-recoge-en-build-y-se-consulta-congelada.md)) |
 
-Dos proveedores, dos roles y dos sellos. Los dos entran **por un puerto**:
+Dos proveedores, tres roles y tres sellos. Los tres entran **por un puerto**:
 cambiar de proveedor es un adaptador y una versión nueva, no una reescritura.
 
 ---
@@ -199,6 +202,12 @@ uv run python scripts/check_policies.py --source=db   # el catálogo desde Postg
 uv run python scripts/check_retrieval.py              # ablación del descubrimiento
 ```
 
+> `check_policies.py` afirma explícitamente que FP-10 **no** dispara sobre el
+> dataset, incluso saturado con un indicador por emisor fechado hoy: las 7 000
+> transacciones son de diciembre de 2025 y la ventana de 24 h se resuelve
+> *as-of* contra el cargo, así que un indicador capturado hoy queda a ocho
+> meses. No es una omisión — es una propiedad del dato, afirmada, no supuesta.
+
 ### Smoke tests
 
 ```bash
@@ -208,7 +217,8 @@ uv run python scripts/smoke_degradation.py      # un agente caído no aborta el 
 uv run python scripts/smoke_persistence.py      # un reintento no duplica señales
 uv run python scripts/smoke_catalog_sources.py  # archivo y base dan el mismo catálogo
 uv run python scripts/smoke_retrieval.py        # la búsqueda no mezcla generaciones
-uv run python scripts/smoke_decision.py         # un caso aprobado y uno bloqueado
+uv run python scripts/smoke_threat_intel.py     # el fetch es idempotente; el lookup no mezcla snapshots
+uv run python scripts/smoke_decision.py         # incluye el caso que pasa de APPROVE a CHALLENGE por una alerta externa
 ```
 
 ### Regenerar artefactos derivados
@@ -230,7 +240,7 @@ regenerar es una guarda válida de CI.
 
 ```
 ├── compose.yml                  # Postgres 18 + pgvector
-├── migrations/versions/         # 10 revisiones · head: catálogo y sellos
+├── migrations/versions/         # 15 revisiones · head: sello del snapshot externo
 ├── scripts/                     # gates, smoke tests y generadores
 ├── data/
 │   ├── policies/                # documento normativo + vinculaciones
@@ -239,7 +249,7 @@ regenerar es una guarda válida de CI.
 │   ├── transactions.csv
 │   └── README.md
 ├── docs/
-│   ├── contrato_de_interfaz.md  # documento vivo (v0.6)
+│   ├── contrato_de_interfaz.md  # documento vivo (v0.8)
 │   ├── CHANGELOG.md
 │   ├── enmiendas_pendientes.md  # staging de la próxima versión
 │   ├── runbook_base_nueva.md
