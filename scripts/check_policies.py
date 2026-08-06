@@ -102,7 +102,9 @@ class _IndicadorSintetico:
     """
 
     observed_at: datetime
-    source_url: str = "synthetic://check_policies/corpus-saturado"
+    retrieved_at: datetime
+    source_url: str = "https://synthetic.invalid/check_policies/corpus-saturado"
+    summary: str = "Indicador sintetico del gate (no es dato real)"
 
 
 def corpus_saturado(transacciones) -> dict:
@@ -119,7 +121,8 @@ def corpus_saturado(transacciones) -> dict:
     desfase de fechas no es una invariante. Si algún día el dataset se regenerara
     con fechas actuales, este gate se pondría rojo el mismo día.
     """
-    ahora = (_IndicadorSintetico(observed_at=datetime.now(timezone.utc)),)
+    hoy = datetime.now(timezone.utc)
+    ahora = (_IndicadorSintetico(observed_at=hoy, retrieved_at=hoy),)
     return {
         (IndicatorType.ISSUER, t.issuer_bank): ahora
         for t in transacciones

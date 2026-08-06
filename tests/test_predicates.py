@@ -183,12 +183,20 @@ def test_lista_negra(tx):
 
 
 class _Alerta:
-    """Una observación del corpus congelado. El predicado sólo mira estos dos
-    campos, y el dominio no importa de `db/`."""
+    """Una observación del corpus congelado, con la forma que expone
+    `Indicator`. Se escribe acá y no se importa de `db/repositories/` porque el
+    dominio no depende de la capa de base."""
 
-    def __init__(self, observed_at, source_url="https://sbs.gob.pe/alertas/x"):
+    def __init__(
+        self,
+        observed_at,
+        source_url="https://sbs.gob.pe/alertas/x",
+        summary="SBS - Alerta de fraude",
+    ):
         self.observed_at = observed_at
         self.source_url = source_url
+        self.summary = summary
+        self.retrieved_at = observed_at
 
 
 def _corpus(emisor: str, *alertas: _Alerta, tipo=IndicatorType.ISSUER) -> dict:
@@ -209,7 +217,28 @@ def test_alerta_dentro_de_la_ventana_dispara_y_trae_la_fuente(tx):
     assert hit is not None
     assert hit.observed["issuer_bank"] == "BCP"
     assert hit.observed["hours_since_published"] == 3.0
-    assert hit.observed["source_urls"] == ["https://sbs.gob.pe/alertas/x"]
+
+    # Las fuentes viajan listas para proyectarse a `citations_external`: el
+    # predicado es el unico que sabe cuales cayeron dentro de la ventana.
+    (fuente,) = hit.observed["sources"]
+    assert fuente["url"] == "https://sbs.gob.pe/alertas/x"
+    assert fuente["summary"] == "SBS - Alerta de fraude"
+    assert fuente["retrieved_at"].startswith("2026-03-10T12:00")
+
+
+def test_lo_observado_es_serializable_a_json(tx):
+    """`observed` viaja a JSONB: un `datetime` crudo ahí explota al persistir."""
+    import json
+
+    t = utc(2026, 3, 10, 15, 0)
+    hit = issuer_under_alert(
+        ctx(
+            tx(issuer_bank="BCP", timestamp=t),
+            indicators=_corpus("BCP", _Alerta(t - timedelta(hours=1))),
+        ),
+        window_hours=24,
+    )
+    json.dumps(hit.observed)  # sin `default=str`: tiene que salir tal cual
 
 
 def test_alerta_mas_vieja_que_la_ventana_no_dispara(tx):

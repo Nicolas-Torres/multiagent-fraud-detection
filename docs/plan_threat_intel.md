@@ -21,7 +21,7 @@ Leer los dos antes de tocar código: acá está el orden, no el porqué.
 | 5 | Caché de indicadores en `GraphContext` | ✅ 9 tests verdes |
 | 6 | `fetch_threat_intel.py` | ✅ `--dry-run` y `--fake` × 2 verificados |
 | 7 | Predicado y vinculación de FP-10 | ✅ 7000/7000, FP-10 activa y afirmada |
-| 8 | El nodo | ⬜ |
+| 8 | El nodo | ✅ 8 tests, smokes del grafo verdes |
 | 9 | Sello, persistencia y explicabilidad | ⬜ |
 | 10 | Cierre documental | ⬜ |
 

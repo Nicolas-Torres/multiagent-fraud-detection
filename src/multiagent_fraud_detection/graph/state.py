@@ -55,9 +55,11 @@ class RetrievedChunk(InternalCitation):
     score: float
 
 
-class DiscardedSource(BaseModel):
-    url: str  # `str` y no `HttpUrl`: una fuente rechazada puede venir malformada
-    reason: str
+# `DiscardedSource` se retiro con ADR-0014: el allowlist gobierna el camino de
+# **escritura**, asi que en runtime no hay nada que descartar —lo que no paso el
+# filtro no llego a `threat_indicators`, y el nodo solo hace lookup—. Lo
+# rechazado se registra en el informe de `fetch_threat_intel.py`, que es donde
+# efectivamente ocurre el descarte.
 
 
 # --- El estado ---
@@ -119,6 +121,12 @@ class GraphState(GraphInput, total=False):
     # cuando el texto salio de la plantilla de respaldo, y esa ausencia dice que
     # ningun modelo participo.
     explanation_prompt_version: str
+    # Que foto de la inteligencia externa informo el veredicto (ADR-0014). Es el
+    # quinto eje de auditoria, con la misma semantica de nulo que los otros dos:
+    # ausente significa **no se consulto snapshot** —el nodo degrado antes de
+    # completar el lookup—, no dato faltante. Un corpus vacio NO produce
+    # ausencia: consultar y no encontrar nada es haber consultado.
+    threat_intel_version: str
     decision: DecisionType
     confidence: float
     confidence_rationale: str
@@ -127,4 +135,3 @@ class GraphState(GraphInput, total=False):
 
     # Zona 4
     rag_chunks: list[RetrievedChunk]
-    discarded_sources: list[DiscardedSource]

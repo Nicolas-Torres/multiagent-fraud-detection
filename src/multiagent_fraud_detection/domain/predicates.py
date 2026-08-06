@@ -71,6 +71,16 @@ CONTEXT_INPUTS: frozenset[Input] = frozenset({"transaction", "blacklist"})
 #: atribuir falsos positivos.
 INTEL_INPUTS: frozenset[Input] = frozenset({"indicators"})
 
+#: Clave de `Hit.observed` por la que un predicado de inteligencia externa
+#: entrega las fuentes que respaldan su observación. El nodo las proyecta a
+#: `citations_external`.
+#:
+#: El nombre vive acá y no en el grafo porque productor y consumidor no pueden
+#: divergir, y porque el **único** que sabe qué observaciones cayeron dentro de
+#: la ventana es el predicado: recalcularlo del lado del nodo sería la misma
+#: aritmética escrita dos veces, lista para desincronizarse.
+SOURCES_KEY = "sources"
+
 
 @dataclass(frozen=True, slots=True)
 class EvalContext:
@@ -575,7 +585,16 @@ def issuer_under_alert(ctx: EvalContext, *, window_hours: int) -> Hit | None:
             "window_hours": window_hours,
             "hours_since_published": round(horas, 1),
             "alert_count": len(dentro),
-            "source_urls": [o.source_url for o in dentro],
+            # Serializable a JSON —`observed` viaja a JSONB—: por eso
+            # `retrieved_at` va como texto ISO y no como `datetime`.
+            SOURCES_KEY: [
+                {
+                    "url": o.source_url,
+                    "summary": o.summary,
+                    "retrieved_at": o.retrieved_at.isoformat(),
+                }
+                for o in dentro
+            ],
         },
     )
 
