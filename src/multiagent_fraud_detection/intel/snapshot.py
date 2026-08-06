@@ -36,3 +36,9 @@ QUERY_TEMPLATE = (
 def build_query(issuer_bank: str) -> str:
     """La query para un emisor. Determinista: mismo emisor, misma query."""
     return QUERY_TEMPLATE.format(issuer_bank=issuer_bank)
+
+
+# Versión aparte para `fetch_threat_intel.py --fake`, mismo criterio que
+# `FAKE_INDEX_VERSION`: un snapshot de prueba no puede confundirse con el
+# corpus real, y el lookup en runtime filtra por `SNAPSHOT_VERSION` exacto.
+FAKE_SNAPSHOT_VERSION = f"fake:{TEMPLATE_TAG}:v{GENERATION}"

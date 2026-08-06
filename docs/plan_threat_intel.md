@@ -19,7 +19,7 @@ Leer los dos antes de tocar código: acá está el orden, no el porqué.
 | 3 | Puerto `Searcher` | ✅ 18 tests verdes |
 | 4 | `web_search_allowlist` + `issuer_bank` | ✅ migración aplicada, gates verdes |
 | 5 | Caché de indicadores en `GraphContext` | ✅ 9 tests verdes |
-| 6 | `fetch_threat_intel.py` | ⬜ |
+| 6 | `fetch_threat_intel.py` | ✅ `--dry-run` y `--fake` × 2 verificados |
 | 7 | Predicado y vinculación de FP-10 | ⬜ |
 | 8 | El nodo | ⬜ |
 | 9 | Sello, persistencia y explicabilidad | ⬜ |
