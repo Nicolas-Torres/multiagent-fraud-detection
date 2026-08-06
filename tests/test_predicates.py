@@ -1,4 +1,4 @@
-"""Los catorce predicados, caso por caso.
+"""Los quince predicados, caso por caso.
 
 No se testea que "funcionen": eso lo prueba `check_policies.py` sobre las 7 000.
 Acá se testean los **bordes que el dataset no cubre o cubre por accidente**: el
@@ -15,6 +15,7 @@ import pytest
 from multiagent_fraud_detection.domain.predicates import (
     LIBRARY,
     CONTEXT_INPUTS,
+    INTEL_INPUTS,
     EvalContext,
     account_age_below,
     amount_over_absolute,
@@ -26,17 +27,21 @@ from multiagent_fraud_detection.domain.predicates import (
     daily_sum_over_limit,
     device_not_usual,
     distinct_country_in_window,
+    issuer_under_alert,
     merchant_blacklisted,
     outside_usual_hours,
     preceding_micro_charges,
     profile_changed_within,
 )
+from multiagent_fraud_detection.enums import IndicatorType
 
 from conftest import utc
 
 
-def ctx(tx, perfil=None, *, hist=(), dev=(), blacklist=frozenset()):
-    return EvalContext(tx, perfil, tuple(hist), tuple(dev), blacklist)
+def ctx(tx, perfil=None, *, hist=(), dev=(), blacklist=frozenset(), indicators=None):
+    return EvalContext(
+        tx, perfil, tuple(hist), tuple(dev), blacklist, indicators or {}
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -173,6 +178,124 @@ def test_lista_negra(tx):
 
 
 # --------------------------------------------------------------------------- #
+# Inteligencia externa (ADR-0014 / ADR-0015)
+# --------------------------------------------------------------------------- #
+
+
+class _Alerta:
+    """Una observación del corpus congelado. El predicado sólo mira estos dos
+    campos, y el dominio no importa de `db/`."""
+
+    def __init__(self, observed_at, source_url="https://sbs.gob.pe/alertas/x"):
+        self.observed_at = observed_at
+        self.source_url = source_url
+
+
+def _corpus(emisor: str, *alertas: _Alerta, tipo=IndicatorType.ISSUER) -> dict:
+    """De más reciente a más antigua, como lo entrega `active_indicators`."""
+    return {(tipo, emisor): tuple(alertas)}
+
+
+def test_alerta_dentro_de_la_ventana_dispara_y_trae_la_fuente(tx):
+    t = utc(2026, 3, 10, 15, 0)
+    hit = issuer_under_alert(
+        ctx(
+            tx(issuer_bank="BCP", timestamp=t),
+            indicators=_corpus("BCP", _Alerta(t - timedelta(hours=3))),
+        ),
+        window_hours=24,
+    )
+
+    assert hit is not None
+    assert hit.observed["issuer_bank"] == "BCP"
+    assert hit.observed["hours_since_published"] == 3.0
+    assert hit.observed["source_urls"] == ["https://sbs.gob.pe/alertas/x"]
+
+
+def test_alerta_mas_vieja_que_la_ventana_no_dispara(tx):
+    """El borde que sostiene el gate: el dataset es de diciembre de 2025 y
+    cualquier indicador capturado hoy queda fuera de las 24 h."""
+    t = utc(2026, 3, 10, 15, 0)
+    assert (
+        issuer_under_alert(
+            ctx(
+                tx(issuer_bank="BCP", timestamp=t),
+                indicators=_corpus("BCP", _Alerta(t - timedelta(hours=25))),
+            ),
+            window_hours=24,
+        )
+        is None
+    )
+
+
+def test_alerta_posterior_al_cargo_no_lo_explica(tx):
+    """*As-of* contra el `timestamp` de la transacción, nunca contra `now()`.
+
+    Con `now()` un caso reprocesado meses después vería alertas que no existían
+    cuando ocurrió el cargo, y el gate dejaría de dar el mismo número dos veces.
+    """
+    t = utc(2026, 3, 10, 15, 0)
+    assert (
+        issuer_under_alert(
+            ctx(
+                tx(issuer_bank="BCP", timestamp=t),
+                indicators=_corpus("BCP", _Alerta(t + timedelta(hours=1))),
+            ),
+            window_hours=24,
+        )
+        is None
+    )
+
+
+def test_emisor_nulo_no_es_error(tx):
+    """Hay transacciones sin `issuer_bank`: la política no se cumple y ya."""
+    t = utc(2026, 3, 10, 15, 0)
+    assert (
+        issuer_under_alert(
+            ctx(tx(timestamp=t), indicators=_corpus("BCP", _Alerta(t))),
+            window_hours=24,
+        )
+        is None
+    )
+
+
+def test_una_alerta_sobre_otro_emisor_no_cuenta(tx):
+    t = utc(2026, 3, 10, 15, 0)
+    assert (
+        issuer_under_alert(
+            ctx(
+                tx(issuer_bank="BBVA", timestamp=t),
+                indicators=_corpus("BCP", _Alerta(t)),
+            ),
+            window_hours=24,
+        )
+        is None
+    )
+
+
+def test_el_tipo_del_indicador_discrimina(tx):
+    """`(tipo, valor)` es la clave: un comercio que compartiera código con un
+    emisor no puede dispararle la alerta."""
+    t = utc(2026, 3, 10, 15, 0)
+    assert (
+        issuer_under_alert(
+            ctx(
+                tx(issuer_bank="BCP", timestamp=t),
+                indicators=_corpus("BCP", _Alerta(t), tipo=IndicatorType.MERCHANT),
+            ),
+            window_hours=24,
+        )
+        is None
+    )
+
+
+def test_corpus_vacio_no_es_indisponibilidad(tx):
+    """Sin alertas la política no se cumple; no queda *skipped*."""
+    assert issuer_under_alert(ctx(tx(issuer_bank="BCP")), window_hours=24) is None
+    assert "indicators" in ctx(tx()).available
+
+
+# --------------------------------------------------------------------------- #
 # Secuencia
 # --------------------------------------------------------------------------- #
 
@@ -251,8 +374,8 @@ def test_suma_diaria_usa_el_dia_local_del_cliente(tx, perfil):
 # --------------------------------------------------------------------------- #
 
 
-def test_la_biblioteca_tiene_catorce_predicados():
-    assert len(LIBRARY) == 14
+def test_la_biblioteca_tiene_quince_predicados():
+    assert len(LIBRARY) == 15
 
 
 def test_todo_predicado_declara_señal_y_severidad():
@@ -267,7 +390,11 @@ def test_solo_dos_predicados_son_de_context():
 
 
 def test_ningun_predicado_pide_insumos_fuera_del_catalogo():
-    validos = set(CONTEXT_INPUTS) | {"profile", "history_customer", "history_device"}
+    validos = (
+        set(CONTEXT_INPUTS)
+        | set(INTEL_INPUTS)
+        | {"profile", "history_customer", "history_device"}
+    )
     for p in LIBRARY.values():
         assert p.requires <= validos
 
@@ -310,7 +437,9 @@ def test_sin_perfil_el_motor_evalua_mas_politicas_que_el_etiquetador(tx, catalog
         for p in catalogo.policies
         if p.evaluable and p.requires <= disponibles
     }
-    assert evaluables == {"FP-03", "FP-05", "FP-07"}
+    # FP-10 entra porque la inteligencia externa no depende del cliente: un
+    # emisor bajo alerta lo está exista o no el perfil.
+    assert evaluables == {"FP-03", "FP-05", "FP-07", "FP-10"}
 
 
 def _muestra(spec):

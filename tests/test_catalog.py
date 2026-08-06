@@ -20,6 +20,7 @@ from multiagent_fraud_detection.domain.catalog import (
     PolicyState,
     fingerprint,
     load_catalog,
+    owner_of,
     predicate_library_spec,
 )
 
@@ -51,13 +52,27 @@ def escribir(tmp_path):
 
 
 def test_el_catalogo_del_repo_carga_limpio(catalogo):
-    assert catalogo.health == {"active": 10, "excluded": 1, "pending": 0, "stale": 0}
+    assert catalogo.health == {"active": 11, "excluded": 0, "pending": 0, "stale": 0}
 
 
-def test_el_reparto_context_behavioral_se_deriva(catalogo):
-    """1 contra 9, y no lo eligió nadie: sale de los insumos de cada predicado."""
+def test_el_reparto_entre_agentes_se_deriva(catalogo):
+    """1 / 9 / 1, y no lo eligió nadie: sale de los insumos de cada predicado."""
     assert [p.policy_id for p in catalogo.evaluable_by(Owner.CONTEXT)] == ["FP-07"]
     assert len(catalogo.evaluable_by(Owner.BEHAVIORAL)) == 9
+    assert [p.policy_id for p in catalogo.evaluable_by(Owner.THREAT_INTEL)] == ["FP-10"]
+
+
+def test_indicators_gana_sobre_la_particion_contexto_comportamiento():
+    """La precedencia de ADR-0015, en su forma más chica.
+
+    `issuer_under_alert` pide `transaction` **e** `indicators`. Sin la
+    precedencia, la partición binaria lo mandaría a Behavioral y
+    `WorkingSignal.emitted_by` mentiría en el único campo que el harness usa para
+    atribuir falsos positivos.
+    """
+    assert owner_of(frozenset({"transaction", "indicators"})) is Owner.THREAT_INTEL
+    assert owner_of(frozenset({"transaction", "blacklist"})) is Owner.CONTEXT
+    assert owner_of(frozenset({"transaction", "profile"})) is Owner.BEHAVIORAL
 
 
 def test_las_politicas_salen_ordenadas(catalogo):
@@ -66,11 +81,20 @@ def test_las_politicas_salen_ordenadas(catalogo):
     assert ids == sorted(ids)
 
 
-def test_fp10_es_una_exclusion_registrada_no_un_hueco(catalogo):
+def test_fp10_esta_vinculada_sin_reescribir_el_documento(catalogo):
+    """ADR-0015: la evidencia externa habla por el vocabulario del catálogo.
+
+    Vincular una política antes excluida es precisamente la operación para la que
+    ADR-0007 separó documento de vinculación: el texto del banco **no se tocó**,
+    así que la huella sigue coincidiendo y `ACTIVE` sale por derivación, no por
+    haber reescrito nada.
+    """
     fp10 = catalogo["FP-10"]
-    assert fp10.state is PolicyState.EXCLUDED
-    assert "ADR-0005" in fp10.excluded_reason
-    assert not fp10.evaluable
+    assert fp10.state is PolicyState.ACTIVE
+    assert fp10.evaluable
+    assert fp10.excluded_reason is None
+    assert fp10.owner is Owner.THREAT_INTEL
+    assert fp10.signals == ("ISSUER_UNDER_ALERT",)
 
 
 def test_toda_vinculacion_esta_firmada(catalogo):
@@ -168,7 +192,16 @@ def test_accion_approve_es_invalida(escribir):
 
 def test_exclusion_sin_motivo(escribir):
     """`condition: null` sin motivo confunde "excluida" con "pendiente"."""
-    d, b = escribir(mutar_binds=lambda x: x["bindings"][9].pop("excluded_reason"))
+
+    def excluir_sin_motivo(x):
+        # Desde ADR-0015 ninguna vinculación del repo está excluida, así que el
+        # caso se sintetiza. Se busca por `policy_id` y no por índice: el orden
+        # del archivo no es contrato.
+        v = next(v for v in x["bindings"] if v["policy_id"] == "FP-10")
+        v["condition"] = None
+        v.pop("excluded_reason", None)
+
+    d, b = escribir(mutar_binds=excluir_sin_motivo)
     with pytest.raises(CatalogError, match="excluded_reason"):
         load_catalog(d, b)
 
@@ -217,7 +250,10 @@ def test_los_problemas_se_reportan_todos_juntos(escribir):
 
 def test_la_biblioteca_se_serializa_para_el_dashboard():
     spec = predicate_library_spec()
-    assert len(spec) == 14
+    assert len(spec) == 15
+
+    intel = next(s for s in spec if s["name"] == "issuer_under_alert")
+    assert intel["owner"] == Owner.THREAT_INTEL
 
     factor = next(s for s in spec if s["name"] == "amount_over_avg_multiple")["params"]["factor"]
     assert factor["kind"] == "number"

@@ -20,7 +20,7 @@ Leer los dos antes de tocar código: acá está el orden, no el porqué.
 | 4 | `web_search_allowlist` + `issuer_bank` | ✅ migración aplicada, gates verdes |
 | 5 | Caché de indicadores en `GraphContext` | ✅ 9 tests verdes |
 | 6 | `fetch_threat_intel.py` | ✅ `--dry-run` y `--fake` × 2 verificados |
-| 7 | Predicado y vinculación de FP-10 | ⬜ |
+| 7 | Predicado y vinculación de FP-10 | ✅ 7000/7000, FP-10 activa y afirmada |
 | 8 | El nodo | ⬜ |
 | 9 | Sello, persistencia y explicabilidad | ⬜ |
 | 10 | Cierre documental | ⬜ |
