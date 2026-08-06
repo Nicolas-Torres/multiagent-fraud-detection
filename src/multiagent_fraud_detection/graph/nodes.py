@@ -23,6 +23,7 @@ from multiagent_fraud_detection.db.repositories.transaction_history import (
     history_for_customer,
     history_for_device,
 )
+from multiagent_fraud_detection.debate import pro_customer, pro_fraud
 from multiagent_fraud_detection.enums import CaseStatus, DecisionType, Severity
 from multiagent_fraud_detection.domain.catalog import Owner
 from multiagent_fraud_detection.domain.engine import evaluate, prescribed_action
@@ -481,13 +482,73 @@ async def evidence_aggregation(
 
 
 @degrades(PRO_FRAUD)
-async def debate_pro_fraud(state: GraphState) -> dict:
-    return {"agent_route": [PRO_FRAUD], "pro_fraud_argument": "stub"}
+async def debate_pro_fraud(
+    state: GraphState, runtime: Runtime[GraphContext]
+) -> dict:
+    """El argumento a favor de la cautela, sobre la evidencia ya consolidada.
+
+    Mismo molde que `explainability`: `@degrades` como red de ultima
+    instancia, y adentro un try/except propio, porque `pro_fraud_argument` es
+    una columna no nulable y su ausencia no es representable. Si el proveedor
+    falla, cae al texto de respaldo declarado — nunca a cadena vacia — y dice
+    por que en `agent_errors`.
+    """
+    evidencia = state.get("evidence", [])
+    politicas = state.get("policies", [])
+    riesgo = state.get("risk_score", 0.0)
+
+    salida: dict = {"agent_route": [PRO_FRAUD]}
+
+    try:
+        salida["pro_fraud_argument"] = await asyncio.to_thread(
+            runtime.context.narrator.narrate,
+            pro_fraud.SYSTEM_PROMPT,
+            pro_fraud.build_prompt(evidencia, politicas, riesgo),
+        )
+    except Exception as exc:  # noqa: BLE001 - degradar el argumento, no el caso
+        logger.exception("argumento pro-fraude degradado; se usa el respaldo")
+        salida["pro_fraud_argument"] = pro_fraud.fallback_argument()
+        salida["agent_errors"] = [
+            AgentError(
+                agent=PRO_FRAUD,
+                error_type=type(exc).__name__,
+                message=f"debate no disponible: {exc}",
+            )
+        ]
+
+    return salida
 
 
 @degrades(PRO_CUSTOMER)
-async def debate_pro_customer(state: GraphState) -> dict:
-    return {"agent_route": [PRO_CUSTOMER], "pro_customer_argument": "stub"}
+async def debate_pro_customer(
+    state: GraphState, runtime: Runtime[GraphContext]
+) -> dict:
+    """El argumento a favor de la legitimidad. Ver `debate_pro_fraud`: mismo
+    molde, mismo motivo para el try/except propio."""
+    evidencia = state.get("evidence", [])
+    politicas = state.get("policies", [])
+    riesgo = state.get("risk_score", 0.0)
+
+    salida: dict = {"agent_route": [PRO_CUSTOMER]}
+
+    try:
+        salida["pro_customer_argument"] = await asyncio.to_thread(
+            runtime.context.narrator.narrate,
+            pro_customer.SYSTEM_PROMPT,
+            pro_customer.build_prompt(evidencia, politicas, riesgo),
+        )
+    except Exception as exc:  # noqa: BLE001 - degradar el argumento, no el caso
+        logger.exception("argumento pro-cliente degradado; se usa el respaldo")
+        salida["pro_customer_argument"] = pro_customer.fallback_argument()
+        salida["agent_errors"] = [
+            AgentError(
+                agent=PRO_CUSTOMER,
+                error_type=type(exc).__name__,
+                message=f"debate no disponible: {exc}",
+            )
+        ]
+
+    return salida
 
 
 # --- Nodos fatales: si fallan no hay caso, asi que lanzan ---
