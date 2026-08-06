@@ -6,7 +6,7 @@ vivo tiene siempre la versión vigente; su encabezado dice cuál es.
 Para recuperar el texto completo de una versión anterior:
 
 ```bash
-git show contrato-v0.6:docs/contrato_de_interfaz.md
+git show contrato-v0.7:docs/contrato_de_interfaz.md
 ```
 
 > Las versiones 0.1 y 0.2 son anteriores a que el contrato entrara a control de
@@ -18,6 +18,43 @@ git show contrato-v0.6:docs/contrato_de_interfaz.md
 
 Sin enmiendas acumuladas. Las próximas se anotan en
 [`enmiendas_pendientes.md`](enmiendas_pendientes.md).
+
+---
+
+## [0.8] — Inteligencia externa congelada y quinto eje de auditoría
+
+Ocho enmiendas, todas salidas de traer el Threat Intel Agent de punta a punta:
+recolección gobernada en build, consulta congelada en runtime, y FP-10 —hasta
+acá excluida por evidencia no reproducible— vinculada al catálogo.
+
+| # | Enmienda | Toca | Por qué |
+|---|---|---|---|
+| 1 | **`threat_indicators`** entra como tabla trece | §4, §7.1 | Última tabla pendiente del contrato. Dato de gobernanza: mutable, curado por un humano, con audit trail. Misma forma y mismo TTL que `merchant_blacklist`. Con ella §7.1 queda sin pendientes por primera vez desde v0.2. |
+| 2 | **`web_search_allowlist`** se especifica como gobernanza **del camino de escritura** | §4 | v0.2 la describía filtrando el fetch en runtime. Con el snapshot de ADR-0014 el enforcement ocurre en el build: lo que no pasa la lista no llega a la base. La lista sigue siendo tabla; cambia dónde se aplica — y de paso, sin lectura por transacción, deja de necesitar caché. |
+| 3 | `Decision` gana **`threat_intel_version`** | §2.5, §7.1 | Quinto eje de auditoría: con qué generación del snapshot se consultó. `null` no es dato faltante — dice que este veredicto **no consultó inteligencia externa**. Misma semántica que `retrieval_index_version`. |
+| 4 | `Transaction` gana **`issuer_bank`** | §2.5, §7.1 | Insumo de FP-10, que pasa a estar vinculada. La columna ya existía en `transactions.csv` y no se modelaba por falta de consumidor. Migración *expand*: nullable, poblada desde el dataset. |
+| 5 | §1.2 gana un **cuarto modo de arranque**: `fetch-intel` | §1.2 | La imagen soporta el comando; el CD lo invoca como Job periódico. Misma asimetría que el seed: un fetch fallido deja un snapshot viejo, no un servicio roto. |
+| 6 | §1.4 gana **`ANTHROPIC_API_KEY` como insumo del tercer puerto** | §1.4 | Ya estaba declarada para generación; ahora también alimenta `Searcher`. Sigue siendo opcional: sin ella no hay snapshot nuevo, y eso deja la inteligencia externa vacía, no el servicio caído. |
+| 7 | §1.4 documenta el **techo organizacional de dominios** | §1.4 | Las restricciones de dominio por request sólo pueden restringir más, nunca expandir la lista configurada a nivel de organización en la Console del proveedor. Es una lista fuera del repo que puede vaciar los resultados sin que nada falle: infraestructura tiene que saber que existe. |
+| 8 | §3.3 gana una **cuarta métrica operativa**: antigüedad del snapshot vigente | §3.3 | Un snapshot viejo es citable y silenciosamente obsoleto — el mismo estado legítimo que motivó la métrica de *chunks pendientes de indexar*. |
+
+**Decisiones cerradas nuevas** (§5): la búsqueda de inteligencia externa se
+recoge en build y se consulta congelada, nunca en vivo dentro del grafo; la
+evidencia externa entra al veredicto por una política del catálogo (FP-10
+vinculada), no por una señal con código propio fuera de su vocabulario.
+
+**FP-10 pasa de excluida a vinculada**: activa, citable y sin ground truth
+reproducible — el dataset es de diciembre de 2025 y la ventana de 24 h se
+resuelve *as-of*, así que no puede disparar sobre él aunque la tabla esté
+llena. El harness lo reporta así, nunca como recall 0.
+
+**De paso**, §5 corrige una numeración duplicada que arrastraba desde v0.6 (dos
+filas `10`, dos `11`, dos `12`) y §7.8 pone al día la cadena de migraciones,
+que se había quedado en `1276e208c3d9` desde v0.5.
+
+Detrás: [ADR-0014](adr/0014-la-inteligencia-externa-se-recoge-en-build-y-se-consulta-congelada.md),
+[ADR-0015](adr/0015-la-evidencia-externa-entra-al-veredicto-por-el-vocabulario-del-catalogo.md)
+y el acta [`reviews/07-threat-intel.md`](reviews/07-threat-intel.md).
 
 ---
 
