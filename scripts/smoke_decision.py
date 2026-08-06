@@ -17,12 +17,19 @@ el escenario 2.
 | 1 | Ninguna política dispara | Que `APPROVE` es alcanzable: el 90% del tráfico |
 | 2 | Dispara FP-03 | Que un veredicto autónomo cita la norma que lo autoriza |
 | 3 | Dispara FP-03 y el proveedor de embeddings está caído | Que el veredicto sobrevive sin descubrimiento |
+| 4 | El caso limpio, con una alerta sobre su emisor | Que la inteligencia externa cambia un veredicto, no sólo la confianza (ADR-0015) |
 
 El tercero es el que justifica el diseño del nodo. Si `@degrades` fuera la única
 red, una caída del proveedor se llevaría también el bloque de autorización y
 todos los casos escalarían — lo contrario de lo que ADR-0011 promete. Correrlo
 sobre el mismo caso que el escenario 2 prueba de paso la semántica de reemplazo
 del agregado: un reintento sustituye, no acumula.
+
+El cuarto reutiliza el caso **limpio** del escenario 1 por el mismo motivo: si
+fuera un caso nuevo, "cambió de APPROVE a CHALLENGE" sería sólo una afirmación
+sobre dos casos distintos. Reprocesar el mismo `case_id` con un indicador nuevo
+es la demostración real —y de paso, otra vez reemplazo del agregado, no
+acumulación.
 
 ## Por qué el cliente no tiene perfil
 
@@ -46,12 +53,13 @@ if sys.platform == "win32":
 
 from sqlalchemy import delete, select
 
-from multiagent_fraud_detection.db.models import Case, Decision, Transaction
+from multiagent_fraud_detection.db.models import Case, Decision, ThreatIndicator, Transaction
 from multiagent_fraud_detection.db.session import AsyncSessionLocal
-from multiagent_fraud_detection.enums import CaseStatus, Channel, DecisionType
+from multiagent_fraud_detection.enums import CaseStatus, Channel, DecisionType, IndicatorType
 from multiagent_fraud_detection.graph.builder import build_graph
 from multiagent_fraud_detection.graph.context import GraphContext
-from multiagent_fraud_detection.graph.nodes import POLICY_RAG
+from multiagent_fraud_detection.graph.nodes import POLICY_RAG, THREAT_INTEL
+from multiagent_fraud_detection.intel.snapshot import SNAPSHOT_VERSION
 from multiagent_fraud_detection.schemas.transaction import TransactionIn
 
 CASO_LIMPIO = UUID("00000000-0000-0000-0000-0000000000d1")
@@ -74,7 +82,9 @@ class ProveedorCaido:
         raise ConnectionError("el proveedor de embeddings no responde")
 
 
-def tx(tx_id: str, *, minuto: int, monto: str, device: str) -> TransactionIn:
+def tx(
+    tx_id: str, *, minuto: int, monto: str, device: str, issuer_bank: str | None = None
+) -> TransactionIn:
     return TransactionIn(
         transaction_id=tx_id,
         customer_id=CLIENTE,
@@ -85,11 +95,20 @@ def tx(tx_id: str, *, minuto: int, monto: str, device: str) -> TransactionIn:
         device_id=device,
         timestamp=BASE + timedelta(minutes=minuto),
         merchant_id=COMERCIO,
+        issuer_bank=issuer_bank,
     )
 
 
+# Emisor del caso limpio. Sin indicador sembrado no cambia nada del escenario
+# 1 —`issuer_under_alert` no dispara sin una alerta que mirar—; el escenario 4
+# lo reutiliza para demostrar que sembrar una sí lo hace.
+EMISOR_SMOKE = "SMOKE-BANK"
+
 TRANSACCIONES = {
-    TX_LIMPIA: tx(TX_LIMPIA, minuto=0, monto="50.00", device="D-SMOKE-OTRO"),
+    TX_LIMPIA: tx(
+        TX_LIMPIA, minuto=0, monto="50.00", device="D-SMOKE-OTRO",
+        issuer_bank=EMISOR_SMOKE,
+    ),
     **{
         t: tx(t, minuto=10 + i, monto="60.00", device=DISPOSITIVO)
         for i, t in enumerate(TX_PREVIAS)
@@ -110,6 +129,9 @@ async def limpiar() -> None:
                 delete(Transaction).where(
                     Transaction.transaction_id.in_(list(TRANSACCIONES))
                 )
+            )
+            await session.execute(
+                delete(ThreatIndicator).where(ThreatIndicator.value == EMISOR_SMOKE)
             )
 
 
@@ -158,6 +180,7 @@ def mostrar(titulo: str, caso: Case, decision: Decision | None) -> None:
     print(f"   risk / confidence   : {decision.risk_score} / {decision.confidence}")
     print(f"   degraded_agents     : {decision.degraded_agents}")
     print(f"   índice sellado      : {decision.retrieval_index_version}")
+    print(f"   snapshot sellado    : {decision.threat_intel_version}")
 
 
 async def main() -> int:
@@ -258,6 +281,69 @@ async def main() -> int:
                 "monitoreo no pueden saber que la evidencia estaba incompleta"
             )
 
+    # --- 4. el caso limpio, con una alerta sobre su emisor ------------------ #
+    #
+    # El `case_id` es el mismo del escenario 1: `persist_decision` reemplaza el
+    # agregado, así que la fila de `decisions` que va a quedar es esta, no una
+    # unión con la del escenario 1.
+    async with AsyncSessionLocal() as session:
+        async with session.begin():
+            session.add(
+                ThreatIndicator(
+                    indicator_type=IndicatorType.ISSUER,
+                    value=EMISOR_SMOKE,
+                    # Tres horas antes del cargo: dentro de la ventana de 24h de
+                    # FP-10, y as-of contra `timestamp` — nunca contra `now()`.
+                    observed_at=TRANSACCIONES[TX_LIMPIA].timestamp - timedelta(hours=3),
+                    retrieved_at=datetime.now(UTC),
+                    source_url="https://sbs.gob.pe/alertas/smoke-decision",
+                    summary="Alerta simulada del smoke (no es una alerta real)",
+                    snapshot_version=SNAPSHOT_VERSION,
+                    added_by="smoke",
+                )
+            )
+
+    # La caché de indicadores del contexto ya sirvió un lookup vacío durante el
+    # escenario 1 y puede seguir vigente por su TTL. `invalidate()` es lo que
+    # hace que el alta de arriba se vea al instante, en vez de esperar a que
+    # venza — el mismo mecanismo que usaría el alta desde el dashboard.
+    contexto.indicators.invalidate()
+
+    await graph.ainvoke(
+        {"case_id": CASO_LIMPIO, "transaction": TRANSACCIONES[TX_LIMPIA]},
+        context=contexto,
+    )
+    caso, decision = await leer(CASO_LIMPIO)
+    mostrar("4. el caso limpio, con una alerta sobre su emisor", caso, decision)
+
+    if decision is None:
+        problemas.append("con la alerta sembrada no quedó fila en `decisions`")
+    else:
+        citadas = {c["policy_id"] for c in decision.citations_internal}
+        if decision.decision is not DecisionType.CHALLENGE:
+            problemas.append(
+                f"FP-10 prescribe CHALLENGE y llegó {decision.decision.value}"
+            )
+        if "FP-10" not in (decision.matched_policies or []):
+            problemas.append(
+                "FP-10 no disparó: revisá que el indicador haya quedado dentro "
+                "de la ventana de 24h"
+            )
+        elif "FP-10" not in citadas:
+            problemas.append("FP-10 disparó y no está citada: el invariante falló")
+        if not decision.citations_external:
+            problemas.append(
+                "FP-10 disparó sin dejar cita externa: el analista no podría "
+                "ver de qué fuente salió la alerta"
+            )
+        if decision.threat_intel_version is None:
+            problemas.append(
+                "threat_intel_version quedó nulo con el nodo corriendo limpio: "
+                "un veredicto que sí consultó el snapshot tiene que sellarlo"
+            )
+        if THREAT_INTEL in decision.degraded_agents:
+            problemas.append("el nodo de inteligencia externa degradó sin motivo")
+
     print()
     if problemas:
         print(f"FALLA: {len(problemas)} problemas")
@@ -265,8 +351,17 @@ async def main() -> int:
             print(f"  - {p}")
         return 1
 
+    # Limpieza al final, no sólo al principio de la próxima corrida: `TX_LIMPIA`
+    # lleva `issuer_bank`, y dejarlo en `transactions` filtraría hacia
+    # `fetch_threat_intel.py` —que arma su lista de emisores con un `SELECT
+    # DISTINCT issuer_bank`— y una corrida real pagaría una búsqueda por un
+    # emisor que no existe. El resto de los datos del smoke no tiene ese
+    # efecto lateral, pero limpiar todo junto es más simple que separar cuál sí.
+    await limpiar()
+
     print("OK · un caso aprobado y uno bloqueado, los dos en DECIDED")
     print("     el veredicto sobrevive a que el proveedor de embeddings caiga")
+    print("     una alerta externa cambia el veredicto del caso limpio, no sólo la confianza")
     return 0
 
 
