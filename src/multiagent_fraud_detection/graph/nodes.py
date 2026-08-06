@@ -693,6 +693,10 @@ async def persist_decision(
                     # solo se transcribe —`null` cuando no hubo recuperacion, que
                     # no es dato faltante sino "este veredicto no uso el indice"—.
                     retrieval_index_version=state.get("retrieval_index_version"),
+                    # Quinto eje (ADR-0014): que foto del corpus externo se
+                    # consulto. `null` si el nodo degrado antes de completar el
+                    # lookup, nunca si el corpus estaba vacio.
+                    threat_intel_version=state.get("threat_intel_version"),
                     matched_policies=state.get("policies", []),
                     policy_catalog_version=runtime.context.catalog.version,
                     # model_dump(mode="json"): en modo Python, HttpUrl y

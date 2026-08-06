@@ -80,6 +80,13 @@ class Decision(Base):
     # caido o sin clave—. No es dato faltante: dice que ningun modelo participo.
     explanation_prompt_version: Mapped[str | None] = mapped_column(String(64))
 
+    # Quinto eje de auditoria (ADR-0014): que foto del corpus de amenazas
+    # externas informo el veredicto. Misma semantica de nulo que los otros
+    # cuatro: `null` significa *no se consulto snapshot* —el nodo degrado antes
+    # de completar el lookup—, nunca *no habia alertas*. Un corpus vacio SI
+    # sella version, porque consultar y no encontrar nada es haber consultado.
+    threat_intel_version: Mapped[str | None] = mapped_column(String(64))
+
     citations_internal: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
 
     citations_external: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)

@@ -19,7 +19,9 @@ from multiagent_fraud_detection.explain.customer import (
 )
 from multiagent_fraud_detection.explain.narrator import FakeNarrator
 from multiagent_fraud_detection.graph.state import AgentError, WorkingSignal
-from multiagent_fraud_detection.schemas.decision import InternalCitation
+from multiagent_fraud_detection.schemas.decision import ExternalCitation, InternalCitation
+
+from conftest import utc
 
 TODOS = list(SAFE_THEMES)
 
@@ -188,10 +190,57 @@ def test_la_auditoria_dice_cuando_no_hubo_politicas():
     assert "ninguna política" in texto.lower()
 
 
-def test_la_auditoria_lista_los_cuatro_sellos():
-    texto = build_audit_explanation(estado(explanation_prompt_version=PROMPT_VERSION))
-    for sello in ("catálogo", "scoring", "índice", "prompt"):
+def test_la_auditoria_lista_los_cinco_sellos():
+    texto = build_audit_explanation(
+        estado(
+            explanation_prompt_version=PROMPT_VERSION,
+            threat_intel_version="claude-sonnet-4-6:issuer-alert:v1",
+        )
+    )
+    for sello in ("catálogo", "scoring", "índice", "prompt", "snapshot"):
         assert sello in texto
+    assert "claude-sonnet-4-6:issuer-alert:v1" in texto
+
+
+def test_la_auditoria_distingue_no_consultado_de_snapshot_vacio():
+    """`null` es *no se consultó snapshot* —el nodo degradó antes de
+    completar el lookup—, nunca *no había alertas*. La distinción tiene que
+    verse en el texto, no perderse en un `state.get(..., "n/a")` silencioso."""
+    texto = build_audit_explanation(estado(threat_intel_version=None))
+    assert "snapshot n/a" in texto
+
+
+def test_la_auditoria_nombra_la_fuente_y_el_indicador_de_una_alerta_externa():
+    """ADR-0015: qué indicador, de qué fuente. El titular nunca ve esto —es
+    `explain/customer.py` el que lo esconde—, pero el analista sí."""
+    texto = build_audit_explanation(
+        estado(
+            policies=["FP-03", "FP-10"],
+            citations_internal=[
+                InternalCitation(
+                    policy_id="FP-03", chunk_id="FP-03:2025.1:0", version="2025.1"
+                ),
+                InternalCitation(
+                    policy_id="FP-10", chunk_id="FP-10:2025.1:0", version="2025.1"
+                ),
+            ],
+            citations_external=[
+                ExternalCitation(
+                    url="https://sbs.gob.pe/alertas/x",
+                    summary="SBS - Alerta de fraude sobre el emisor",
+                    retrieved_at=utc(2026, 3, 10, 12, 0),
+                )
+            ],
+            threat_intel_version="claude-sonnet-4-6:issuer-alert:v1",
+        )
+    )
+    assert "Evidencia externa" in texto
+    assert "SBS - Alerta de fraude sobre el emisor" in texto
+    assert "https://sbs.gob.pe/alertas/x" in texto
+
+
+def test_la_auditoria_sin_evidencia_externa_no_menciona_el_parrafo():
+    assert "Evidencia externa" not in build_audit_explanation(estado())
 
 
 def test_el_narrador_falso_no_se_disfraza_de_real():

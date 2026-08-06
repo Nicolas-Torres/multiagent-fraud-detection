@@ -22,7 +22,7 @@ Leer los dos antes de tocar código: acá está el orden, no el porqué.
 | 6 | `fetch_threat_intel.py` | ✅ `--dry-run` y `--fake` × 2 verificados |
 | 7 | Predicado y vinculación de FP-10 | ✅ 7000/7000, FP-10 activa y afirmada |
 | 8 | El nodo | ✅ 8 tests, smokes del grafo verdes |
-| 9 | Sello, persistencia y explicabilidad | ⬜ |
+| 9 | Sello, persistencia y explicabilidad | ✅ migración aplicada, 224 tests verdes |
 | 10 | Cierre documental | ⬜ |
 
 `issuer_bank` se adelantó del paso 7 al 4: el fetch necesita la lista de emisores
