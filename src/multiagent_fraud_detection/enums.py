@@ -43,3 +43,14 @@ class Segment(StrEnum):
     RETAIL = "retail"
     PREMIUM = "premium"
     BUSINESS = "business"
+
+class IndicatorType(StrEnum):
+    """Qué clase de entidad señala un indicador de compromiso.
+
+    Es enum y no `varchar` libre por el mismo motivo que `Segment`: la aplicación
+    **agrupa por él** —el lookup es por `(tipo, valor)`— y un texto libre
+    admitiría `issuer` e `Issuer` como claves distintas sin que nada falle.
+    """
+    ISSUER = "issuer"
+    DEVICE = "device"
+    MERCHANT = "merchant"

@@ -37,6 +37,19 @@ erDiagram
         VARCHAR added_by
         DATETIME added_at
     }
+    threat_indicators {
+        BIGINT id PK
+        VARCHAR_16 indicator_type UK
+        VARCHAR_64 value UK
+        DATETIME observed_at UK
+        DATETIME retrieved_at
+        TEXT source_url
+        TEXT summary
+        VARCHAR_64 snapshot_version UK
+        BOOLEAN active
+        VARCHAR added_by
+        DATETIME added_at
+    }
     transactions {
         VARCHAR transaction_id PK
         VARCHAR customer_id

@@ -173,7 +173,7 @@ async def _reset(session) -> None:
     await session.execute(
         text(
             "TRUNCATE transactions, customer_behaviors, merchant_blacklist, "
-            "fraud_policies, binding_sets, policy_bindings, policy_chunks CASCADE"
+            "fraud_policies, binding_sets, policy_bindings, policy_chunks, threat_indicators CASCADE"
         )
     )
 

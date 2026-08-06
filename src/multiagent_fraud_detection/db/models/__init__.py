@@ -10,6 +10,7 @@ from multiagent_fraud_detection.db.models.fraud_policy import FraudPolicy
 from multiagent_fraud_detection.db.models.binding_set import BindingSet
 from multiagent_fraud_detection.db.models.policy_binding import PolicyBinding
 from multiagent_fraud_detection.db.models.policy_chunk import PolicyChunk
+from multiagent_fraud_detection.db.models.threat_indicator import ThreatIndicator
 
 __all__ = [
     "Case",
@@ -24,4 +25,5 @@ __all__ = [
     "BindingSet",
     "PolicyBinding",
     "PolicyChunk",
+    "ThreatIndicator",
 ]

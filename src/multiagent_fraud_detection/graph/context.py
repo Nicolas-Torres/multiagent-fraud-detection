@@ -32,6 +32,9 @@ from multiagent_fraud_detection.domain.catalog import PolicyCatalog, load_catalo
 from multiagent_fraud_detection.explain.narrator import AnthropicNarrator, Narrator
 from multiagent_fraud_detection.retrieval.embeddings import Embedder, GeminiEmbedder
 from multiagent_fraud_detection.retrieval.query import QueryCache, code_vocabulary
+from multiagent_fraud_detection.db.repositories.threat_indicator import IndicatorCache
+
+
 
 # Fase 2 de ADR-0007: el catalogo se lee de archivos versionados. La fase 3 lo
 # mueve a las tablas `fraud_policies` / `policy_bindings`, y entonces esto pasa a
@@ -79,6 +82,8 @@ class GraphContext:
     # tampoco tiene sentido que el llamador lo pase por separado, porque
     # entonces podrian no corresponderse.
     vocabulary: dict[str, str] = field(init=False, repr=False)
+
+    indicators: IndicatorCache = field(default_factory=IndicatorCache)
 
     def __post_init__(self) -> None:
         self.vocabulary = code_vocabulary(self.catalog)
