@@ -18,7 +18,7 @@ Leer los dos antes de tocar código: acá está el orden, no el porqué.
 | 2 | Enforcement del allowlist | ✅ 15 tests verdes |
 | 3 | Puerto `Searcher` | ✅ 18 tests verdes |
 | 4 | `web_search_allowlist` + `issuer_bank` | ✅ migración aplicada, gates verdes |
-| 5 | Caché de indicadores en `GraphContext` | ⬜ |
+| 5 | Caché de indicadores en `GraphContext` | ✅ 9 tests verdes |
 | 6 | `fetch_threat_intel.py` | ⬜ |
 | 7 | Predicado y vinculación de FP-10 | ⬜ |
 | 8 | El nodo | ⬜ |
