@@ -26,7 +26,7 @@ from multiagent_fraud_detection.db.repositories.transaction_history import (
 from multiagent_fraud_detection.enums import CaseStatus, DecisionType, Severity
 from multiagent_fraud_detection.domain.catalog import Owner
 from multiagent_fraud_detection.domain.engine import evaluate, prescribed_action
-from multiagent_fraud_detection.domain.predicates import EvalContext
+from multiagent_fraud_detection.domain.predicates import SOURCES_KEY, EvalContext
 from multiagent_fraud_detection.domain.scoring import (
     SCORING_VERSION,
     base_confidence,
@@ -54,8 +54,10 @@ from multiagent_fraud_detection.retrieval.citations import (
     merge_citations,
     missing_authorization,
 )
+from multiagent_fraud_detection.intel.snapshot import SNAPSHOT_VERSION
 from multiagent_fraud_detection.retrieval.embeddings import INDEX_VERSION, format_query
 from multiagent_fraud_detection.retrieval.query import build_query, query_codes
+from multiagent_fraud_detection.schemas.decision import ExternalCitation
 
 logger = logging.getLogger(__name__)
 
@@ -139,6 +141,25 @@ def _a_working(señales, emitido_por: str) -> list[WorkingSignal]:
         )
         for s in señales
     ]
+
+
+def _a_citations(señales) -> list[ExternalCitation]:
+    """Las fuentes que respaldan una senal de inteligencia externa.
+
+    Salen de `observed[SOURCES_KEY]`, que lo llena el predicado: es el unico que
+    sabe que observaciones cayeron dentro de la ventana. Una senal sin esa clave
+    —cualquier otro predicado— no aporta citas, asi que esto es seguro de correr
+    sobre la lista entera.
+
+    Se deduplica por URL conservando el orden: dos indicadores del mismo emisor
+    pueden compartir fuente, y una cita repetida en el rastro de auditoria es
+    ruido, no evidencia adicional.
+    """
+    por_url: dict[str, ExternalCitation] = {}
+    for s in señales:
+        for fuente in s.observed.get(SOURCES_KEY, ()):
+            por_url.setdefault(fuente["url"], ExternalCitation(**fuente))
+    return list(por_url.values())
 
 
 # --- Ola 1: independientes entre si ---
@@ -246,8 +267,43 @@ async def behavioral_pattern(
 
 
 @degrades(THREAT_INTEL)
-async def external_threat_intel(state: GraphState) -> dict:
-    return {"agent_route": [THREAT_INTEL], "citations_external": [], "discarded_sources": []}
+async def external_threat_intel(
+    state: GraphState, runtime: Runtime[GraphContext]
+) -> dict:
+    """Inteligencia externa **congelada**: lookup, nunca busqueda (ADR-0014).
+
+    El corpus lo recogio `fetch_threat_intel.py` en tiempo de build, aplicando
+    el allowlist en el camino de escritura. Aca su unica dependencia es
+    Postgres, asi que este nodo no puede fallar por red: `@degrades` deja de ser
+    la red que atrapa lo probable y vuelve a ser la que atrapa lo imprevisto.
+
+    Es tambien la razon por la que no escribe `discarded_sources`: no hay nada
+    que descartar en runtime, porque lo indebido nunca entro a la tabla.
+
+    **La ventana de 24h la resuelve el predicado**, as-of contra el `timestamp`
+    de la transaccion. Aca solo se carga el indice y se proyectan las fuentes
+    que el predicado ya selecciono (`observed[SOURCES_KEY]`): recalcular cuales
+    cayeron dentro seria la misma aritmetica escrita dos veces.
+
+    Devuelve `threat_intel_version` **siempre que complete el lookup**, aunque
+    el corpus este vacio: consultar y no encontrar nada es haber consultado. La
+    ausencia de la clave significa que el nodo degrado antes de llegar aca.
+    """
+    ctx = EvalContext(
+        transaction=state["transaction"],
+        indicators=await runtime.context.indicators.get(
+            runtime.context.session_factory
+        ),
+    )
+    resultado = evaluate(runtime.context.catalog, Owner.THREAT_INTEL, ctx)
+
+    return {
+        "agent_route": [THREAT_INTEL],
+        "signals": _a_working(resultado.signals, THREAT_INTEL),
+        "matched_policies": list(resultado.matched_policies),
+        "citations_external": _a_citations(resultado.signals),
+        "threat_intel_version": SNAPSHOT_VERSION,
+    }
 
 
 # --- Ola 2 ---
@@ -637,6 +693,10 @@ async def persist_decision(
                     # solo se transcribe —`null` cuando no hubo recuperacion, que
                     # no es dato faltante sino "este veredicto no uso el indice"—.
                     retrieval_index_version=state.get("retrieval_index_version"),
+                    # Quinto eje (ADR-0014): que foto del corpus externo se
+                    # consulto. `null` si el nodo degrado antes de completar el
+                    # lookup, nunca si el corpus estaba vacio.
+                    threat_intel_version=state.get("threat_intel_version"),
                     matched_policies=state.get("policies", []),
                     policy_catalog_version=runtime.context.catalog.version,
                     # model_dump(mode="json"): en modo Python, HttpUrl y

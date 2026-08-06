@@ -136,7 +136,14 @@ async def main() -> None:
 
     print("5. las guardas levantan")
     casos = [
-        ("veredicto autonomo sin citas internas", estado(citations_internal=[])),
+        # El invariante es de **contencion**: una cita por cada politica que
+        # disparo. Sin `policies` se cumple vaciamente —justamente lo que
+        # ADR-0015 senala—, asi que el caso tiene que traer la politica que
+        # quedo sin respaldo, o no prueba la guarda.
+        (
+            "politica disparada sin cita que la respalde",
+            estado(policies=["FP-01"], citations_internal=[]),
+        ),
         ("veredicto autonomo sin score deterministico", estado(base_confidence=None)),
         ("ajuste de confianza sin justificacion", estado(confidence=0.7)),
     ]

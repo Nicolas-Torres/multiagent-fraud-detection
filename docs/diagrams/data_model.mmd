@@ -37,6 +37,19 @@ erDiagram
         VARCHAR added_by
         DATETIME added_at
     }
+    threat_indicators {
+        BIGINT id PK
+        VARCHAR_16 indicator_type UK
+        VARCHAR_64 value UK
+        DATETIME observed_at UK
+        DATETIME retrieved_at
+        TEXT source_url
+        TEXT summary
+        VARCHAR_64 snapshot_version UK
+        BOOLEAN active
+        VARCHAR added_by
+        DATETIME added_at
+    }
     transactions {
         VARCHAR transaction_id PK
         VARCHAR customer_id
@@ -47,6 +60,14 @@ erDiagram
         VARCHAR device_id
         DATETIME timestamp
         VARCHAR merchant_id
+        VARCHAR_16 issuer_bank "NULL"
+    }
+    web_search_allowlist {
+        VARCHAR domain PK
+        BOOLEAN active
+        TEXT reason
+        VARCHAR added_by
+        DATETIME added_at
     }
     cases {
         CHAR_32 case_id PK
@@ -90,6 +111,7 @@ erDiagram
         VARCHAR_32 policy_catalog_version "NULL"
         VARCHAR_64 retrieval_index_version "NULL"
         VARCHAR_64 explanation_prompt_version "NULL"
+        VARCHAR_64 threat_intel_version "NULL"
         JSONB citations_internal
         JSONB citations_external
         TEXT debate_pro_fraud

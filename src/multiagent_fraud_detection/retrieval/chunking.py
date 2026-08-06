@@ -28,9 +28,9 @@ cita de enero siga resolviendo contra el índice reconstruido en marzo.
 ## Qué se indexa
 
 **Todas las políticas, sin mirar su estado.** Es contraintuitivo y es el punto:
-una política `PENDING` —documento sin vinculación— o `EXCLUDED` —FP-10, no
-evaluable— jamás va a aparecer en `matched_policies`, así que el bloque de
-autorización no puede citarla nunca. El descubrimiento es su **única** vía de
+una política `PENDING` —documento sin vinculación—, `EXCLUDED` o `STALE` jamás va
+a aparecer en `matched_policies`, así que el bloque de autorización no puede
+citarla nunca. El descubrimiento es su **única** vía de
 llegar a un caso. Filtrarlas acá dejaría fuera precisamente las que dependen del
 índice para existir.
 """

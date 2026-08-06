@@ -64,6 +64,8 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from multiagent_fraud_detection.domain.predicates import (
+    CONTEXT_INPUTS,
+    INTEL_INPUTS,
     LIBRARY,
     Input,
     Predicate,
@@ -90,6 +92,21 @@ class PolicyState(StrEnum):
 class Owner(StrEnum):
     CONTEXT = "context"
     BEHAVIORAL = "behavioral"
+    THREAT_INTEL = "threat_intel"
+
+
+def owner_of(requires: frozenset[Input]) -> Owner:
+    """Qué agente evalúa una condición, derivado de sus insumos. Tres ramas.
+
+    `indicators` **gana** sobre la partición contexto/comportamiento (ADR-0015):
+    `issuer_under_alert` pide `transaction` e `indicators`, y sin la precedencia
+    la partición binaria lo mandaría a Behavioral. El motivo es de honestidad de
+    datos, no de estética — `WorkingSignal.emitted_by` es lo que el harness usa
+    para atribuir falsos positivos, y ahí no puede mentir.
+    """
+    if requires & INTEL_INPUTS:
+        return Owner.THREAT_INTEL
+    return Owner.CONTEXT if requires <= CONTEXT_INPUTS else Owner.BEHAVIORAL
 
 
 @dataclass(frozen=True, slots=True)
@@ -125,8 +142,7 @@ class Policy:
     def owner(self) -> Owner | None:
         if not self.condition:
             return None
-        todos_context = all(s.predicate.is_context() for s in self.condition)
-        return Owner.CONTEXT if todos_context else Owner.BEHAVIORAL
+        return owner_of(self.requires)
 
     @property
     def signals(self) -> tuple[str, ...]:
@@ -371,7 +387,7 @@ def load_catalog(documents_path: Path, bindings_path: Path) -> PolicyCatalog:
 
 
 def predicate_library_spec() -> list[dict[str, Any]]:
-    """Los catorce predicados en forma serializable.
+    """Los quince predicados en forma serializable.
 
     Alimenta `GET /api/v1/predicates`. Si esta lista viviera en el frontend
     habría dos fuentes de verdad para lo mismo, y la segunda se desactualizaría
@@ -383,7 +399,7 @@ def predicate_library_spec() -> list[dict[str, Any]]:
             "description": p.description,
             "requires": sorted(p.requires),
             "severity": p.severity.value,
-            "owner": Owner.CONTEXT if p.is_context() else Owner.BEHAVIORAL,
+            "owner": owner_of(p.requires),
             "params": {
                 k: {
                     "kind": s.kind,

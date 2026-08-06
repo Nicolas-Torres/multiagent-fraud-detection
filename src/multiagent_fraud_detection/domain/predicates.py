@@ -1,4 +1,4 @@
-"""Los catorce predicados del motor determinístico.
+"""Los quince predicados del motor determinístico.
 
 **Esto es lo único de la capa de reglas que vive en código.** Una política no está
 acá: está en `data/policies/policy_bindings_*.json`, y es una conjunción de estos
@@ -29,6 +29,7 @@ cuánto* se pasó el umbral —donde el drift se ve antes de que cambien los con
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -39,7 +40,7 @@ from multiagent_fraud_detection.domain.params import (
     SEGMENT_AVG_REF,
     from_reference,
 )
-from multiagent_fraud_detection.enums import Severity
+from multiagent_fraud_detection.enums import IndicatorType, Severity
 
 # --------------------------------------------------------------------------- #
 # Contexto de evaluación
@@ -53,11 +54,32 @@ Input = Literal[
     "history_customer",
     "history_device",
     "blacklist",
+    "indicators",
 ]
 
 #: Insumos que **no** dependen del cliente. Una política cuyos predicados sólo
 #: piden de acá es de Transaction Context; cualquier otra, de Behavioral Pattern.
 CONTEXT_INPUTS: frozenset[Input] = frozenset({"transaction", "blacklist"})
+
+#: Inteligencia externa congelada (ADR-0014). Un predicado que la pide hace que
+#: su política sea del Threat Intel Agent, **con precedencia** sobre la partición
+#: contexto/comportamiento (ADR-0015).
+#:
+#: La precedencia no es estética: `issuer_under_alert` pide `transaction` e
+#: `indicators`, así que la partición binaria lo mandaría a Behavioral, y
+#: `WorkingSignal.emitted_by` mentiría en el único campo que el harness usa para
+#: atribuir falsos positivos.
+INTEL_INPUTS: frozenset[Input] = frozenset({"indicators"})
+
+#: Clave de `Hit.observed` por la que un predicado de inteligencia externa
+#: entrega las fuentes que respaldan su observación. El nodo las proyecta a
+#: `citations_external`.
+#:
+#: El nombre vive acá y no en el grafo porque productor y consumidor no pueden
+#: divergir, y porque el **único** que sabe qué observaciones cayeron dentro de
+#: la ventana es el predicado: recalcularlo del lado del nodo sería la misma
+#: aritmética escrita dos veces, lista para desincronizarse.
+SOURCES_KEY = "sources"
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,10 +103,31 @@ class EvalContext:
     history_device: tuple[Any, ...] = ()
     blacklist: frozenset[str] = frozenset()
 
+    #: `(tipo, valor) → observaciones`, de más reciente a más antigua. El tipo
+    #: exacto es `IndicatorIndex` (`db/repositories/threat_indicator.py`), pero
+    #: acá se escribe suelto a propósito: el dominio no importa de `db/`, y los
+    #: predicados reciben valores inmutables, nunca instancias del ORM.
+    indicators: Mapping[tuple[IndicatorType, str], tuple[Any, ...]] = field(
+        default_factory=dict
+    )
+
     @property
     def available(self) -> frozenset[Input]:
-        """Insumos realmente disponibles para este caso."""
-        base = {"transaction", "blacklist", "history_customer", "history_device"}
+        """Insumos realmente disponibles para este caso.
+
+        `indicators` está siempre disponible, como `blacklist`: un corpus vacío
+        significa *no hay alertas*, no *no se puede evaluar*. Tratarlo como
+        faltante mandaría FP-10 a `skipped_policies` cada vez que el snapshot no
+        tuviera filas, y eso se lee como un problema de cobertura cuando es la
+        respuesta correcta.
+        """
+        base = {
+            "transaction",
+            "blacklist",
+            "indicators",
+            "history_customer",
+            "history_device",
+        }
         if self.profile is not None:
             base.add("profile")
         return frozenset(base)  # type: ignore[arg-type]
@@ -488,6 +531,71 @@ def merchant_blacklisted(ctx: EvalContext) -> Hit | None:
     return Hit(
         detail=f"Comercio {comercio} está en la lista negra",
         observed={"merchant_id": comercio},
+    )
+
+
+@predicate(
+    name="issuer_under_alert",
+    requires=("transaction", "indicators"),
+    signal="ISSUER_UNDER_ALERT",
+    severity=Severity.MEDIUM,
+    params={"window_hours": integer("ventana en horas desde la publicación", minimum=1)},
+)
+def issuer_under_alert(ctx: EvalContext, *, window_hours: int) -> Hit | None:
+    """Hay una alerta pública sobre el banco emisor dentro de la ventana.
+
+    **La ventana se resuelve *as-of* contra el `timestamp` de la transacción, no
+    contra `now()`** (ADR-0004). Con `now()` el resultado dependería de cuándo se
+    corre el análisis: un caso reprocesado meses después vería alertas que no
+    existían cuando ocurrió el cargo, y el gate dejaría de dar el mismo número
+    dos veces.
+
+    Se compara `observed_at` —cuándo se publicó la alerta— y nunca
+    `retrieved_at` —cuándo la trajimos—: con la segunda, un `fetch` de hoy
+    volvería reciente una alerta de hace un año, que es justo lo que la ventana
+    existe para impedir.
+
+    `window_hours` y no `window_minutes` como los predicados de velocidad: la
+    norma habla en horas y `observed_at` tiene granularidad de día —el proveedor
+    no informa más precisión—, así que pedir minutos sería inventar precisión.
+
+    Emisor nulo no es error: hay transacciones sin `issuer_bank`, y para ellas la
+    política simplemente no se cumple.
+    """
+    emisor = ctx.transaction.issuer_bank
+    if not emisor:
+        return None
+
+    observaciones = ctx.indicators.get((IndicatorType.ISSUER, emisor), ())
+    as_of = ctx.transaction.timestamp
+    corte = timedelta(hours=window_hours)
+    dentro = [o for o in observaciones if timedelta(0) <= as_of - o.observed_at < corte]
+    if not dentro:
+        return None
+
+    # El índice llega ordenado de más reciente a más antigua.
+    horas = (as_of - dentro[0].observed_at).total_seconds() / 3600
+    return Hit(
+        detail=(
+            f"Alerta pública sobre el emisor {emisor} publicada {horas:.0f} h "
+            f"antes del cargo (ventana: {window_hours} h)"
+        ),
+        observed={
+            "issuer_bank": emisor,
+            "window_hours": window_hours,
+            "hours_since_published": round(horas, 1),
+            "alert_count": len(dentro),
+            # Serializable a JSON —`observed` viaja a JSONB—: por eso
+            # `retrieved_at` va como texto ISO y no como `datetime`.
+            SOURCES_KEY: [
+                {
+                    "url": o.source_url,
+                    "summary": o.summary,
+                    "retrieved_at": o.retrieved_at.isoformat(),
+                }
+                for o in dentro
+            ],
+        },
     )
 
 

@@ -24,18 +24,35 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 from _dataset import BLACKLIST, leer_ground_truth, leer_perfiles, leer_transacciones
-from check_policies import evaluar_todo
+from check_policies import corpus_saturado, evaluar_todo
+
+#: FP-10 está **activa y no medida** (ADR-0015): el ground truth no la contempla
+#: y no se regenera, porque tocar la rama del generador correría el stream
+#: aleatorio y cambiaría las 7 000 filas. No es un hueco de cobertura ni un
+#: recall 0 — es una política implementada, citable, sin evidencia reproducible
+#: contra la que medirla. Se nombra acá para que su ausencia sea una excepción
+#: declarada y no un test que se fue debilitando.
+SIN_GROUND_TRUTH = {"FP-10"}
+SEÑALES_SIN_GROUND_TRUTH = {"ISSUER_UNDER_ALERT"}
 
 
 @pytest.fixture(scope="module")
 def corrida(catalogo):
-    """Una sola evaluación del dataset completo, compartida por los tests."""
+    """Una sola evaluación del dataset completo, compartida por los tests.
+
+    Con el mismo corpus saturado que usa `check_policies`: un indicador activo
+    para cada emisor, fechado hoy. Es lo que convierte "FP-10 no disparó" en una
+    afirmación sobre el dato —el desfase de ocho meses— y no sobre la
+    configuración.
+    """
     perfiles = {p.customer_id: p for p in leer_perfiles()}
+    transacciones = leer_transacciones()
     obtenido = evaluar_todo(
         catalogo,
         perfiles,
-        leer_transacciones(),
+        transacciones,
         frozenset(m.merchant_id for m in BLACKLIST),
+        corpus_saturado(transacciones),
     )
     return obtenido, leer_ground_truth()
 
@@ -61,13 +78,29 @@ def test_la_precedencia_reproduce_la_decision_esperada(corrida):
 def test_ninguna_politica_queda_sin_ejercitar(corrida, catalogo):
     """Una política que nunca dispara en 7 000 filas no está probada por el gate.
 
-    Hoy las diez evaluables tienen positivos. Si mañana una queda en cero, el
-    gate seguiría en verde midiendo nueve.
+    Hoy las diez medibles tienen positivos. Si mañana una queda en cero, el gate
+    seguiría en verde midiendo nueve.
     """
     obtenido, _ = corrida
     disparadas = {p for pol, _, _ in obtenido.values() for p in pol}
     evaluables = {p.policy_id for p in catalogo.policies if p.evaluable}
-    assert evaluables - disparadas == set()
+    assert evaluables - disparadas == SIN_GROUND_TRUTH
+
+
+def test_fp10_no_dispara_ni_con_todos_los_emisores_bajo_alerta(corrida):
+    """La invariante de ADR-0015, afirmada y no supuesta.
+
+    El corpus de la corrida tiene un indicador para **cada** emisor del dataset,
+    fechado hoy. Que FP-10 igual no dispare es una propiedad del dato: las 7 000
+    transacciones son de diciembre de 2025 y la ventana de 24 h se resuelve
+    *as-of* contra el `timestamp` del cargo, así que un indicador de hoy queda a
+    ocho meses.
+
+    El día que el dataset se regenere con fechas actuales, esto se pone rojo — que
+    es exactamente lo que tiene que pasar.
+    """
+    obtenido, _ = corrida
+    assert [tid for tid, (pol, _, _) in obtenido.items() if "FP-10" in pol] == []
 
 
 def test_toda_señal_del_catalogo_aparece_al_menos_una_vez(corrida, catalogo):
@@ -75,4 +108,4 @@ def test_toda_señal_del_catalogo_aparece_al_menos_una_vez(corrida, catalogo):
     obtenido, _ = corrida
     emitidas = {s.code for _, _, sigs in obtenido.values() for s in sigs}
     declaradas = {c for p in catalogo.policies for c in p.signals}
-    assert declaradas - emitidas == set()
+    assert declaradas - emitidas == SEÑALES_SIN_GROUND_TRUTH

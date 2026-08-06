@@ -89,6 +89,14 @@ def build_audit_explanation(state: dict[str, Any]) -> str:
             + "."
         )
 
+    citas_externas = state.get("citations_external", [])
+    if citas_externas:
+        detalle = "; ".join(
+            f"{c.summary} ({c.url}, recuperada {c.retrieved_at.isoformat()})"
+            for c in citas_externas
+        )
+        lineas.append(f"Evidencia externa: {detalle}.")
+
     riesgo = state.get("risk_score")
     base = state.get("base_confidence")
     confianza = state.get("confidence")
@@ -115,6 +123,7 @@ def build_audit_explanation(state: dict[str, Any]) -> str:
         ("scoring", state.get("scoring_version")),
         ("índice", state.get("retrieval_index_version")),
         ("prompt", state.get("explanation_prompt_version")),
+        ("snapshot", state.get("threat_intel_version")),
     ]
     lineas.append(
         "Versiones: "

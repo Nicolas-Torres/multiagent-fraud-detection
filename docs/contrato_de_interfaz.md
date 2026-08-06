@@ -1,5 +1,5 @@
 # Contrato de Interfaz — Sistema Multi-Agente de Detección de Fraude
-**Versión 0.7 — RAG de políticas, sellos de auditoría y hand-off por digest**
+**Versión 0.8 — Inteligencia externa congelada y quinto eje de auditoría**
 
 > Define las **fronteras** entre el motor de agentes (yo), la infraestructura (mi
 > compañero) y el dashboard del analista.
@@ -30,7 +30,7 @@
 
 La costura no es el código ni los schemas: **es la imagen versionada en GHCR**.
 
-### 1.2 Ejecución: una imagen, tres modos de arranque
+### 1.2 Ejecución: una imagen, cuatro modos de arranque
 
 ```
 # Modo servir (proceso principal)
@@ -43,6 +43,10 @@ alembic upgrade head
 # Modo sembrar (Job de POST-deploy, idempotente, sin --reset;
 # si falla, NO aborta el rollout)
 python scripts/seed.py
+
+# Modo fetch-intel (Job periódico, idempotente;
+# si falla, NO aborta el rollout)
+python scripts/fetch_threat_intel.py
 ```
 
 > **No** va `alembic upgrade head` en el entrypoint normal: con N réplicas tendrías
@@ -62,6 +66,17 @@ un servicio roto ([ADR-0010](adr/0010-seed-como-job-de-post-deploy.md)).
 El seed **también construye el índice vectorial** de políticas. Sin
 `GEMINI_API_KEY` lo omite con aviso en vez de fallar: el resultado es un estado
 previsto y medido —*chunks pendientes de indexar*, §3.3—, no una caída.
+
+**`fetch-intel` es la misma asimetría que el seed, y por el mismo motivo**
+([ADR-0014](adr/0014-la-inteligencia-externa-se-recoge-en-build-y-se-consulta-congelada.md)).
+El grafo no sale a la red: en runtime, el nodo Threat Intel hace *lookup* sobre
+lo que este Job ya congeló en `threat_indicators`. Un fetch fallido deja un
+snapshot viejo —estado previsto y medido, §3.3—, nunca un servicio roto.
+
+**El allowlist vacío falla ruidosamente**, a propósito distinto del anterior:
+sin esa guarda, el Job pagaría una búsqueda por emisor y guardaría cero filas,
+que se lee exactamente igual que "no hay alertas" — el peor de los dos
+fallos posibles, porque no avisa.
 
 #### Expand / contract
 
@@ -109,8 +124,20 @@ Ambos sin autenticación, `200` cuando OK.
 > `ANTHROPIC_API_KEY` y `GEMINI_API_KEY` son las **únicas** variables de los
 > proveedores. El modelo, la dimensión y las plantillas de prompt viven en código:
 > configurables por `env` podrían cambiarse sin que suban las versiones selladas
-> en `decisions`, y los cuatro sellos de §2.5 mentirían a la vez.
+> en `decisions`, y los cinco sellos de §2.5 mentirían a la vez.
 > El allowlist de búsqueda web **no** es env var → tabla gobernada (§4).
+>
+> 🆕 `ANTHROPIC_API_KEY` alimenta ahora **dos** puertos: `Narrator` (explicación
+> al cliente) y `Searcher` (inteligencia externa, consumido por el Job
+> `fetch-intel`, nunca por el grafo). Misma regla: sólo la clave es variable de
+> entorno; el modelo y la plantilla de búsqueda viven en código.
+>
+> 🆕 **Techo organizacional de dominios.** El proveedor de búsqueda admite
+> restringir por dominio a nivel de la organización, en su consola —fuera de
+> este repo—. Esa lista sólo puede **acotar**, nunca **expandir**, lo que
+> `allowed_domains` pide por request: es un segundo filtro invisible desde el
+> código, que puede vaciar los resultados sin que nada falle. Infraestructura
+> tiene que saber que existe antes de depurar un fetch que vuelve vacío.
 
 #### Tres entornos, no uno
 
@@ -301,6 +328,7 @@ mediría la discrepancia de reglas en vez de la calidad del sistema.
 | `device_id` | `str` | `min_length=1` |
 | `timestamp` | `datetime` | aware, UTC |
 | `merchant_id` | `str` | `min_length=1` |
+| **`issuer_bank`** | `str \| null` | 🆕 código del banco emisor, **normalizado a mayúsculas**; insumo de FP-10 (alerta externa). Nullable: no todo emisor del dataset está en el corpus de amenazas |
 
 #### `CustomerBehavior` — *NO viene en el request*
 
@@ -369,6 +397,7 @@ el análisis (§7.4).
 | **`policy_catalog_version`** | `str \| null` | qué versión del catálogo se evaluó (ej. `2025.1-b1`) |
 | **`retrieval_index_version`** | `str \| null` | 🆕 con qué generación del índice se recuperó (`gemini-embedding-2:1536:doc:1`). `null` = **no hubo recuperación** |
 | **`explanation_prompt_version`** | `str \| null` | 🆕 con qué modelo y prompt se redactó `explanation_customer`. `null` = **ningún modelo participó** |
+| **`threat_intel_version`** | `str \| null` | 🆕 quinto eje: con qué generación del snapshot externo se consultó (`claude-sonnet-4-6:issuer-alert:v1`). `null` = **no se consultó snapshot** — nunca "no había alertas": un corpus vacío consultado igual sella versión |
 | `signals` | `list[Signal]` | orden determinístico fijado por Evidence Aggregation |
 | `citations_internal` | `list[InternalCitation]` | políticas (RAG) |
 | `citations_external` | `list[ExternalCitation]` | alertas web (gobernada) |
@@ -612,9 +641,18 @@ indexado es **citable por identidad e invisible por similitud**: si dispara, se
 cita igual —esa vía no consulta el índice—; si no dispara, no hay forma de que
 aparezca. Estado legítimo y **silencioso**: nada falla.
 
-Las tres son la misma clase de cosa —desincronizaciones entre artefactos con
+**Cuarta métrica 🆕: antigüedad del snapshot de inteligencia externa vigente**
+—`now() - max(retrieved_at)` sobre `threat_indicators` en la generación activa.
+Un snapshot viejo es **citable y silenciosamente obsoleto**: el mismo estado
+legítimo que motivó la primera métrica, del otro lado del puerto
+([ADR-0014](adr/0014-la-inteligencia-externa-se-recoge-en-build-y-se-consulta-congelada.md)).
+Nada en el sistema falla si el Job `fetch-intel` deja de correr; esta métrica es
+lo único que lo haría visible.
+
+Las cuatro son la misma clase de cosa —desincronizaciones entre artefactos con
 dueños distintos—. La norma sin vinculación no se evalúa; la norma sin chunk no
-se descubre; la huella rota deja de evaluarse sin dejar de citarse.
+se descubre; la huella rota deja de evaluarse sin dejar de citarse; el snapshot
+viejo se sigue consultando sin avisar que está viejo.
 
 ---
 
@@ -625,10 +663,19 @@ auditoría), no config de infraestructura. Vive en Postgres, no en env var.
 
 **Tabla `web_search_allowlist`**: `domain`, `added_by`, `added_at`, `active`, `reason`.
 
-- Se **siembra** con una migración/seed.
-- Se **cachea en memoria** con invalidación al escribir.
-- El *enforcement* (rechazar fetch fuera de la lista + registrar la fuente para
-  `citations_external`) es idéntico sin importar dónde viva la lista.
+- Se **siembra** con el seed; se administra como `merchant_blacklist`.
+- **🆕 Gobierna el camino de escritura, no el de lectura**
+  ([ADR-0014](adr/0014-la-inteligencia-externa-se-recoge-en-build-y-se-consulta-congelada.md)).
+  v0.2–v0.7 la describían filtrando el *fetch* en runtime; con el snapshot
+  congelado el enforcement ocurre **una vez, en el Job `fetch-intel`**: lo que
+  no pasa la lista no llega a `threat_indicators`, y en runtime el grafo no
+  tiene nada que filtrar —hace *lookup*, nunca búsqueda—.
+- **🆕 Sin caché.** A diferencia de `merchant_blacklist`, la lee un Job de build
+  una vez por corrida, no el grafo una vez por transacción: no hay lectura
+  repetida en runtime que justifique TTL ni invalidación (§4.2).
+- Lo rechazado por el *enforcement* se registra en el **informe del Job**, no en
+  una tabla del grafo: en runtime no hay nada que descartar, porque nada
+  indebido entró.
 
 **Regla general reutilizable**: *¿es config de infraestructura (estática, por deploy)
 o dato de gobernanza (mutable, con audit trail)?* Lo primero → env var. Lo segundo → tabla.
@@ -661,9 +708,10 @@ Postura: **TTL de 60 s más `invalidate()`**. El TTL da obsolescencia acotada en
 todas las réplicas sin coordinación; el `invalidate()` se conserva para que la
 réplica que atiende un alta desde el dashboard la vea al instante.
 
-Aplica a `merchant_blacklist` —ya implementado— y a `web_search_allowlist`.
-
-> **Pendiente de modelar.** Es la única tabla del contrato que aún no existe en BD.
+Aplica a las cachés que el **grafo** lee por transacción: `merchant_blacklist` y
+**🆕 `threat_indicators`** (el índice `(tipo, valor) → observaciones` que arma
+el Threat Intel Agent). **No** aplica a `web_search_allowlist`: esa la lee el
+Job `fetch-intel` una vez por corrida de build, no el grafo (§4).
 
 ---
 
@@ -685,10 +733,11 @@ Aplica a `merchant_blacklist` —ya implementado— y a `web_search_allowlist`.
 | 12 | 🆕 Falla de un agente | **Degrada** la decisión, no la aborta; `FAILED` solo por excepción no capturada |
 | 13 | 🆕 Errores de agente | **Tabla** `agent_errors` (el sistema los mide); la frontera expone solo `degraded_agents` |
 | 14 | 🆕 Escritura del grafo | **Un solo punto**, con semántica de reemplazo del agregado |
-
-| 10 | 🆕 Forma ejecutable de una política | **Vinculación** al documento normativo, con huella. El documento es del banco |
-| 11 | 🆕 `NO_CUSTOMER_PROFILE` en el riesgo | **No suma**. "No pude comparar" no es "esto es sospechoso" |
-| 12 | 🆕 Caché de datos de gobernanza | **TTL + invalidación**, no solo invalidación (§4.2) |
+| 15 | 🆕 Forma ejecutable de una política | **Vinculación** al documento normativo, con huella. El documento es del banco |
+| 16 | 🆕 `NO_CUSTOMER_PROFILE` en el riesgo | **No suma**. "No pude comparar" no es "esto es sospechoso" |
+| 17 | 🆕 Caché de datos de gobernanza | **TTL + invalidación**, no solo invalidación (§4.2) |
+| 18 | 🆕 Búsqueda de inteligencia externa | **Se recoge en build, se consulta congelada** — nunca en vivo dentro del grafo (ADR-0014) |
+| 19 | 🆕 Evidencia externa en el veredicto | **Entra por política del catálogo** (FP-10 vinculada), no por señal con código propio fuera de su vocabulario (ADR-0015) |
 
 
 ---
@@ -714,7 +763,7 @@ documentadas:
 > Frontera **interna**: no la ve el dashboard. Se documenta porque es donde se
 > resuelve el "JSONB vs relacional" y dónde viven las garantías que §2 promete.
 
-### 7.1 Las doce tablas
+### 7.1 Las catorce tablas
 
 | Tabla | PK | Notas |
 |---|---|---|
@@ -730,10 +779,10 @@ documentadas:
 | **`binding_sets`** | `version` (`2025.1-b1`) | 🆕 encabezado del set de vinculaciones; a lo sumo uno activo, por **índice parcial único** |
 | **`policy_bindings`** | `(binding_set_version, policy_id)` | 🆕 FK **compuesta** a `fraud_policies(policy_id, version)`; `condition` JSONB nullable |
 | **`policy_chunks`** | `(index_version, chunk_id)` | 🆕 `embedding vector(1536)`; **ningún índice extra**: la PK ya sirve el filtro por generación |
+| **`threat_indicators`** | `id` (BIGSERIAL) | 🆕 gobernanza; UNIQUE `(indicator_type, value, observed_at, snapshot_version)` — hace idempotente el fetch; **sin índice de lectura**: decenas de filas, se cachean (§4.2) |
+| **`web_search_allowlist`** | `domain` (natural) | 🆕 gobernanza; baja lógica con `active`, igual forma que `merchant_blacklist` (§4) |
 
 Los hijos llevan `ON DELETE CASCADE` a nivel BD.
-
-**Falta**: `web_search_allowlist` (§4).
 
 > **Por qué `fraud_policies` no lleva `active`.** El patrón de
 > `merchant_blacklist` invita a copiarla, pero ahí la bandera **es** el dato. En
@@ -751,6 +800,14 @@ Los hijos llevan `ON DELETE CASCADE` a nivel BD.
 > `WHERE index_version = <vigente>` no es un filtro sino un **invariante de
 > corrección** —sin él la búsqueda mezcla generaciones y devuelve vecinos de otro
 > modelo, sin fallar— ([ADR-0012](adr/0012-el-indice-vectorial-es-dato-derivado-y-versionado.md)).
+>
+> 🆕 **`threat_indicators` tiene el mismo invariante**, con `snapshot_version` en
+> vez de `index_version`: sin el filtro, un veredicto podría consultar dos
+> generaciones a la vez y `threat_intel_version` sellaría una sola
+> ([ADR-0014](adr/0014-la-inteligencia-externa-se-recoge-en-build-y-se-consulta-congelada.md)).
+> `observed_at` (publicación) ≠ `retrieved_at` (recuperación) — FP-10 evalúa la
+> primera, y evaluar la segunda haría que un fetch de hoy volviera reciente una
+> alerta de hace un año.
 
 > `merchant_blacklist` es la primera tabla de **gobernanza** —dato mutable,
 > administrado por un humano, con audit trail—, la categoría que §4 definió para
@@ -915,15 +972,23 @@ c558fd490ae6  (pgvector)
          → 694142a4c8b6  (agent_errors)
            → 073738cbc0ec  (campos de evaluación en customer_behaviors)
              → 699755dfc00e  (índices de historial)
-               → 1276e208c3d9  (merchant_blacklist)  ← head
+               → 1276e208c3d9  (merchant_blacklist)
+                 → 8990ef73796f  (matched_policies, policy_catalog_version)
+                   → ec429a4e2aa1  (catálogo de políticas: 4 tablas)
+                     → 8db41fe7465f  (sello del prompt de explicación)
+                       → 3367ac570a62  (threat_indicators)
+                         → 5730aa53f76d  (web_search_allowlist, issuer_bank)
+                           → f193c092654b  (sello del snapshot externo)  ← head
 ```
 
 ---
 
-**Estado**: v0.7 — RAG de políticas cerrado y sin decisiones conjuntas
+**Estado**: v0.8 — inteligencia externa congelada y sin decisiones conjuntas
 pendientes. El motor reproduce el ground truth en las 7 000 transacciones, en
 memoria y contra Postgres; los casos llegan a `DECIDED` con respaldo interno
-verificable, y cada decisión sella los cuatro ejes de auditoría.
+verificable, y cada decisión sella los **cinco** ejes de auditoría. FP-10 pasa
+de excluida a vinculada: activa, citable y sin ground truth reproducible —el
+harness la reporta así, nunca como recall 0—.
 
-**§1 validado por el compañero.** ADR-0008 a ADR-0010 pasan a **aceptados**.
+**§1 validado por el compañero.** ADR-0008 a ADR-0010 siguen **aceptados**.
 **Valido yo**: §2–§4, §7.

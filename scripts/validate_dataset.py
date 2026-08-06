@@ -184,8 +184,9 @@ def check_transactions(tx: pd.DataFrame, cb: pd.DataFrame) -> list[str]:
     return fallas
 
 
-# Las diez políticas dentro del alcance implementado. FP-10 (alerta externa)
-# queda fuera: su evidencia es búsqueda web real, no reproducible.
+# Las diez políticas **medibles**. FP-10 está implementada desde ADR-0015, pero
+# el ground truth no la contempla y no se regenera, así que queda activa y no
+# medida: sin positivos que exigirle acá.
 POLITICAS_EN_ALCANCE = [
     "FP-01", "FP-02", "FP-03", "FP-04", "FP-05",
     "FP-06", "FP-07", "FP-08", "FP-09", "FP-11",
@@ -215,7 +216,7 @@ def check_ground_truth(gt: pd.DataFrame, tx: pd.DataFrame) -> list[str]:
         _minimo(fallas, f"positivos de {pol}", conteo.get(pol, 0), 30)
 
     if "FP-10" in conteo:
-        fallas.append("FP-10 aparece en el ground truth (está fuera de alcance)")
+        fallas.append("FP-10 aparece en el ground truth (es activa y no medida)")
 
     # La población negativa es lo que hace medible la precisión.
     aprobadas = int((gt.expected_decision == "APPROVE").sum())

@@ -193,11 +193,17 @@
       "source_version": "2025.1",
       "source_fingerprint": "sha256:53341a6246e030d40bb574391694c858345726af80cb22d011593722356ee48f",
       "action": "CHALLENGE",
-      "condition": null,
-      "excluded_reason": "ADR-0005: la evidencia es busqueda web real, no reproducible entre corridas. Excluida a proposito, no pendiente de traduccion.",
+      "condition": [
+        {
+          "predicate": "issuer_under_alert",
+          "params": {
+            "window_hours": 24
+          }
+        }
+      ],
       "active": true,
       "bound_by": "nicolas",
-      "bound_at": "2026-08-03T00:00:00Z"
+      "bound_at": "2026-08-06T00:00:00Z"
     },
     {
       "policy_id": "FP-11",

@@ -88,6 +88,7 @@ from multiagent_fraud_detection.db.models import (
     MerchantBlacklist,
     PolicyBinding,
     Transaction,
+    WebSearchAllowlist,
 )
 from multiagent_fraud_detection.config.settings import settings
 from multiagent_fraud_detection.db.session import engine
@@ -95,7 +96,7 @@ from multiagent_fraud_detection.domain.catalog import FileCatalogSource
 from multiagent_fraud_detection.retrieval.embeddings import INDEX_VERSION, GeminiEmbedder
 from multiagent_fraud_detection.retrieval.indexing import index_catalog, index_size
 
-from _dataset import BLACKLIST, DATA_DIR, leer_perfiles, leer_transacciones
+from _dataset import ALLOWLIST, BLACKLIST, DATA_DIR, leer_perfiles, leer_transacciones
 
 # 7 000 transacciones x 9 columnas son 63 000 parámetros, y psycopg corta en
 # 65 535. Un solo INSERT pasaría raspando hoy y reventaría al agregar una
@@ -173,7 +174,8 @@ async def _reset(session) -> None:
     await session.execute(
         text(
             "TRUNCATE transactions, customer_behaviors, merchant_blacklist, "
-            "fraud_policies, binding_sets, policy_bindings, policy_chunks CASCADE"
+            "fraud_policies, binding_sets, policy_bindings, policy_chunks, "
+            "threat_indicators, web_search_allowlist CASCADE"
         )
     )
 
@@ -291,6 +293,12 @@ async def sembrar(reset: bool) -> None:
             [b.model_dump() for b in BLACKLIST],
             "merchant_id",
         )
+        await _upsert(
+            session,
+            WebSearchAllowlist,
+            [a.model_dump() for a in ALLOWLIST],
+            "domain",
+        )
 
         # El catálogo, en orden de FK: documentos y sobre antes que las
         # vinculaciones, que apuntan a los dos. Acá el orden **sí** lo exige la
@@ -318,6 +326,7 @@ async def sembrar(reset: bool) -> None:
     print(f"  {len(transacciones)} transacciones "
           f"({sin_perfil} clientes sin perfil)")
     print(f"  {len(BLACKLIST)} comercios en lista negra")
+    print(f"  {len(ALLOWLIST)} dominios en el allowlist de búsqueda")
     print(f"  {len(documentos)} políticas · {len(vinculaciones)} vinculaciones "
           f"· set {sobre['version']} activo")
 

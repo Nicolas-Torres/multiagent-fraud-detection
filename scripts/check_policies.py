@@ -44,7 +44,8 @@ Tampoco prueba las consultas: acá el historial se arma en memoria. Un bug de
 import argparse
 import sys
 from collections import defaultdict
-from datetime import timedelta
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 
 from multiagent_fraud_detection.domain.catalog import (
     CatalogSource,
@@ -54,6 +55,7 @@ from multiagent_fraud_detection.domain.catalog import (
 )
 from multiagent_fraud_detection.domain.engine import evaluate, prescribed_action
 from multiagent_fraud_detection.domain.predicates import EvalContext
+from multiagent_fraud_detection.enums import IndicatorType
 
 from _dataset import (
     BLACKLIST,
@@ -90,7 +92,45 @@ def elegir_fuente(nombre: str) -> CatalogSource:
     )
 
 
-def evaluar_todo(catalog, perfiles, transacciones, blacklist):
+@dataclass(frozen=True, slots=True)
+class _IndicadorSintetico:
+    """Un indicador fabricado por el gate. Lleva su origen en la URL a propósito.
+
+    El predicado sólo mira `observed_at` y `source_url`, así que no hace falta
+    importar `Indicator` de `db/repositories/` —y no conviene: eso arrastraría la
+    capa de base al gate que corre sin Postgres—.
+    """
+
+    observed_at: datetime
+    retrieved_at: datetime
+    source_url: str = "https://synthetic.invalid/check_policies/corpus-saturado"
+    summary: str = "Indicador sintetico del gate (no es dato real)"
+
+
+def corpus_saturado(transacciones) -> dict:
+    """Un indicador por emisor del dataset, fechado **hoy**. El peor caso posible.
+
+    ADR-0015 afirma que FP-10 no puede disparar sobre el dataset *aunque la tabla
+    esté llena*: las 7 000 transacciones son de diciembre de 2025 y la ventana de
+    24 h se resuelve *as-of* contra el `timestamp` del cargo, así que cualquier
+    indicador capturado hoy queda a ocho meses.
+
+    Este corpus lo **demuestra** en vez de suponerlo. Con la tabla vacía —que es
+    como está hoy el snapshot real— la afirmación sería verdadera por
+    configuración, y una invariante que depende de que alguien recuerde el
+    desfase de fechas no es una invariante. Si algún día el dataset se regenerara
+    con fechas actuales, este gate se pondría rojo el mismo día.
+    """
+    hoy = datetime.now(timezone.utc)
+    ahora = (_IndicadorSintetico(observed_at=hoy, retrieved_at=hoy),)
+    return {
+        (IndicatorType.ISSUER, t.issuer_bank): ahora
+        for t in transacciones
+        if t.issuer_bank
+    }
+
+
+def evaluar_todo(catalog, perfiles, transacciones, blacklist, indicadores):
     """Recorre el dataset en orden cronológico, acumulando historial.
 
     El orden importa y el acumulado también: una transacción se juzga con lo que
@@ -115,12 +155,15 @@ def evaluar_todo(catalog, perfiles, transacciones, blacklist):
             history_customer=tuple(hist_cli),
             history_device=tuple(hist_dev),
             blacklist=blacklist,
+            indicators=indicadores,
         )
 
-        # Los dos agentes por separado y luego consolidados, igual que el grafo:
-        # Context y Behavioral corren en paralelo y Evidence Aggregation une.
-        ev = evaluate(catalog, Owner.CONTEXT, ctx).merge(
-            evaluate(catalog, Owner.BEHAVIORAL, ctx)
+        # Los tres agentes por separado y luego consolidados, igual que el grafo:
+        # corren en paralelo en el superstep 0 y Evidence Aggregation une.
+        ev = (
+            evaluate(catalog, Owner.CONTEXT, ctx)
+            .merge(evaluate(catalog, Owner.BEHAVIORAL, ctx))
+            .merge(evaluate(catalog, Owner.THREAT_INTEL, ctx))
         )
 
         salida[tx.transaction_id] = (
@@ -155,9 +198,12 @@ def main() -> int:
     perfiles = {p.customer_id: p for p in leer_perfiles()}
     transacciones = leer_transacciones()
     blacklist = frozenset(m.merchant_id for m in BLACKLIST)
+    indicadores = corpus_saturado(transacciones)
     esperado = leer_ground_truth()
 
-    obtenido = evaluar_todo(catalog, perfiles, transacciones, blacklist)
+    obtenido = evaluar_todo(
+        catalog, perfiles, transacciones, blacklist, indicadores
+    )
 
     # --- comparación --------------------------------------------------------
     tp = defaultdict(int)
@@ -201,11 +247,31 @@ def main() -> int:
     for code, n in sorted(señales.items(), key=lambda kv: -kv[1]):
         print(f"  {code:26s} {n:5d}")
 
+    # --- la invariante de FP-10, afirmada y no supuesta ---------------------
+    #
+    # FP-10 no tiene ground truth —el dataset no la contempla y no se regenera
+    # (ADR-0015)—, así que su ausencia de la tabla de arriba no prueba nada por
+    # sí sola. Lo que se afirma acá es más fuerte: con un indicador activo para
+    # **todos** los emisores, fechado hoy, sigue sin disparar.
+    fp10_disparo = sorted(
+        tid for tid, (pol, _, _) in obtenido.items() if "FP-10" in pol
+    )
+    print(
+        f"\nFP-10 · activa, sin ground truth · corpus saturado: "
+        f"{len(indicadores)} emisores fechados hoy"
+    )
+    if fp10_disparo:
+        print(f"  FALLA: disparó en {len(fp10_disparo)} transacciones "
+              f"(p. ej. {fp10_disparo[0]})")
+    else:
+        print("  no disparó: el dataset es de diciembre de 2025 y la ventana de "
+              "24 h se resuelve as-of contra el cargo")
+
     if args.detalle:
         for tid, esp, got in discrepancias:
             print(f"  {tid}: esperado={esp} obtenido={got}")
 
-    if discrepancias or decision_mal:
+    if discrepancias or decision_mal or fp10_disparo:
         print("\nFALLA: el motor no reproduce el ground truth")
         return 1
 

@@ -19,6 +19,9 @@ from zoneinfo import ZoneInfo
 from multiagent_fraud_detection.schemas.customer_behavior import CustomerBehaviorIn
 from multiagent_fraud_detection.schemas.merchant_blacklist import MerchantBlacklistIn
 from multiagent_fraud_detection.schemas.transaction import TransactionIn
+from multiagent_fraud_detection.schemas.web_search_allowlist import (
+    WebSearchAllowlistIn,
+)
 
 DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 
@@ -68,8 +71,6 @@ def leer_perfiles() -> list[CustomerBehaviorIn]:
                     timezone=fila["timezone"],
                     segment=fila["segment"],
                 )
-                # `issuer_bank` se descarta: era el insumo de FP-10, que quedó
-                # fuera de alcance. Se conserva en el CSV como dato de origen.
             )
 
     return perfiles
@@ -95,6 +96,7 @@ def leer_transacciones() -> list[TransactionIn]:
                 # Ya trae offset explícito (`+00:00`), a diferencia del perfil.
                 timestamp=datetime.fromisoformat(fila["timestamp"]),
                 merchant_id=fila["merchant_id"],
+                issuer_bank=fila["issuer_bank"] or None,
             )
             for fila in csv.DictReader(fh)
         ]
@@ -128,4 +130,27 @@ BLACKLIST = [
         reason="Comercio con reportes recurrentes de fraude (dataset sintético)",
         added_by="seed",
     )
+]
+
+# Supervisores y asociaciones bancarias, no blogs: son las fuentes cuya
+# publicación sobre un emisor es un hecho verificable, no una opinión.
+ALLOWLIST = [
+    WebSearchAllowlistIn(
+        domain="sbs.gob.pe",
+        reason=(
+            "Superintendencia de Banca, Seguros y AFP del Perú: regulador "
+            "bancario nacional, fuente primaria de alertas sobre entidades "
+            "supervisadas."
+        ),
+        added_by="seed",
+    ),
+    WebSearchAllowlistIn(
+        domain="asbanc.com.pe",
+        reason=(
+            "Asociación de Bancos del Perú: gremio bancario, publica alertas "
+            "de phishing y campañas de fraude dirigidas a clientes de sus "
+            "asociados."
+        ),
+        added_by="seed",
+    ),
 ]

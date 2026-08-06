@@ -20,8 +20,11 @@ transacción que *completa* el patrón lleva la etiqueta: cuando llegó la prime
 la ráfaga todavía no existía y APPROVE era la respuesta correcta. Es el mismo
 invariante que las consultas de historial del grafo tienen que respetar.
 
-FP-10 (alerta externa sobre el emisor/BIN) no se evalúa: su evidencia es
-búsqueda web real, no reproducible desde el dataset. El harness nunca la espera.
+FP-10 (alerta externa sobre el emisor/BIN) **no se etiqueta**, aunque desde
+ADR-0015 sí esté implementada y sea citable. El motivo ya no es que su evidencia
+no sea reproducible —ADR-0014 la congela— sino que este generador no se vuelve a
+correr: tocar su rama movería el stream aleatorio y cambiaría las 7 000 filas.
+FP-10 queda *activa y no medida*, y el harness nunca la espera.
 
 Columnas de salida:
     transaction_id      clave

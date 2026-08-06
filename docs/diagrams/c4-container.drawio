@@ -1,148 +1,149 @@
-<mxfile host="app.diagrams.net">
-  <diagram name="Página-1" id="dRtuS67UgYsgkpVd1u33">
-    <mxGraphModel dx="2470" dy="1103" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="900" math="0" shadow="0" adaptiveColors="auto">
-      <root>
-        <mxCell id="0" />
-        <mxCell id="1" parent="0" />
-        <mxCell id="title" parent="1" style="text;html=1;fontSize=20;fontStyle=1;align=left;verticalAlign=middle;" value="C4 — Vista Container · estado al cerrar &lt;b&gt;feature/policy-rag&lt;/b&gt;" vertex="1">
-          <mxGeometry height="30" width="900" x="-79" y="23" as="geometry" />
-        </mxCell>
-        <mxCell id="subtitle" parent="1" style="text;html=1;fontSize=12;fontStyle=2;align=left;verticalAlign=middle;" value="Verde = construido y verificado · Gris discontinuo = pendiente · Azul = externo" vertex="1">
-          <mxGeometry height="24" width="900" x="-79" y="51" as="geometry" />
-        </mxCell>
-        <mxCell id="a_gw" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="Pasarela de pagos&#xa;&#xa;sistema origen" vertex="1">
-          <mxGeometry height="80" width="160" x="-79" y="190" as="geometry" />
-        </mxCell>
-        <mxCell id="a_an" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;fillColor=#f5f5f5;strokeColor=#999999;dashed=1;fontColor=#666666;" value="Analista de fraude&#xa;&#xa;dashboard (polling)" vertex="1">
-          <mxGeometry height="80" width="160" x="-79" y="302" as="geometry" />
-        </mxCell>
-        <mxCell id="sys" parent="1" style="swimlane;startSize=34;html=1;fontSize=12;fontStyle=1;fillColor=#fafafa;strokeColor=#666666;dashed=1;" value="Sistema Multi-Agente de Detección de Fraude — un solo contenedor desplegable (monolito en-proceso, sin broker)" vertex="1">
-          <mxGeometry height="763" width="921" x="270" y="130" as="geometry" />
-        </mxCell>
-        <mxCell id="c_api" parent="sys" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=none;strokeColor=#999999;dashed=1;fontColor=#666666;" value="API FastAPI&#xa;&#xa;POST /cases · GET /cases&#xa;/health · /ready" vertex="1">
-          <mxGeometry height="100" width="200" x="30" y="50" as="geometry" />
-        </mxCell>
-        <mxCell id="c_graph" parent="sys" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=none;strokeColor=#999999;dashed=1;fontColor=#666666;" value="Grafo de agentes (LangGraph)&#xa;&#xa;Context · Behavioral · Policy RAG&#xa;Threat Intel · Aggregation&#xa;Debate · Arbiter · Explainability&#xa;+ checkpointer (HITL)" vertex="1">
-          <mxGeometry height="100" width="280" x="526" y="50" as="geometry" />
-        </mxCell>
-        <mxCell id="c_alembic" parent="sys" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#d5e8d4;strokeColor=#82b366;" value="&lt;b&gt;Alembic&lt;/b&gt;&lt;br&gt;sync · 12 migraciones" vertex="1">
-          <mxGeometry height="100" width="140" x="742" y="432" as="geometry" />
-        </mxCell>
-        <mxCell id="c_seed" value="&lt;b&gt;Job de seed&lt;/b&gt;&lt;br&gt;post-deploy · idempotente&lt;br&gt;dataset + catálogo + índice&lt;br&gt;&lt;i&gt;no aborta el rollout&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="sys"><mxGeometry x="742" y="292" width="140" height="110" as="geometry"/></mxCell>
-        <mxCell id="e_seed_db" value="seed.py (sin --reset)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;dashed=1;" edge="1" parent="sys" source="c_seed" target="c_db"><mxGeometry relative="1" as="geometry"/></mxCell>
-        <mxCell id="c_dom" parent="sys" style="swimlane;startSize=28;html=1;fontSize=11;fontStyle=1;fillColor=#e8f5e9;strokeColor=#82b366;" value="Dominio · recuperación · explicabilidad" vertex="1">
-          <mxGeometry height="188" width="823" x="49" y="232" as="geometry" />
-        </mxCell>
-        <mxCell id="d_pyd" parent="c_dom" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#d5e8d4;strokeColor=#82b366;align=left;spacingLeft=8;" value="schemas Pydantic (frontera)&#xa;&#xa;types.py: CountryCode · Money · Confidence&#xa;TransactionIn/Read · CustomerBehaviorIn/Read&#xa;DecisionRead · SignalRead · CaseDetail&#xa;CaseSummary · CaseCreated · Page[T]&#xa;HumanResolutionIn/Read" vertex="1">
-          <mxGeometry height="120" width="320" x="49" y="49" as="geometry" />
-        </mxCell>
-        <mxCell id="d_orm" parent="c_dom" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#d5e8d4;strokeColor=#82b366;align=left;spacingLeft=8;" value="&lt;b&gt;modelos ORM (SQLAlchemy 2.0 async)&lt;/b&gt;&lt;br&gt;12 tablas · el diagrama se genera&lt;br&gt;desde Base.metadata (data_model.png)" vertex="1">
-          <mxGeometry height="120" width="320" x="457" y="49" as="geometry" />
-        </mxCell>
-        <mxCell id="c_db" parent="sys" style="shape=cylinder3;boundedLbl=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#d5e8d4;strokeColor=#82b366;verticalAlign=middle;" value="&lt;b&gt;PostgreSQL 18 + pgvector&lt;/b&gt;&lt;br&gt;transacciones · casos · decisiones · señales · errores&lt;br&gt;gobernanza: merchant_blacklist · catálogo de políticas&lt;br&gt;&lt;b&gt;índice vectorial&lt;/b&gt; policy_chunks — sin poda: la búsqueda filtra por index_version&lt;br&gt;PENDIENTE: web_search_allowlist · checkpointer" vertex="1">
-          <mxGeometry height="130" width="700" x="91.5" y="611" as="geometry" />
-        </mxCell>
-        <mxCell id="x_llm" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=none;strokeColor=#999999;dashed=1;fontColor=#666666;" value="&lt;b&gt;Proveedores&lt;/b&gt;&lt;br&gt;Gemini · embeddings&lt;br&gt;(retrieval_index_version)&lt;br&gt;Anthropic · explicación&lt;br&gt;(explanation_prompt_version)" vertex="1">
-          <mxGeometry height="90" width="200" x="1421" y="185" as="geometry" />
-        </mxCell>
-        <mxCell id="x_web" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=none;strokeColor=#999999;dashed=1;fontColor=#666666;" value="Fuentes web externas&#xa;&#xa;búsqueda gobernada por&#xa;allowlist en tabla" vertex="1">
-          <mxGeometry height="90" width="200" x="1426" y="287" as="geometry" />
-        </mxCell>
-        <mxCell id="x_ls" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=none;strokeColor=#999999;dashed=1;fontColor=#666666;" value="LangSmith&#xa;&#xa;trazas · evals&#xa;entregables 6 y 7" vertex="1">
-          <mxGeometry height="90" width="200" x="1418" y="418" as="geometry" />
-        </mxCell>
-        <mxCell id="e_gw" edge="1" parent="1" source="a_gw" style="fontSize=10;strokeWidth=2;strokeColor=#6c8ebf;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="c_api" value="POST /cases&#xa;202 + case_id">
-          <mxGeometry relative="1" x="-0.0046" y="18" as="geometry">
-            <mxPoint as="offset" />
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="e_an" edge="1" parent="1" source="a_an" style="fontSize=10;strokeWidth=2;dashed=1;strokeColor=#999999;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="c_api" value="GET /cases (polling)&#xa;POST /resolution">
-          <mxGeometry relative="1" x="-0.4278" y="20" as="geometry">
-            <mxPoint as="offset" />
-            <Array as="points">
-              <mxPoint x="400" y="342" />
-            </Array>
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="e_api_graph" edge="1" parent="1" source="c_api" style="fontSize=10;strokeWidth=2;dashed=1;strokeColor=#999999;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="c_graph" value="dispara en&#xa;segundo plano">
-          <mxGeometry relative="1" x="-0.027" y="18" as="geometry">
-            <mxPoint as="offset" />
-            <Array as="points" />
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="e_api_dom" edge="1" parent="1" source="c_api" style="fontSize=10;strokeWidth=2;dashed=1;strokeColor=#999999;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="d_pyd" value="valida y serializa">
-          <mxGeometry relative="1" x="0.0718" y="53" as="geometry">
-            <mxPoint as="offset" />
-            <Array as="points">
-              <mxPoint x="528" y="230" />
-            </Array>
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="e_graph_dom" edge="1" parent="1" source="c_graph" style="fontSize=10;strokeWidth=2;dashed=1;strokeColor=#999999;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="d_orm" value="persiste el resultado">
-          <mxGeometry relative="1" x="-0.3435" y="51" as="geometry">
-            <mxPoint as="offset" />
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="e_dom_db" edge="1" parent="1" source="d_orm" style="fontSize=10;strokeWidth=2;strokeColor=#82b366;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="c_db" value="async · psycopg3">
-          <mxGeometry relative="1" x="0.3251" y="47" as="geometry">
-            <mxPoint as="offset" />
-            <Array as="points">
-              <mxPoint x="712" y="471" />
-            </Array>
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="e_al_db" edge="1" parent="1" source="c_alembic" style="fontSize=10;strokeWidth=2;strokeColor=#82b366;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;entryPerimeter=0;" target="c_db" value="upgrade head&#xa;(Job de pre-deploy)">
-          <mxGeometry relative="1" x="-0.3435" y="-50" as="geometry">
-            <mxPoint as="offset" />
-            <Array as="points">
-              <mxPoint x="1082" y="806" />
-            </Array>
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="e_g_llm" edge="1" parent="1" source="c_graph" style="strokeWidth=2;dashed=1;strokeColor=#999999;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="x_llm" value="">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-        <mxCell id="e_g_web" edge="1" parent="1" source="c_graph" style="strokeWidth=2;dashed=1;strokeColor=#999999;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" target="x_web" value="">
-          <mxGeometry relative="1" as="geometry">
-            <Array as="points">
-              <mxPoint x="1280" y="230" />
-              <mxPoint x="1280" y="332" />
-            </Array>
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="e_g_ls" edge="1" parent="1" source="c_graph" style="strokeWidth=2;dashed=1;strokeColor=#999999;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" target="x_ls" value="">
-          <mxGeometry relative="1" as="geometry">
-            <Array as="points">
-              <mxPoint x="1280" y="230" />
-              <mxPoint x="1280" y="463" />
-            </Array>
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="ci" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=none;strokeColor=#999999;dashed=1;fontColor=#666666;" value="&lt;b&gt;CI — mío&lt;/b&gt;&lt;br&gt;lint → pytest → check_policies&lt;br&gt;→ diagrama --check → alembic check&lt;br&gt;→ build → push" vertex="1">
-          <mxGeometry height="70" width="290" x="192" y="971" as="geometry" />
-        </mxCell>
-        <mxCell id="ghcr" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;" value="&lt;b&gt;GHCR&lt;/b&gt;&lt;br&gt;tags legibles (semver, sha)&lt;br&gt;&lt;b&gt;EL HAND-OFF ES EL DIGEST&lt;/b&gt;" vertex="1">
-          <mxGeometry height="70" width="220" x="639" y="971" as="geometry" />
-        </mxCell>
-        <mxCell id="cd" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=none;strokeColor=#999999;dashed=1;fontColor=#666666;" value="CD — compañero&#xa;Terraform · rollout · secretos · migración" vertex="1">
-          <mxGeometry height="70" width="290" x="1062" y="971" as="geometry" />
-        </mxCell>
-        <mxCell id="e_ci" edge="1" parent="1" source="ci" style="fontSize=10;strokeWidth=2;dashed=1;strokeColor=#999999;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="ghcr" value="push">
-          <mxGeometry relative="1" x="0.0191" y="17" as="geometry">
-            <mxPoint as="offset" />
-            <Array as="points" />
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="e_cd" edge="1" parent="1" source="ghcr" style="fontSize=10;strokeWidth=2;dashed=1;strokeColor=#999999;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="cd" value="pull por &lt;b&gt;digest&lt;/b&gt;&lt;br&gt;ghcr.io/…@sha256:…">
-          <mxGeometry relative="1" x="0.0246" y="18" as="geometry">
-            <mxPoint as="offset" />
-            <Array as="points" />
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="n_next" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;align=left;spacingLeft=10;fillColor=#fff2cc;strokeColor=#d6b656;verticalAlign=middle;" value="&lt;b&gt;SIGUIENTE ETAPA: agentes con LLM&lt;/b&gt;&lt;br&gt;&lt;br&gt;Debate ×2 y Arbiter agéntico. El determinístico ya es el brazo de control (ADR-0006).&lt;br&gt;&lt;br&gt;Decidir primero: &lt;b&gt;qué hace el Arbiter con LLM que el determinístico no hace&lt;/b&gt;. Si sólo lo imita, no hay nada que medir.&lt;br&gt;&lt;br&gt;Y el muestreo: 4 llamadas por caso no corren sobre 7 000." vertex="1">
-          <mxGeometry height="220" width="200" x="-99" y="512" as="geometry" />
-        </mxCell>
-      </root>
-    </mxGraphModel>
-  </diagram>
+<mxfile host="65bd71144e">
+    <diagram name="Página-1" id="dRtuS67UgYsgkpVd1u33">
+        <mxGraphModel dx="2121" dy="230" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="900" math="0" shadow="0" adaptiveColors="auto">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="title" value="C4 — Vista Container · estado al cerrar &lt;b&gt;feature/threat-intel&lt;/b&gt;" style="text;html=1;fontSize=20;fontStyle=1;align=left;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="-79" y="23" width="900" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="subtitle" value="Verde = construido y verificado · Gris discontinuo = pendiente · Azul = externo" style="text;html=1;fontSize=12;fontStyle=2;align=left;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="-79" y="51" width="900" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="a_gw" value="Pasarela de pagos&#xa;&#xa;sistema origen" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="1" vertex="1">
+                    <mxGeometry x="-79" y="190" width="160" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="a_an" value="Analista de fraude&#xa;&#xa;dashboard (polling)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;fillColor=#f5f5f5;strokeColor=#999999;dashed=1;fontColor=#666666;" parent="1" vertex="1">
+                    <mxGeometry x="-79" y="302" width="160" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="sys" value="Sistema Multi-Agente de Detección de Fraude — un solo contenedor desplegable (monolito en-proceso, sin broker)" style="swimlane;startSize=34;html=1;fontSize=12;fontStyle=1;fillColor=#fafafa;strokeColor=#666666;dashed=1;" parent="1" vertex="1">
+                    <mxGeometry x="270" y="130" width="973" height="763" as="geometry"/>
+                </mxCell>
+                <mxCell id="c_api" value="API FastAPI&#xa;&#xa;POST /cases · GET /cases&#xa;/health · /ready" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=none;strokeColor=#999999;dashed=1;fontColor=#666666;" parent="sys" vertex="1">
+                    <mxGeometry x="30" y="50" width="200" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="c_graph" value="Grafo de agentes (LangGraph)&#xa;&#xa;Context · Behavioral · Policy RAG&#xa;Threat Intel · Aggregation&#xa;Debate · Arbiter · Explainability&#xa;+ checkpointer (HITL)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=none;strokeColor=#999999;dashed=1;fontColor=#666666;" parent="sys" vertex="1">
+                    <mxGeometry x="526" y="50" width="280" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="c_alembic" value="&lt;b&gt;Alembic&lt;/b&gt;&lt;br&gt;sync · 15 migraciones" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#d5e8d4;strokeColor=#82b366;" parent="sys" vertex="1">
+                    <mxGeometry x="771" y="463" width="140" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_seed_db" value="seed.py (sin --reset)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;dashed=1;" parent="sys" source="c_seed" target="c_db" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="852" y="450"/>
+                            <mxPoint x="443" y="450"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="c_dom" value="Dominio · recuperación · explicabilidad" style="swimlane;startSize=28;html=1;fontSize=11;fontStyle=1;fillColor=#e8f5e9;strokeColor=#82b366;" parent="sys" vertex="1">
+                    <mxGeometry x="49" y="232" width="924" height="188" as="geometry"/>
+                </mxCell>
+                <mxCell id="d_pyd" value="schemas Pydantic (frontera)&#xa;&#xa;types.py: CountryCode · Money · Confidence&#xa;TransactionIn/Read · CustomerBehaviorIn/Read&#xa;DecisionRead · SignalRead · CaseDetail&#xa;CaseSummary · CaseCreated · Page[T]&#xa;HumanResolutionIn/Read" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#d5e8d4;strokeColor=#82b366;align=left;spacingLeft=8;" parent="c_dom" vertex="1">
+                    <mxGeometry x="49" y="49" width="320" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="d_orm" value="&lt;b&gt;modelos ORM (SQLAlchemy 2.0 async)&lt;/b&gt;&lt;br&gt;14 tablas · el diagrama se genera&lt;br&gt;desde Base.metadata (data_model.png)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#d5e8d4;strokeColor=#82b366;align=left;spacingLeft=8;" parent="c_dom" vertex="1">
+                    <mxGeometry x="401" y="37" width="320" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="c_seed" value="&lt;b&gt;Job de seed&lt;/b&gt;&lt;br&gt;post-deploy · idempotente&lt;br&gt;dataset + catálogo + índice&lt;br&gt;&lt;i&gt;no aborta el rollout&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#d5e8d4;strokeColor=#82b366;" parent="c_dom" vertex="1">
+                    <mxGeometry x="733" y="42" width="140" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="c_db" value="&lt;b&gt;PostgreSQL 18 + pgvector&lt;/b&gt;&lt;br&gt;transacciones · casos · decisiones · señales · errores&lt;br&gt;gobernanza: merchant_blacklist · web_search_allowlist · catálogo de políticas&lt;br&gt;&lt;b&gt;índice vectorial&lt;/b&gt; policy_chunks — sin poda: la búsqueda filtra por index_version&lt;br&gt;&lt;b&gt;threat_indicators&lt;/b&gt; — snapshot congelado, sin poda: filtra por snapshot_version&lt;br&gt;PENDIENTE: checkpointer" style="shape=cylinder3;boundedLbl=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#d5e8d4;strokeColor=#82b366;verticalAlign=middle;" parent="sys" vertex="1">
+                    <mxGeometry x="93" y="617" width="700" height="130" as="geometry"/>
+                </mxCell>
+                <mxCell id="x_llm" value="&lt;b&gt;Proveedores&lt;/b&gt;&lt;br&gt;Gemini · embeddings&lt;br&gt;(retrieval_index_version)&lt;br&gt;Anthropic · explicación&lt;br&gt;(explanation_prompt_version)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=none;strokeColor=#999999;dashed=1;fontColor=#666666;" parent="1" vertex="1">
+                    <mxGeometry x="1421" y="185" width="200" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="x_web" value="Fuentes web externas&#xa;&#xa;consultadas en BUILD, nunca en&#xa;runtime (ADR-0014) · gobernadas&#xa;por allowlist en tabla · congeladas&#xa;en threat_indicators" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=none;strokeColor=#999999;dashed=1;fontColor=#666666;" parent="1" vertex="1">
+                    <mxGeometry x="1426" y="287" width="200" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="x_ls" value="LangSmith&#xa;&#xa;trazas · evals&#xa;entregables 6 y 7" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=none;strokeColor=#999999;dashed=1;fontColor=#666666;" parent="1" vertex="1">
+                    <mxGeometry x="1418" y="418" width="200" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_gw" value="POST /cases&#xa;202 + case_id" style="fontSize=10;strokeWidth=2;strokeColor=#6c8ebf;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="a_gw" target="c_api" edge="1">
+                    <mxGeometry x="-0.0046" y="18" relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e_an" value="GET /cases (polling)&#xa;POST /resolution" style="fontSize=10;strokeWidth=2;dashed=1;strokeColor=#999999;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="a_an" target="c_api" edge="1">
+                    <mxGeometry x="-0.4278" y="20" relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                        <Array as="points">
+                            <mxPoint x="400" y="342"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e_api_graph" value="dispara en&#xa;segundo plano" style="fontSize=10;strokeWidth=2;dashed=1;strokeColor=#999999;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="c_api" target="c_graph" edge="1">
+                    <mxGeometry x="-0.027" y="18" relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                        <Array as="points"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e_api_dom" value="valida y serializa" style="fontSize=10;strokeWidth=2;dashed=1;strokeColor=#999999;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="c_api" target="d_pyd" edge="1">
+                    <mxGeometry x="0.0718" y="53" relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                        <Array as="points">
+                            <mxPoint x="528" y="230"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e_graph_dom" value="persiste el resultado" style="fontSize=10;strokeWidth=2;dashed=1;strokeColor=#999999;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="c_graph" target="d_orm" edge="1">
+                    <mxGeometry x="-0.3435" y="51" relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e_dom_db" value="async · psycopg3" style="fontSize=10;strokeWidth=2;strokeColor=#82b366;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="d_orm" target="c_db" edge="1">
+                    <mxGeometry x="0.3251" y="47" relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                        <Array as="points">
+                            <mxPoint x="712" y="471"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e_al_db" value="upgrade head&#xa;(Job de pre-deploy)" style="fontSize=10;strokeWidth=2;strokeColor=#82b366;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;entryPerimeter=0;" parent="1" source="c_alembic" target="c_db" edge="1">
+                    <mxGeometry x="-0.5329" y="-51" relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                        <Array as="points">
+                            <mxPoint x="1111" y="812"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e_g_llm" value="" style="strokeWidth=2;dashed=1;strokeColor=#999999;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="c_graph" target="x_llm" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_g_ls" value="" style="strokeWidth=2;dashed=1;strokeColor=#999999;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" parent="1" source="c_graph" target="x_ls" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="1280" y="230"/>
+                            <mxPoint x="1280" y="463"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="ci" value="&lt;b&gt;CI — mío&lt;/b&gt;&lt;br&gt;lint → pytest → check_policies&lt;br&gt;→ diagrama --check → alembic check&lt;br&gt;→ build → push" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=none;strokeColor=#999999;dashed=1;fontColor=#666666;" parent="1" vertex="1">
+                    <mxGeometry x="192" y="971" width="290" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="ghcr" value="&lt;b&gt;GHCR&lt;/b&gt;&lt;br&gt;tags legibles (semver, sha)&lt;br&gt;&lt;b&gt;EL HAND-OFF ES EL DIGEST&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="639" y="971" width="220" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="cd" value="CD — compañero&#xa;Terraform · rollout · secretos · migración" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=none;strokeColor=#999999;dashed=1;fontColor=#666666;" parent="1" vertex="1">
+                    <mxGeometry x="1062" y="971" width="290" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_ci" value="push" style="fontSize=10;strokeWidth=2;dashed=1;strokeColor=#999999;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="ci" target="ghcr" edge="1">
+                    <mxGeometry x="0.0191" y="17" relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                        <Array as="points"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e_cd" value="pull por &lt;b&gt;digest&lt;/b&gt;&lt;br&gt;ghcr.io/…@sha256:…" style="fontSize=10;strokeWidth=2;dashed=1;strokeColor=#999999;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="ghcr" target="cd" edge="1">
+                    <mxGeometry x="0.0246" y="18" relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                        <Array as="points"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="n_next" value="&lt;b&gt;SIGUIENTE ETAPA: agentes con LLM&lt;/b&gt;&lt;br&gt;&lt;br&gt;Debate ×2 y Arbiter agéntico. El determinístico ya es el brazo de control (ADR-0006).&lt;br&gt;&lt;br&gt;Decidir primero: &lt;b&gt;qué hace el Arbiter con LLM que el determinístico no hace&lt;/b&gt;. Si sólo lo imita, no hay nada que medir.&lt;br&gt;&lt;br&gt;Y el muestreo: 4 llamadas por caso no corren sobre 7 000." style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;align=left;spacingLeft=10;fillColor=#fff2cc;strokeColor=#d6b656;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="-99" y="512" width="200" height="220" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
 </mxfile>

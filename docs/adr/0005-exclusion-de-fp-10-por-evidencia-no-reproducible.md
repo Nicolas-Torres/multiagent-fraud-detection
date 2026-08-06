@@ -1,6 +1,6 @@
 # ADR-0005: se excluye FP-10 porque su evidencia no es reproducible
 
-- **Estado**: aceptado
+- **Estado**: reemplazado por [ADR-0015](0015-la-evidencia-externa-entra-al-veredicto-por-el-vocabulario-del-catalogo.md)
 - **Fecha**: 2026-08-02
 
 ## Contexto

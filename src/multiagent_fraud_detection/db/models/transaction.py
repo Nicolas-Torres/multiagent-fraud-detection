@@ -31,6 +31,13 @@ class Transaction(Base):
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     merchant_id: Mapped[str] = mapped_column(String)
 
+    # Insumo de FP-10 (ADR-0015): el predicado `issuer_under_alert` lo compara
+    # contra `threat_indicators` de tipo `ISSUER`. Nullable porque no todo
+    # emisor del dataset está en el corpus de amenazas, y una transacción sin
+    # ese dato tiene que poder insertarse igual — mismo criterio que
+    # `customer_id` sin perfil.
+    issuer_bank: Mapped[str | None] = mapped_column(String(16))
+
     # Dos índices porque hay **dos ejes de acceso**, no uno.
     #
     # Por cliente: FP-04 (card testing), FP-05 (geolocalización imposible) y
