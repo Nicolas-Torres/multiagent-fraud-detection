@@ -14,9 +14,9 @@ Leer los dos antes de tocar código: acá está el orden, no el porqué.
 
 | # | Paso | Estado |
 |---|---|---|
-| 1 | Tabla `threat_indicators` | 🟡 migración generada y revisada, falta aplicar |
+| 1 | Tabla `threat_indicators` | ✅ migración aplicada (`alembic current` = head) |
 | 2 | Enforcement del allowlist | ✅ 15 tests verdes |
-| 3 | Puerto `Searcher` | ⬜ |
+| 3 | Puerto `Searcher` | ✅ 18 tests verdes |
 | 4 | `web_search_allowlist` + `issuer_bank` | ⬜ |
 | 5 | Caché de indicadores en `GraphContext` | ⬜ |
 | 6 | `fetch_threat_intel.py` | ⬜ |

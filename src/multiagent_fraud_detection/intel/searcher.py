@@ -24,6 +24,7 @@ un resumen redactado. Nada generado entra al rastro de auditoría.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import date, datetime
 from typing import Any, Protocol
 
 from multiagent_fraud_detection.config.settings import settings
@@ -31,6 +32,12 @@ from multiagent_fraud_detection.intel.snapshot import MODEL
 
 MAX_USES = 3
 MAX_TOKENS = 1024
+
+# El único formato que la API documenta y ejemplifica para `page_age`
+# ("April 30, 2025"). No hay garantía de que sea el único que el proveedor
+# produzca: ante cualquier otra forma, `parse_page_age` rechaza en vez de
+# adivinar.
+_PAGE_AGE_FORMAT = "%B %d, %Y"
 
 
 class SearchError(Exception):
@@ -146,6 +153,22 @@ def _extraer(respuesta: Any) -> tuple[SearchResult, ...]:
             )
 
     return tuple(salida)
+
+
+def parse_page_age(page_age: str | None) -> date | None:
+    """La fecha de publicación de la fuente, o `None` si no se puede leer.
+
+    Estricto a propósito: adivinar un formato distinto al documentado
+    arriesga leer mal la fecha que evalúa la ventana de 24h de FP-10. El
+    llamador (`fetch_threat_intel.py`) rechaza la fila cuando esto da `None`.
+    """
+    if not page_age:
+        return None
+
+    try:
+        return datetime.strptime(page_age.strip(), _PAGE_AGE_FORMAT).date()
+    except ValueError:
+        return None
 
 
 @dataclass
