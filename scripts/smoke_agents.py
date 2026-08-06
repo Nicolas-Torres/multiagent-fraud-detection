@@ -122,7 +122,10 @@ async def main() -> int:
         resumen = ", ".join(
             f"{k}:{min(args.por_politica, len(v))}" for k, v in sorted(estratos.items())
         )
-        print(f"  estratos → {resumen}")
+        # `->` y no `→`: la consola de Windows es cp1252 y U+2192 no existe
+        # ahi, asi que el `print` levanta UnicodeEncodeError y tumba el smoke
+        # entero justo al final. Es el unico caracter del repo con ese problema.
+        print(f"  estratos -> {resumen}")
 
     fallos = []
     sin_perfil = 0

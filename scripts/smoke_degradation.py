@@ -126,8 +126,14 @@ async def verificar_degradacion_en_el_grafo() -> None:
     print(f"  ok - la falla llego como evidencia: {errores[0].agent}"
           f" / {errores[0].error_type}")
 
+    # Se afirma **quien** aporto, no cuantas senales salieron: el conteo depende
+    # del catalogo —FP-07 gano un conjunto y la cuenta paso de 2 a 3 sin que
+    # nada se rompiera— y un numero magico convierte cada cambio de catalogo en
+    # un smoke rojo que no dice nada. Lo que este smoke vino a probar es que los
+    # hermanos del superstep conservaron su aporte pese a la caida del tercero.
+    emisores = {s.emitted_by for s in estado["signals"]}
+    assert emisores == {CONTEXT, BEHAVIORAL}, f"los hermanos perdieron su aporte: {emisores}"
     codigos = [s.code for s in estado["signals"]]
-    assert len(codigos) == 2, f"los hermanos perdieron su aporte: {codigos}"
     print(f"  ok - los hermanos del superstep conservaron sus {len(codigos)} senales")
 
     ruta = estado["agent_route"]
