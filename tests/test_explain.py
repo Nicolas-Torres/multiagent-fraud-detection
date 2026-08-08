@@ -243,5 +243,24 @@ def test_la_auditoria_sin_evidencia_externa_no_menciona_el_parrafo():
     assert "Evidencia externa" not in build_audit_explanation(estado())
 
 
+def test_la_auditoria_nombra_los_dos_argumentos_del_debate():
+    """ADR-0016: el analista tiene que poder leer qué vio el Arbiter, no sólo
+    el resumen de `confidence_rationale`."""
+    texto = build_audit_explanation(
+        estado(
+            pro_fraud_argument="la velocidad del dispositivo es atípica",
+            pro_customer_argument="ninguna otra señal la corrobora",
+        )
+    )
+    assert "Debate" in texto
+    assert "la velocidad del dispositivo es atípica" in texto
+    assert "ninguna otra señal la corrobora" in texto
+
+
+def test_la_auditoria_sin_debate_no_menciona_el_parrafo():
+    """Un caso que no llegó a debate no tiene qué mostrar ahí."""
+    assert "Debate" not in build_audit_explanation(estado())
+
+
 def test_el_narrador_falso_no_se_disfraza_de_real():
     assert FakeNarrator().narrate("s", "u") == "[explicación de prueba]"

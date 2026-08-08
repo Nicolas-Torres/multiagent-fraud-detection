@@ -23,10 +23,10 @@ sellos que justifique el eje nuevo.
 
 | # | Paso | Estado |
 |---|---|---|
-| 1 | Prompts de debate (reutilizan `Narrator`) | ⬜ |
-| 2 | Nodo de debate real | ⬜ |
-| 3 | Puerto `Judge` + prompt del Arbiter | ⬜ |
-| 4 | Nodo `decision_arbiter` real + cuarta guarda de W2 | ⬜ |
+| 1 | Prompts de debate (reutilizan `Narrator`) | ✅ |
+| 2 | Nodo de debate real | ✅ |
+| 3 | Puerto `Judge` + prompt del Arbiter | ✅ |
+| 4 | Nodo `decision_arbiter` real + cuarta guarda de W2 | ✅ |
 | 5 | Auditoría: párrafo de debate | ⬜ |
 | 6 | Golden set + evaluación DeepEval (deuda de ADR-0013) | ⬜ |
 | 7 | Cierre documental | ⬜ |

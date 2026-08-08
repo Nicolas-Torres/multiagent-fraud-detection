@@ -97,6 +97,18 @@ def build_audit_explanation(state: dict[str, Any]) -> str:
         )
         lineas.append(f"Evidencia externa: {detalle}.")
 
+    # Los dos argumentos que el Arbiter tuvo para decidir (ADR-0016). Sólo
+    # cuando los dos están presentes: un caso que no llegó a debate no tiene
+    # qué mostrar acá, y mostrar uno solo sugeriría que el otro se omitió a
+    # propósito.
+    pro_fraude = state.get("pro_fraud_argument")
+    pro_cliente = state.get("pro_customer_argument")
+    if pro_fraude and pro_cliente:
+        lineas.append(
+            f"Debate: a favor de la cautela, {pro_fraude!r}; a favor de la "
+            f"legitimidad, {pro_cliente!r}."
+        )
+
     riesgo = state.get("risk_score")
     base = state.get("base_confidence")
     confianza = state.get("confidence")
