@@ -139,7 +139,9 @@ def test_aprobar_sin_citas_es_valido():
     """El caso que la redacción anterior hacía imposible."""
     from multiagent_fraud_detection.graph.nodes import _verificar_invariantes
 
-    _verificar_invariantes(_estado(DecisionType.APPROVE, policies=[], citations=[]))
+    _verificar_invariantes(
+        _estado(DecisionType.APPROVE, policies=[], citations=[]), catalogo()
+    )
 
 
 def test_bloquear_sin_respaldo_levanta():
@@ -147,7 +149,7 @@ def test_bloquear_sin_respaldo_levanta():
 
     with pytest.raises(ValueError, match="FP-03"):
         _verificar_invariantes(
-            _estado(DecisionType.BLOCK, policies=["FP-03"], citations=[])
+            _estado(DecisionType.BLOCK, policies=["FP-03"], citations=[]), catalogo()
         )
 
 
@@ -161,7 +163,8 @@ def test_bloquear_citando_otra_norma_levanta():
                 DecisionType.BLOCK,
                 policies=["FP-03"],
                 citations=[cita("FP-05", "FP-05:2025.1:0")],
-            )
+            ),
+            catalogo(),
         )
 
 
@@ -169,5 +172,53 @@ def test_escalar_queda_exento():
     from multiagent_fraud_detection.graph.nodes import _verificar_invariantes
 
     _verificar_invariantes(
-        _estado(DecisionType.ESCALATE_TO_HUMAN, policies=["FP-03"], citations=[])
+        _estado(DecisionType.ESCALATE_TO_HUMAN, policies=["FP-03"], citations=[]),
+        catalogo(),
+    )
+
+
+# --------------------------------------------------------------------------- #
+# La cuarta guarda (ADR-0016): el Arbiter no puede bajar del piso
+# --------------------------------------------------------------------------- #
+
+
+def test_veredicto_por_debajo_del_piso_levanta():
+    """FP-03 prescribe BLOCK; el Arbiter no puede aprobar aunque cite bien."""
+    from multiagent_fraud_detection.graph.nodes import _verificar_invariantes
+
+    with pytest.raises(ValueError, match="por debajo del piso"):
+        _verificar_invariantes(
+            _estado(
+                DecisionType.APPROVE,
+                policies=["FP-03"],
+                citations=[cita("FP-03", "FP-03:2025.1:0")],
+            ),
+            catalogo(),
+        )
+
+
+def test_veredicto_por_encima_del_piso_es_valido():
+    """FP-01 prescribe CHALLENGE; el Arbiter puede escalar a BLOCK."""
+    from multiagent_fraud_detection.graph.nodes import _verificar_invariantes
+
+    _verificar_invariantes(
+        _estado(
+            DecisionType.BLOCK,
+            policies=["FP-01"],
+            citations=[cita("FP-01", "FP-01:2025.1:0")],
+        ),
+        catalogo(),
+    )
+
+
+def test_veredicto_igual_al_piso_es_valido():
+    from multiagent_fraud_detection.graph.nodes import _verificar_invariantes
+
+    _verificar_invariantes(
+        _estado(
+            DecisionType.CHALLENGE,
+            policies=["FP-01"],
+            citations=[cita("FP-01", "FP-01:2025.1:0")],
+        ),
+        catalogo(),
     )
