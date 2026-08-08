@@ -6,7 +6,7 @@ vivo tiene siempre la versión vigente; su encabezado dice cuál es.
 Para recuperar el texto completo de una versión anterior:
 
 ```bash
-git show contrato-v0.7:docs/contrato_de_interfaz.md
+git show contrato-v0.8:docs/contrato_de_interfaz.md
 ```
 
 > Las versiones 0.1 y 0.2 son anteriores a que el contrato entrara a control de
@@ -18,6 +18,32 @@ git show contrato-v0.7:docs/contrato_de_interfaz.md
 
 Sin enmiendas acumuladas. Las próximas se anotan en
 [`enmiendas_pendientes.md`](enmiendas_pendientes.md).
+
+---
+
+## [0.9] — El Arbiter con LLM escala el piso determinista, nunca lo cruza
+
+Dos enmiendas, las dos salidas de reemplazar los stubs de `debate_pro_fraud`,
+`debate_pro_customer` y `decision_arbiter` por los nodos reales (ADR-0016). Sin
+migraciones: no se agregó ningún sello nuevo esta versión.
+
+| # | Enmienda | Toca | Por qué |
+|---|---|---|---|
+| 1 | §7.3 gana una **cuarta guarda de W2** | §7.3 | `decision != ESCALATE_TO_HUMAN` ⟹ `precedencia(decision) >= precedencia(prescribed_action(...))`. Las tres guardas existentes exigían citación y `base_confidence`, ninguna comparaba el veredicto contra lo que el catálogo prescribe — el Arbiter con LLM puede escalar ese piso, nunca bajarlo, y hasta ahora nada lo hacía cumplir estructuralmente. |
+| 2 | §7.3 corrige la descripción de `confidence`: **sin delta acotado** | §7.3 | v0.2–v0.8 anticipaban que el Arbiter movería `confidence` "dentro de un delta acotado" respecto de `base_confidence`. Lo que ADR-0016 implementó es más simple: el Arbiter con LLM elige cualquier valor en `[0, 1]`, y lo único que el sistema exige es la justificación cuando difiere del base. La cota está en la obligación de explicar, no en la magnitud del cambio. |
+
+**Deliberadamente afuera de esta versión**: `arbiter_prompt_version` y
+`debate_prompt_version` — un sexto y séptimo eje de auditoría, mismo criterio
+que `explanation_prompt_version`, quedan para cuando haya uso real de esos
+sellos que justifique el eje nuevo. La evaluación de calidad del juicio del
+Arbiter (DeepEval sobre un golden set) es deuda de
+[ADR-0013](adr/0013-que-se-mide-con-metricas-duras-y-que-con-llm-as-judge.md)
+pagada esta etapa; no toca el contrato porque reporta, no bloquea, y no agrega
+ni cambia ningún campo persistido.
+
+Detrás: [ADR-0006](adr/0006-reparto-deterministico-y-llm.md),
+[ADR-0016](adr/0016-el-arbitro-con-llm-escala-pero-no-cruza-el-piso-determinista.md)
+y el acta [`reviews/08-llm-agents.md`](reviews/08-llm-agents.md).
 
 ---
 
