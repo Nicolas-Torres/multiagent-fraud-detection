@@ -10,7 +10,7 @@ haberlo levantado mal.
 Requiere `seed.py` corrido —el índice tiene que existir— y `GEMINI_API_KEY` para
 el escenario 2.
 
-## Los tres escenarios
+## Los cinco escenarios
 
 | # | Situación | Qué prueba |
 |---|---|---|
@@ -18,6 +18,7 @@ el escenario 2.
 | 2 | Dispara FP-03 | Que un veredicto autónomo cita la norma que lo autoriza |
 | 3 | Dispara FP-03 y el proveedor de embeddings está caído | Que el veredicto sobrevive sin descubrimiento |
 | 4 | El caso limpio, con una alerta sobre su emisor | Que la inteligencia externa cambia un veredicto, no sólo la confianza (ADR-0015) |
+| 5 | Dispara sólo FP-10, con `NO_CUSTOMER_PROFILE` como señal aislada | Que el Arbiter LLM no baja del piso, y que cualquier escalada queda justificada (ADR-0016) |
 
 El tercero es el que justifica el diseño del nodo. Si `@degrades` fuera la única
 red, una caída del proveedor se llevaría también el bloque de autorización y
@@ -30,6 +31,13 @@ fuera un caso nuevo, "cambió de APPROVE a CHALLENGE" sería sólo una afirmaci�
 sobre dos casos distintos. Reprocesar el mismo `case_id` con un indicador nuevo
 es la demostración real —y de paso, otra vez reemplazo del agregado, no
 acumulación.
+
+El quinto es el único donde el veredicto final no es 100% predecible: desde
+que `decision_arbiter` dejó de ser un stub determinista (ADR-0016), lo único
+que este script puede afirmar sobre los escenarios 1 y 4 —y sobre este— es
+que el Arbiter LLM no baje del piso, no que coincida con él. Los escenarios 2
+y 3 siguen comparando por igualdad porque su piso es `BLOCK`, el techo de la
+escala: no hay a dónde escalar, así que ahí la igualdad no puede ser flaky.
 
 ## Por qué el cliente no tiene perfil
 
@@ -55,6 +63,8 @@ from sqlalchemy import delete, select
 
 from multiagent_fraud_detection.db.models import Case, Decision, ThreatIndicator, Transaction
 from multiagent_fraud_detection.db.session import AsyncSessionLocal
+from multiagent_fraud_detection.domain.engine import prescribed_action
+from multiagent_fraud_detection.domain.params import precedencia
 from multiagent_fraud_detection.enums import CaseStatus, Channel, DecisionType, IndicatorType
 from multiagent_fraud_detection.graph.builder import build_graph
 from multiagent_fraud_detection.graph.context import GraphContext
@@ -64,10 +74,12 @@ from multiagent_fraud_detection.schemas.transaction import TransactionIn
 
 CASO_LIMPIO = UUID("00000000-0000-0000-0000-0000000000d1")
 CASO_BLOQUEO = UUID("00000000-0000-0000-0000-0000000000d2")
+CASO_JUICIO = UUID("00000000-0000-0000-0000-0000000000d3")
 
 TX_LIMPIA = "T-SMOKE-DEC-CLEAN"
 TX_BLOQUEO = "T-SMOKE-DEC-BURST-4"
 TX_PREVIAS = [f"T-SMOKE-DEC-BURST-{i}" for i in (1, 2, 3)]
+TX_JUICIO = "T-SMOKE-DEC-JUICIO"
 
 CLIENTE = "CU-SMOKE-DEC"
 DISPOSITIVO = "D-SMOKE-DEC"
@@ -104,6 +116,9 @@ def tx(
 # lo reutiliza para demostrar que sembrar una sí lo hace.
 EMISOR_SMOKE = "SMOKE-BANK"
 
+# Emisor propio del escenario 5, para no acoplar su limpieza a la del 4.
+EMISOR_JUICIO = "SMOKE-JUICIO"
+
 TRANSACCIONES = {
     TX_LIMPIA: tx(
         TX_LIMPIA, minuto=0, monto="50.00", device="D-SMOKE-OTRO",
@@ -116,6 +131,15 @@ TRANSACCIONES = {
     # Cuarta del mismo dispositivo dentro de la ventana de 5 minutos: con las
     # tres anteriores completa el `min_count=4` de FP-03.
     TX_BLOQUEO: tx(TX_BLOQUEO, minuto=13, monto="60.00", device=DISPOSITIVO),
+    # Sin perfil de cliente -mismo motivo que el resto del script- y con un
+    # emisor bajo alerta: dispara sólo FP-10 (piso CHALLENGE), y deja
+    # `NO_CUSTOMER_PROFILE` como señal aislada que el piso no ve pero el
+    # Arbiter sí. Dispositivo y horario propios para no interferir con la
+    # ventana de velocity de los otros escenarios.
+    TX_JUICIO: tx(
+        TX_JUICIO, minuto=120, monto="80.00", device="D-SMOKE-DEC-JUICIO",
+        issuer_bank=EMISOR_JUICIO,
+    ),
 }
 
 
@@ -123,7 +147,9 @@ async def limpiar() -> None:
     async with AsyncSessionLocal() as session:
         async with session.begin():
             await session.execute(
-                delete(Case).where(Case.case_id.in_([CASO_LIMPIO, CASO_BLOQUEO]))
+                delete(Case).where(
+                    Case.case_id.in_([CASO_LIMPIO, CASO_BLOQUEO, CASO_JUICIO])
+                )
             )
             await session.execute(
                 delete(Transaction).where(
@@ -131,7 +157,9 @@ async def limpiar() -> None:
                 )
             )
             await session.execute(
-                delete(ThreatIndicator).where(ThreatIndicator.value == EMISOR_SMOKE)
+                delete(ThreatIndicator).where(
+                    ThreatIndicator.value.in_([EMISOR_SMOKE, EMISOR_JUICIO])
+                )
             )
 
 
@@ -152,6 +180,13 @@ async def sembrar() -> None:
                 Case(
                     case_id=CASO_BLOQUEO,
                     transaction_id=TX_BLOQUEO,
+                    status=CaseStatus.ANALYZING,
+                )
+            )
+            session.add(
+                Case(
+                    case_id=CASO_JUICIO,
+                    transaction_id=TX_JUICIO,
                     status=CaseStatus.ANALYZING,
                 )
             )
@@ -200,13 +235,30 @@ async def main() -> int:
     if decision is None:
         problemas.append("el caso limpio no dejó fila en `decisions`")
     else:
-        if decision.decision is not DecisionType.APPROVE:
+        # El piso sin políticas disparadas es APPROVE, pero el Arbiter LLM
+        # puede escalarlo con justificación (ADR-0016): lo único garantizado
+        # estructuralmente es que no baje, así que comparar por igualdad
+        # estricta haría flaky este smoke ante una escalada legítima.
+        if precedencia(decision.decision) < precedencia(DecisionType.APPROVE):
             problemas.append(
-                f"sin políticas disparadas se esperaba APPROVE y llegó "
-                f"{decision.decision.value}"
+                f"sin políticas disparadas el piso es APPROVE y llegó "
+                f"{decision.decision.value}, por debajo"
             )
-        if caso.status is not CaseStatus.DECIDED:
-            problemas.append(f"el caso limpio quedó en {caso.status.value}")
+        elif decision.decision is not DecisionType.APPROVE:
+            print(
+                f"   nota: el Arbiter escaló el piso APPROVE a "
+                f"{decision.decision.value} — {decision.confidence_rationale}"
+            )
+        estado_esperado = (
+            CaseStatus.PENDING_HUMAN
+            if decision.decision is DecisionType.ESCALATE_TO_HUMAN
+            else CaseStatus.DECIDED
+        )
+        if caso.status is not estado_esperado:
+            problemas.append(
+                f"el caso limpio quedó en {caso.status.value}, se esperaba "
+                f"{estado_esperado.value} para el veredicto {decision.decision.value}"
+            )
         if decision.matched_policies:
             problemas.append(
                 f"la transacción limpia disparó {decision.matched_policies}; "
@@ -320,9 +372,19 @@ async def main() -> int:
         problemas.append("con la alerta sembrada no quedó fila en `decisions`")
     else:
         citadas = {c["policy_id"] for c in decision.citations_internal}
-        if decision.decision is not DecisionType.CHALLENGE:
+        # Mismo criterio que el escenario 1: FP-10 prescribe el piso
+        # CHALLENGE, y el Arbiter puede escalarlo — lo que no puede hacer es
+        # bajarlo, que es lo único que este smoke puede afirmar sin volverse
+        # flaky ante una escalada legítima.
+        if precedencia(decision.decision) < precedencia(DecisionType.CHALLENGE):
             problemas.append(
-                f"FP-10 prescribe CHALLENGE y llegó {decision.decision.value}"
+                f"FP-10 prescribe el piso CHALLENGE y llegó "
+                f"{decision.decision.value}, por debajo"
+            )
+        elif decision.decision is not DecisionType.CHALLENGE:
+            print(
+                f"   nota: el Arbiter escaló el piso CHALLENGE a "
+                f"{decision.decision.value} — {decision.confidence_rationale}"
             )
         if "FP-10" not in (decision.matched_policies or []):
             problemas.append(
@@ -344,6 +406,80 @@ async def main() -> int:
         if THREAT_INTEL in decision.degraded_agents:
             problemas.append("el nodo de inteligencia externa degradó sin motivo")
 
+    # --- 5. FP-10 sólo, con una señal aislada que el piso no ve ------------ #
+    #
+    # Demuestra el Arbiter LLM en el caso para el que ADR-0016 lo diseñó: el
+    # piso determinista (FP-10 → CHALLENGE) es ciego a `NO_CUSTOMER_PROFILE`
+    # -ninguna política la reúne-, pero el Arbiter sí la ve, junto con los
+    # dos argumentos de debate. No se afirma que vaya a escalar -el modelo
+    # decide, no el script-: sólo lo que ADR-0016 garantiza estructuralmente,
+    # que no baje del piso, y que cualquier desvío quede justificado.
+    async with AsyncSessionLocal() as session:
+        async with session.begin():
+            session.add(
+                ThreatIndicator(
+                    indicator_type=IndicatorType.ISSUER,
+                    value=EMISOR_JUICIO,
+                    observed_at=TRANSACCIONES[TX_JUICIO].timestamp - timedelta(hours=3),
+                    retrieved_at=datetime.now(UTC),
+                    source_url="https://sbs.gob.pe/alertas/smoke-decision-juicio",
+                    summary="Alerta simulada del smoke (no es una alerta real)",
+                    snapshot_version=SNAPSHOT_VERSION,
+                    added_by="smoke",
+                )
+            )
+    contexto.indicators.invalidate()
+
+    await graph.ainvoke(
+        {"case_id": CASO_JUICIO, "transaction": TRANSACCIONES[TX_JUICIO]},
+        context=contexto,
+    )
+    caso, decision = await leer(CASO_JUICIO)
+    mostrar("5. FP-10 con una señal aislada (juicio del Arbiter)", caso, decision)
+
+    if decision is None:
+        problemas.append("el caso de juicio no dejó fila en `decisions`")
+    else:
+        print(f"   pro-fraude   : {decision.debate_pro_fraud}")
+        print(f"   pro-cliente  : {decision.debate_pro_customer}")
+        print(f"   rationale    : {decision.confidence_rationale}")
+
+        if "FP-10" not in (decision.matched_policies or []):
+            problemas.append(
+                "el caso de juicio no disparó FP-10: revisá la ventana de 24h"
+            )
+        if not any(s.code == "NO_CUSTOMER_PROFILE" for s in decision.signals):
+            problemas.append(
+                "el caso de juicio no emitió NO_CUSTOMER_PROFILE: sin la señal "
+                "aislada, el escenario no prueba lo que dice probar"
+            )
+        if precedencia(decision.decision) < precedencia(DecisionType.CHALLENGE):
+            problemas.append(
+                f"el Arbiter bajó del piso CHALLENGE a {decision.decision.value}: "
+                f"la cuarta guarda de W2 debería haberlo evitado"
+            )
+        elif decision.decision is not DecisionType.CHALLENGE:
+            if not decision.confidence_rationale:
+                problemas.append(
+                    f"el Arbiter escaló a {decision.decision.value} sin dejar "
+                    f"confidence_rationale: la tercera guarda debería haberlo exigido"
+                )
+            else:
+                print(
+                    f"   nota: el Arbiter escaló el piso CHALLENGE a "
+                    f"{decision.decision.value}"
+                )
+        estado_esperado = (
+            CaseStatus.PENDING_HUMAN
+            if decision.decision is DecisionType.ESCALATE_TO_HUMAN
+            else CaseStatus.DECIDED
+        )
+        if caso.status is not estado_esperado:
+            problemas.append(
+                f"el caso de juicio quedó en {caso.status.value}, se esperaba "
+                f"{estado_esperado.value}"
+            )
+
     print()
     if problemas:
         print(f"FALLA: {len(problemas)} problemas")
@@ -362,6 +498,7 @@ async def main() -> int:
     print("OK · un caso aprobado y uno bloqueado, los dos en DECIDED")
     print("     el veredicto sobrevive a que el proveedor de embeddings caiga")
     print("     una alerta externa cambia el veredicto del caso limpio, no sólo la confianza")
+    print("     el Arbiter LLM no bajó del piso en ningún escenario")
     return 0
 
 
