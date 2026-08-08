@@ -27,9 +27,18 @@ sellos que justifique el eje nuevo.
 | 2 | Nodo de debate real | ✅ |
 | 3 | Puerto `Judge` + prompt del Arbiter | ✅ |
 | 4 | Nodo `decision_arbiter` real + cuarta guarda de W2 | ✅ |
-| 5 | Auditoría: párrafo de debate | ⬜ |
-| 6 | Golden set + evaluación DeepEval (deuda de ADR-0013) | ⬜ |
+| 5 | Auditoría: párrafo de debate | ✅ |
+| 6 | Golden set + evaluación DeepEval (deuda de ADR-0013) | ✅ |
 | 7 | Cierre documental | ⬜ |
+
+**Nota sobre el paso 6**: el golden set quedó en 7 casos reales, no ~15 —
+elegidos a mano contra `data/ground_truth.csv`, uno por veredicto más el caso
+de contradicción y los dos de FP-10, sin casos de agente degradado (queda
+como extensión futura, no bloqueante). Corrida real contra los proveedores:
+`fundamentacion_del_debate` dio mayormente 0.2-0.5, `calidad_del_juicio_del_arbiter`
+0.8 en los casos con desvío del piso y dos fallos de parseo JSON del juez
+-degradados a "error del juez", no crashean la corrida-. Material para el
+entregable 7 (comparación y limitaciones), no un hallazgo a resolver acá.
 
 ---
 

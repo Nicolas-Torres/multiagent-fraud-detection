@@ -32,6 +32,16 @@ dev = [
     "pytest>=8.4.2",
     "pytest-asyncio>=1.3.0",
 ]
+eval = [
+    "deepeval>=4.1.5",
+]
+
+[tool.uv]
+# `eval` es deuda de ADR-0013, no parte del entorno por defecto: instalarlo
+# junto con `dev` inflaría cada `uv sync` con la cadena de `deepeval` (grpcio,
+# openai, telemetría de posthog) para un script que nadie corre en CI. Opt-in
+# explícito: `uv sync --group eval` o `uv run --group eval scripts/eval_golden_set.py`.
+default-groups = ["dev"]
 
 [tool.pytest.ini_options]
 # `src` para el paquete, `tests` para que los módulos de test se importen entre
