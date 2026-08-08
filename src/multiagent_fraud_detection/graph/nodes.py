@@ -23,9 +23,13 @@ from multiagent_fraud_detection.db.repositories.transaction_history import (
     history_for_customer,
     history_for_device,
 )
+from multiagent_fraud_detection.arbiter import prompt as arbiter_prompt
+from multiagent_fraud_detection.arbiter.judge import ArbiterVerdict
+from multiagent_fraud_detection.debate import pro_customer, pro_fraud
 from multiagent_fraud_detection.enums import CaseStatus, DecisionType, Severity
-from multiagent_fraud_detection.domain.catalog import Owner
+from multiagent_fraud_detection.domain.catalog import Owner, PolicyCatalog
 from multiagent_fraud_detection.domain.engine import evaluate, prescribed_action
+from multiagent_fraud_detection.domain.params import precedencia
 from multiagent_fraud_detection.domain.predicates import SOURCES_KEY, EvalContext
 from multiagent_fraud_detection.domain.scoring import (
     SCORING_VERSION,
@@ -481,13 +485,73 @@ async def evidence_aggregation(
 
 
 @degrades(PRO_FRAUD)
-async def debate_pro_fraud(state: GraphState) -> dict:
-    return {"agent_route": [PRO_FRAUD], "pro_fraud_argument": "stub"}
+async def debate_pro_fraud(
+    state: GraphState, runtime: Runtime[GraphContext]
+) -> dict:
+    """El argumento a favor de la cautela, sobre la evidencia ya consolidada.
+
+    Mismo molde que `explainability`: `@degrades` como red de ultima
+    instancia, y adentro un try/except propio, porque `pro_fraud_argument` es
+    una columna no nulable y su ausencia no es representable. Si el proveedor
+    falla, cae al texto de respaldo declarado — nunca a cadena vacia — y dice
+    por que en `agent_errors`.
+    """
+    evidencia = state.get("evidence", [])
+    politicas = state.get("policies", [])
+    riesgo = state.get("risk_score", 0.0)
+
+    salida: dict = {"agent_route": [PRO_FRAUD]}
+
+    try:
+        salida["pro_fraud_argument"] = await asyncio.to_thread(
+            runtime.context.narrator.narrate,
+            pro_fraud.SYSTEM_PROMPT,
+            pro_fraud.build_prompt(evidencia, politicas, riesgo),
+        )
+    except Exception as exc:  # noqa: BLE001 - degradar el argumento, no el caso
+        logger.exception("argumento pro-fraude degradado; se usa el respaldo")
+        salida["pro_fraud_argument"] = pro_fraud.fallback_argument()
+        salida["agent_errors"] = [
+            AgentError(
+                agent=PRO_FRAUD,
+                error_type=type(exc).__name__,
+                message=f"debate no disponible: {exc}",
+            )
+        ]
+
+    return salida
 
 
 @degrades(PRO_CUSTOMER)
-async def debate_pro_customer(state: GraphState) -> dict:
-    return {"agent_route": [PRO_CUSTOMER], "pro_customer_argument": "stub"}
+async def debate_pro_customer(
+    state: GraphState, runtime: Runtime[GraphContext]
+) -> dict:
+    """El argumento a favor de la legitimidad. Ver `debate_pro_fraud`: mismo
+    molde, mismo motivo para el try/except propio."""
+    evidencia = state.get("evidence", [])
+    politicas = state.get("policies", [])
+    riesgo = state.get("risk_score", 0.0)
+
+    salida: dict = {"agent_route": [PRO_CUSTOMER]}
+
+    try:
+        salida["pro_customer_argument"] = await asyncio.to_thread(
+            runtime.context.narrator.narrate,
+            pro_customer.SYSTEM_PROMPT,
+            pro_customer.build_prompt(evidencia, politicas, riesgo),
+        )
+    except Exception as exc:  # noqa: BLE001 - degradar el argumento, no el caso
+        logger.exception("argumento pro-cliente degradado; se usa el respaldo")
+        salida["pro_customer_argument"] = pro_customer.fallback_argument()
+        salida["agent_errors"] = [
+            AgentError(
+                agent=PRO_CUSTOMER,
+                error_type=type(exc).__name__,
+                message=f"debate no disponible: {exc}",
+            )
+        ]
+
+    return salida
 
 
 # --- Nodos fatales: si fallan no hay caso, asi que lanzan ---
@@ -496,23 +560,33 @@ async def debate_pro_customer(state: GraphState) -> dict:
 async def decision_arbiter(
     state: GraphState, runtime: Runtime[GraphContext]
 ) -> dict:
-    """Linea base deterministica: el veredicto que el catalogo prescribe.
+    """El veredicto final: el piso deterministico, ajustado por juicio LLM.
 
-    **No es el Arbiter final.** Es el brazo de control que ADR-0006 prometio para
-    la comparacion del entregable 7: el mismo calculo con el que se construyo
-    `expected_decision`, de modo que el enfoque agentico se mida contra algo y no
-    contra nada. El Arbiter con LLM lo reemplaza y puede apartarse con
-    justificacion auditable.
+    `prescribed_action(catalog, matched_policies)` -el mismo calculo con el
+    que se construyo `expected_decision`, que sigue siendo el brazo de
+    control del entregable 7- deja de ser el veredicto y pasa a ser el
+    **piso**. El Arbiter LLM (ADR-0016) elige la decision final con la
+    restriccion `precedencia(decision) >= precedencia(piso)`: puede subir de
+    nivel con justificacion, nunca bajar uno que una politica ya gano. La
+    cuarta guarda de W2 (`_verificar_invariantes`) es lo que hace cumplir esa
+    restriccion estructuralmente -este nodo no la impone, confia en que la
+    guarda la va a atrapar si el modelo la viola.
 
-    No ajusta la confianza: `confidence == base_confidence` y no hay
-    `confidence_rationale`. Un ajuste sin justificacion es justo lo que la tercera
-    guarda de W2 prohibe, y este arbitro no tiene con que justificar.
+    ## Tres degradaciones, dos motivos distintos
 
-    ## Las dos degradaciones
+    Las dos primeras -sin respaldo interno, sin score deterministico- son
+    evidencia incompleta y corren **antes** de llamar al proveedor de
+    juicio: no tiene sentido preguntarle a un LLM sobre un piso que no se
+    pudo calcular. Degradan a `ESCALATE_TO_HUMAN` antes de que las guardas
+    puedan dispararse.
 
-    Degrada a `ESCALATE_TO_HUMAN` **antes** de que las guardas puedan dispararse.
-    Que una guarda levante significa `FAILED`, y la ausencia de respaldo no es un
-    error del sistema: es la razon por la que existe la cola humana.
+    La tercera es la caida del proveedor de juicio, y es la unica que este
+    nodo atrapa con un try/except propio en vez de dejar que se propague:
+    sigue bajo "nodos fatales" para cualquier otro fallo -un `prescribed_action`
+    que lanza es un bug del catalogo, y eso si tiene que tumbar el caso-, pero
+    un proveedor caido es la misma apuesta que ADR-0016 ya hizo para el
+    desacuerdo del modelo, un paso mas: el peor caso tambien es escalar de
+    mas, nunca aprobar de menos.
     """
     politicas = state.get("policies", sorted(set(state.get("matched_policies", []))))
     citas = state.get("citations_internal", [])
@@ -541,11 +615,57 @@ async def decision_arbiter(
             "confidence_rationale": "sin score deterministico: no hubo consolidacion",
         }
 
-    return {
+    piso = prescribed_action(runtime.context.catalog, tuple(politicas))
+    degradados = sorted({e.agent for e in state.get("agent_errors", [])})
+
+    try:
+        veredicto: ArbiterVerdict = await asyncio.to_thread(
+            runtime.context.judge.judge,
+            arbiter_prompt.SYSTEM_PROMPT,
+            arbiter_prompt.build_prompt(
+                floor=piso,
+                evidence=state.get("evidence", []),
+                policies=politicas,
+                pro_fraud_argument=state.get("pro_fraud_argument", ""),
+                pro_customer_argument=state.get("pro_customer_argument", ""),
+                degraded_agents=degradados,
+                risk_score=state.get("risk_score", 0.0),
+                base_confidence=base,
+            ),
+        )
+    except Exception as exc:  # noqa: BLE001 - degradar el veredicto, no el caso
+        logger.exception("juicio del Arbiter degradado; se escala con el piso")
+        return {
+            "agent_route": [ARBITER],
+            "decision": DecisionType.ESCALATE_TO_HUMAN,
+            "confidence": base,
+            "confidence_rationale": (
+                "proveedor de juicio no disponible: se escala con el piso "
+                "deterministico"
+            ),
+            "agent_errors": [
+                AgentError(
+                    agent=ARBITER,
+                    error_type=type(exc).__name__,
+                    message=f"juicio no disponible: {exc}",
+                )
+            ],
+        }
+
+    salida: dict = {
         "agent_route": [ARBITER],
-        "decision": prescribed_action(runtime.context.catalog, tuple(politicas)),
-        "confidence": base,
+        "decision": veredicto.decision,
+        "confidence": veredicto.confidence,
     }
+    # Rationale siempre que haya un desvio del piso -en decision o en
+    # confianza-, no solo cuando la confianza numerica cambia: ADR-0016
+    # promete que "cada desvio del piso queda en confidence_rationale", y un
+    # veredicto que escala de nivel manteniendo la misma confianza tambien es
+    # un desvio que hay que poder auditar.
+    if veredicto.decision != piso or veredicto.confidence != base:
+        salida["confidence_rationale"] = veredicto.rationale
+
+    return salida
 
 
 @degrades(EXPLAIN)
@@ -610,7 +730,7 @@ async def explainability(
     return salida
 
 
-def _verificar_invariantes(state: GraphState) -> None:
+def _verificar_invariantes(state: GraphState, catalog: PolicyCatalog) -> None:
     """Guardas, no reparaciones: si alguna dispara, el Arbiter tiene un bug.
 
     Una guarda que repara esconde el bug. Estas levantan, y el wrapper del
@@ -642,6 +762,19 @@ def _verificar_invariantes(state: GraphState) -> None:
         if base is None:
             raise ValueError("veredicto autonomo sin score deterministico")
 
+        # Cuarta guarda (ADR-0016): el Arbiter puede escalar el piso
+        # deterministico, nunca bajarlo. Compara contra lo que el catalogo
+        # prescribe con la misma evidencia, no contra "lo que dijo el LLM" -
+        # eso ya es lo que se esta verificando. Si dispara, es un bug del
+        # Arbiter: el caso pasa a FAILED en vez de DECIDED, que es el costo
+        # que el ADR ya asumio a cambio de que el piso sea estructural y no
+        # una convencion que el nodo podria romper en silencio.
+        piso = prescribed_action(catalog, tuple(state.get("policies", [])))
+        if precedencia(decision) < precedencia(piso):
+            raise ValueError(
+                f"veredicto {decision.value} por debajo del piso {piso.value}"
+            )
+
     if base is not None and state["confidence"] != base and not state.get(
         "confidence_rationale"
     ):
@@ -660,7 +793,7 @@ async def persist_decision(
     La clave de idempotencia es `case_id`, que ya es PK de `decisions`; el
     `ON DELETE CASCADE` barre `signals` y `agent_errors` sin nombrarlas.
     """
-    _verificar_invariantes(state)
+    _verificar_invariantes(state, runtime.context.catalog)
 
     case_id = state["case_id"]
     decision = state["decision"]

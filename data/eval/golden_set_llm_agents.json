@@ -1,0 +1,41 @@
+{
+  "_comment": "Curado a mano contra data/ground_truth.csv, no muestreado. Ver docs/plan_llm_agents.md paso 6. Cada caso es un transaction_id real del dataset de 7000; 'reason' documenta por qué se eligió y no se recalcula automáticamente si el dataset cambia.",
+  "version": 1,
+  "cases": [
+    {
+      "transaction_id": "T-2579",
+      "reason": "veredicto esperado APPROVE: ninguna política dispara, el caso base del 90% del tráfico",
+      "seed_threat_indicator": false
+    },
+    {
+      "transaction_id": "T-4445",
+      "reason": "veredicto esperado BLOCK, caso base con una sola política",
+      "seed_threat_indicator": false
+    },
+    {
+      "transaction_id": "T-2760",
+      "reason": "veredicto esperado CHALLENGE, caso base con una sola política",
+      "seed_threat_indicator": false
+    },
+    {
+      "transaction_id": "T-7476",
+      "reason": "veredicto esperado ESCALATE_TO_HUMAN sin intervención del Arbiter",
+      "seed_threat_indicator": false
+    },
+    {
+      "transaction_id": "T-7589",
+      "reason": "dispara FP-02 (ESCALATE_TO_HUMAN) y FP-04 (BLOCK) a la vez: has_contradiction=True, el caso donde el Arbiter tiene evidencia contradictoria real que juzgar",
+      "seed_threat_indicator": false
+    },
+    {
+      "transaction_id": "T-1047",
+      "reason": "APPROVE en el ground truth, sin señales propias; candidato a que un indicador de amenaza sembrado (FP-10) mueva el piso de APPROVE a CHALLENGE",
+      "seed_threat_indicator": true
+    },
+    {
+      "transaction_id": "T-7578",
+      "reason": "mismo criterio que T-1047, emisor distinto (SAN): segundo caso de FP-10 para no depender de uno solo",
+      "seed_threat_indicator": true
+    }
+  ]
+}

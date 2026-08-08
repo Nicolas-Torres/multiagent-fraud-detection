@@ -33,7 +33,7 @@ que no alcanzan confianza suficiente pasan a una cola de revisión humana.
 | Explicabilidad: auditoría por plantilla, cliente por LLM | ✅ |
 | Tabla `web_search_allowlist` | ✅ |
 | Búsqueda web gobernada + Threat Intel Agent | ✅ |
-| Agentes con LLM (Debate x2, Arbiter agéntico) | ⬜ |
+| Agentes con LLM (Debate x2, Arbiter agéntico) | ✅ |
 | API FastAPI + HITL | ⬜ |
 | CI, imagen y despliegue | ⬜ |
 
@@ -87,9 +87,14 @@ de `status` que escribe el mismo nodo, no una bifurcación.
 El diagrama se genera desde el grafo compilado
 (`scripts/export_graph_diagram.py`), no se dibuja a mano.
 
-> `decision_arbiter` es hoy la **línea base determinística**: el veredicto que el
-> catálogo prescribe por precedencia. No es el Arbiter final —es el brazo de
-> control contra el que se mide el enfoque agéntico ([ADR-0006](docs/adr/)).
+> `decision_arbiter` es el Arbiter con LLM: decide el veredicto final sobre un
+> **piso** determinístico —lo que el catálogo prescribe por precedencia
+> (`prescribed_action`, el mismo cálculo que sigue siendo el brazo de control
+> del entregable 7)—. Puede escalar ese piso con justificación auditable en
+> `confidence_rationale`; no puede bajarlo — lo hace cumplir una cuarta guarda
+> estructural en `persist_decision`
+> ([ADR-0006](docs/adr/0006-reparto-deterministico-y-llm.md),
+> [ADR-0016](docs/adr/0016-el-arbitro-con-llm-escala-pero-no-cruza-el-piso-determinista.md)).
 
 ---
 
@@ -218,8 +223,19 @@ uv run python scripts/smoke_persistence.py      # un reintento no duplica señal
 uv run python scripts/smoke_catalog_sources.py  # archivo y base dan el mismo catálogo
 uv run python scripts/smoke_retrieval.py        # la búsqueda no mezcla generaciones
 uv run python scripts/smoke_threat_intel.py     # el fetch es idempotente; el lookup no mezcla snapshots
-uv run python scripts/smoke_decision.py         # incluye el caso que pasa de APPROVE a CHALLENGE por una alerta externa
+uv run python scripts/smoke_decision.py         # incluye el caso que pasa de APPROVE a CHALLENGE, y el Arbiter LLM decidiendo sobre el piso
 ```
+
+### Evaluación no bloqueante
+
+```bash
+uv run --group eval python scripts/eval_golden_set.py [--dry-run]
+```
+
+Calidad del debate y del juicio del Arbiter con DeepEval sobre un golden set
+curado a mano (`data/eval/golden_set_llm_agents.json`). Reporta, no bloquea —
+`deepeval` vive en el grupo opt-in `eval`, fuera de `uv sync` por defecto.
+Deuda declarada por [ADR-0013](docs/adr/0013-que-se-mide-con-metricas-duras-y-que-con-llm-as-judge.md).
 
 ### Regenerar artefactos derivados
 
@@ -249,7 +265,7 @@ regenerar es una guarda válida de CI.
 │   ├── transactions.csv
 │   └── README.md
 ├── docs/
-│   ├── contrato_de_interfaz.md  # documento vivo (v0.8)
+│   ├── contrato_de_interfaz.md  # documento vivo (v0.9)
 │   ├── CHANGELOG.md
 │   ├── enmiendas_pendientes.md  # staging de la próxima versión
 │   ├── runbook_base_nueva.md

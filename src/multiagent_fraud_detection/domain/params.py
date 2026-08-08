@@ -16,6 +16,8 @@ reglas no.
 
 from types import MappingProxyType
 
+from multiagent_fraud_detection.enums import DecisionType
+
 # Versión de los parámetros. Se sella en `Decision.scoring_version` junto con la
 # fórmula de scoring: una decisión evaluada con otros promedios no es comparable.
 PARAMS_VERSION = "1.0"
@@ -61,6 +63,17 @@ SEGMENT_AVG_REF = MappingProxyType({
 # Cuando dos políticas aplican a la vez gana la más restrictiva. La misma regla
 # tiene que usar el Arbiter, o la comparación contra el ground truth es injusta.
 PRECEDENCE = ("BLOCK", "ESCALATE_TO_HUMAN", "CHALLENGE", "APPROVE")
+
+
+def precedencia(decision: DecisionType) -> int:
+    """Qué tan restrictiva es una decisión: mayor número, más restrictiva.
+
+    Es la inversa del índice en `PRECEDENCE` —que resuelve conflictos por
+    "la primera que aparece", con `BLOCK` primero— para que la restricción de
+    ADR-0016 se lea tal cual la escribe el ADR: `precedencia(decision) >=
+    precedencia(piso)` es "el Arbiter no bajó del piso".
+    """
+    return len(PRECEDENCE) - 1 - PRECEDENCE.index(decision.value)
 
 
 def to_reference(amount: float, currency: str) -> float:

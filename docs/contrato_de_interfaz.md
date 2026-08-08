@@ -1,5 +1,5 @@
 # Contrato de Interfaz — Sistema Multi-Agente de Detección de Fraude
-**Versión 0.8 — Inteligencia externa congelada y quinto eje de auditoría**
+**Versión 0.9 — El Arbiter con LLM escala el piso determinista, nunca lo cruza**
 
 > Define las **fronteras** entre el motor de agentes (yo), la infraestructura (mi
 > compañero) y el dashboard del analista.
@@ -432,15 +432,19 @@ mueva. Una falla de agente no es evidencia de fraude.
 
 ##### La confianza es híbrida, y el rastro es auditable
 
-`base_confidence` lo produce **código**; el Arbiter solo puede moverlo dentro de
-un delta acotado. `confidence_rationale` explica el delta.
+`base_confidence` lo produce **código**; el Arbiter con LLM elige `confidence`
+libremente en `[0, 1]` (ADR-0016) — no hay un delta numérico acotado respecto de
+`base_confidence`, lo que está acotado es la obligación de justificar: si el
+valor final difiere del base, `confidence_rationale` **existe**, garantizado por
+el sistema (§7.3), no por convención.
 
 - `confidence_rationale = null` significa **una sola cosa**: no hubo ajuste.
-- Si `confidence != base_confidence`, la justificación **existe** — garantizado
-  por el sistema, no por convención (§7.3).
+- Si `confidence != base_confidence`, la justificación **existe**.
 
 `risk_score` **no** es ajustable por el Arbiter: si un LLM pudiera moverlo,
-dejaría de servir para vigilar drift (entregable 6).
+dejaría de servir para vigilar drift (entregable 6). Tampoco `decision` es libre
+del todo: el piso determinista (`prescribed_action`) es una cota mínima de
+cautela que el Arbiter puede subir con justificación y nunca bajar (§7.3, guarda 4).
 
 ##### La cita autoriza el veredicto, no lo acompaña
 
@@ -881,8 +885,9 @@ entregable 7.
 1. `decision != ESCALATE_TO_HUMAN` ⟹ `citations_internal` **contiene una cita por cada** `policy_id` de `matched_policies`.
 2. `decision != ESCALATE_TO_HUMAN` ⟹ `base_confidence` no es `null`.
 3. `base_confidence` no `null` **y** `confidence != base_confidence` ⟹ hay `confidence_rationale`.
+4. `decision != ESCALATE_TO_HUMAN` ⟹ `precedencia(decision) >= precedencia(prescribed_action(catalog, matched_policies))` — el Arbiter con LLM puede escalar el piso determinista, nunca bajarlo (ADR-0016).
 
-Las tres **levantan**, no reparan: si alguna dispara, el Arbiter tiene un bug, y
+Las cuatro **levantan**, no reparan: si alguna dispara, el Arbiter tiene un bug, y
 una guarda que repara lo esconde. El Arbiter degrada a `ESCALATE_TO_HUMAN` antes
 de que la guarda pueda dispararse; llegar a W2 en violación es un defecto.
 
@@ -983,12 +988,13 @@ c558fd490ae6  (pgvector)
 
 ---
 
-**Estado**: v0.8 — inteligencia externa congelada y sin decisiones conjuntas
-pendientes. El motor reproduce el ground truth en las 7 000 transacciones, en
-memoria y contra Postgres; los casos llegan a `DECIDED` con respaldo interno
-verificable, y cada decisión sella los **cinco** ejes de auditoría. FP-10 pasa
-de excluida a vinculada: activa, citable y sin ground truth reproducible —el
-harness la reporta así, nunca como recall 0—.
+**Estado**: v0.9 — `debate_pro_fraud`, `debate_pro_customer` y `decision_arbiter`
+dejaron de ser stubs. El Arbiter con LLM decide el veredicto final sobre un piso
+determinista (`prescribed_action`) que sólo puede escalar, nunca bajar (ADR-0016,
+guarda 4 de §7.3); `confidence` ya no tiene el delta acotado que v0.2–v0.8
+anticipaban, sino un valor libre en `[0, 1]` con justificación obligatoria ante
+cualquier desvío. Sin migraciones ni sellos nuevos: `arbiter_prompt_version` y
+`debate_prompt_version` quedaron deliberadamente afuera de esta versión.
 
 **§1 validado por el compañero.** ADR-0008 a ADR-0010 siguen **aceptados**.
 **Valido yo**: §2–§4, §7.
