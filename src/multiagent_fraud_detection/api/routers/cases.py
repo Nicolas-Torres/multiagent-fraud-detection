@@ -9,8 +9,8 @@ import logging
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Response, status
-from sqlalchemy import select, update
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Response, status
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,7 +18,8 @@ from multiagent_fraud_detection.api.deps import get_graph, get_graph_context, ge
 from multiagent_fraud_detection.db.models import Case, Transaction
 from multiagent_fraud_detection.enums import CaseStatus
 from multiagent_fraud_detection.graph.context import GraphContext
-from multiagent_fraud_detection.schemas.case import CaseCreated
+from multiagent_fraud_detection.schemas.case import CaseCreated, CaseDetail, CaseSummary
+from multiagent_fraud_detection.schemas.pagination import Page
 from multiagent_fraud_detection.schemas.transaction import TransactionIn
 
 logger = logging.getLogger(__name__)
@@ -112,3 +113,42 @@ async def crear_caso(
     )
 
     return CaseCreated.model_validate(caso)
+
+
+@router.get("/cases", response_model=Page[CaseSummary])
+async def listar_casos(
+    status: CaseStatus | None = None,
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    session: AsyncSession = Depends(get_session),
+) -> Page[CaseSummary]:
+    """La cola HITL (§3 del contrato): `GET /cases?status=PENDING_HUMAN` es
+    la vista que el dashboard filtra. El índice `ix_cases_status_created_at`
+    ya está pensado para este `WHERE status = ... ORDER BY created_at`.
+    """
+    filtro = select(Case)
+    if status is not None:
+        filtro = filtro.where(Case.status == status)
+
+    total = await session.scalar(
+        select(func.count()).select_from(filtro.subquery())
+    )
+    pagina = filtro.order_by(Case.created_at.desc()).limit(limit).offset(offset)
+    casos = (await session.scalars(pagina)).all()
+
+    return Page(
+        items=[CaseSummary.from_case(c) for c in casos],
+        total=total or 0,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@router.get("/cases/{case_id}", response_model=CaseDetail)
+async def detalle_caso(
+    case_id: UUID, session: AsyncSession = Depends(get_session)
+) -> CaseDetail:
+    caso = await session.get(Case, case_id)
+    if caso is None:
+        raise HTTPException(status_code=404, detail="caso no encontrado")
+    return CaseDetail.model_validate(caso)
