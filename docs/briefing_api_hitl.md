@@ -159,8 +159,12 @@ determinísticos no dependen de red ni LLM— aplicado a una capa nueva.
 
 ## 8. Después de esta etapa
 
-**CI, imagen y despliegue** — la última fila `⬜` del README. Necesita algo
-desplegable, que es exactamente lo que esta etapa produce.
+**Dashboard del analista (frontend)** — el reto pide explícitamente
+"web App (Backend + Frontend)", y hasta ahora sólo se construyó el backend.
+El contrato §3 ya especifica en detalle qué consume: cola, detalle de caso y
+vista de políticas — no es diseño desde cero, es la contraparte visual de lo
+que esta etapa expone. Después de esa, **CI, imagen y despliegue**, para
+tener algo completo que desplegar.
 
 ---
 

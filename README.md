@@ -35,6 +35,7 @@ que no alcanzan confianza suficiente pasan a una cola de revisión humana.
 | Búsqueda web gobernada + Threat Intel Agent | ✅ |
 | Agentes con LLM (Debate x2, Arbiter agéntico) | ✅ |
 | API FastAPI + HITL | ⬜ |
+| Dashboard del analista (frontend) | ⬜ |
 | CI, imagen y despliegue | ⬜ |
 
 ---
