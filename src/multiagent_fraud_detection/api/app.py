@@ -65,12 +65,13 @@ def create_app() -> FastAPI:
         await session.execute(text("SELECT 1"))
         return {"status": "ok"}
 
-    from multiagent_fraud_detection.api.routers import cases
+    from multiagent_fraud_detection.api.routers import cases, policies
 
     app.include_router(cases.router, prefix="/api/v1")
+    app.include_router(policies.router, prefix="/api/v1")
 
-    # Los routers que faltan se agregan en los pasos siguientes del plan de
-    # la etapa (`docs/plan_api_hitl.md`): policies, predicates.
+    # El router que falta se agrega en el paso siguiente del plan de la
+    # etapa (`docs/plan_api_hitl.md`): predicates.
 
     return app
 
