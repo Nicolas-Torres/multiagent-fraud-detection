@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import sys
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
@@ -36,7 +36,7 @@ from multiagent_fraud_detection.graph.context import GraphContext
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     app.state.graph = build_graph()
     app.state.graph_context = GraphContext(session_factory=AsyncSessionLocal)
     yield
@@ -65,8 +65,12 @@ def create_app() -> FastAPI:
         await session.execute(text("SELECT 1"))
         return {"status": "ok"}
 
-    # Los routers se agregan uno por uno en los pasos siguientes del plan de
-    # la etapa (`docs/plan_api_hitl.md`): cases, policies, predicates.
+    from multiagent_fraud_detection.api.routers import cases
+
+    app.include_router(cases.router, prefix="/api/v1")
+
+    # Los routers que faltan se agregan en los pasos siguientes del plan de
+    # la etapa (`docs/plan_api_hitl.md`): policies, predicates.
 
     return app
 
