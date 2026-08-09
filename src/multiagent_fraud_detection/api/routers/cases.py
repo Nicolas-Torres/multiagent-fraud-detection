@@ -15,10 +15,11 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from multiagent_fraud_detection.api.deps import get_graph, get_graph_context, get_session
-from multiagent_fraud_detection.db.models import Case, Transaction
+from multiagent_fraud_detection.db.models import Case, HumanResolution, Transaction
 from multiagent_fraud_detection.enums import CaseStatus
 from multiagent_fraud_detection.graph.context import GraphContext
 from multiagent_fraud_detection.schemas.case import CaseCreated, CaseDetail, CaseSummary
+from multiagent_fraud_detection.schemas.human_resolution import HumanResolutionIn
 from multiagent_fraud_detection.schemas.pagination import Page
 from multiagent_fraud_detection.schemas.transaction import TransactionIn
 
@@ -151,4 +152,33 @@ async def detalle_caso(
     caso = await session.get(Case, case_id)
     if caso is None:
         raise HTTPException(status_code=404, detail="caso no encontrado")
+    return CaseDetail.model_validate(caso)
+
+
+@router.post("/cases/{case_id}/resolution", response_model=CaseDetail)
+async def resolver_caso(
+    case_id: UUID,
+    resolucion: HumanResolutionIn,
+    session: AsyncSession = Depends(get_session),
+) -> CaseDetail:
+    """W3 (§7.3 del contrato): el grafo ya terminó -`PENDING_HUMAN` es
+    terminal, no hay `interrupt()` que reanudar (ADR de la etapa del grafo)-,
+    así que resolver es sólo escribir `human_resolutions` y pasar el caso a
+    `RESOLVED`. Sólo válido sobre un caso que de verdad está esperando: otro
+    estado es `409`, no una resolución que reescriba lo que W2 ya decidió.
+    """
+    caso = await session.get(Case, case_id)
+    if caso is None:
+        raise HTTPException(status_code=404, detail="caso no encontrado")
+    if caso.status is not CaseStatus.PENDING_HUMAN:
+        raise HTTPException(
+            status_code=409,
+            detail=f"el caso está en {caso.status.value}, no en PENDING_HUMAN",
+        )
+
+    session.add(HumanResolution(case_id=case_id, **resolucion.model_dump()))
+    caso.status = CaseStatus.RESOLVED
+    await session.commit()
+    await session.refresh(caso)
+
     return CaseDetail.model_validate(caso)
