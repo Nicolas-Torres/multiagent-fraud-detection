@@ -34,7 +34,7 @@ que no alcanzan confianza suficiente pasan a una cola de revisión humana.
 | Tabla `web_search_allowlist` | ✅ |
 | Búsqueda web gobernada + Threat Intel Agent | ✅ |
 | Agentes con LLM (Debate x2, Arbiter agéntico) | ✅ |
-| API FastAPI + HITL | ⬜ |
+| API FastAPI + HITL | ✅ |
 | Dashboard del analista (frontend) | ⬜ |
 | CI, imagen y despliegue | ⬜ |
 
@@ -179,6 +179,9 @@ uv run alembic upgrade head
 
 # 5. Dataset, catálogo e índice vectorial
 uv run python scripts/seed.py
+
+# 6. La API
+uv run uvicorn multiagent_fraud_detection.api.app:app --reload
 ```
 
 `.env` trae valores por defecto que funcionan tal cual en local. `DATABASE_URL`
@@ -266,7 +269,7 @@ regenerar es una guarda válida de CI.
 │   ├── transactions.csv
 │   └── README.md
 ├── docs/
-│   ├── contrato_de_interfaz.md  # documento vivo (v0.9)
+│   ├── contrato_de_interfaz.md  # documento vivo (v0.10)
 │   ├── CHANGELOG.md
 │   ├── enmiendas_pendientes.md  # staging de la próxima versión
 │   ├── runbook_base_nueva.md
