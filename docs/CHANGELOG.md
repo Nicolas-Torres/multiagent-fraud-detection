@@ -6,7 +6,7 @@ vivo tiene siempre la versión vigente; su encabezado dice cuál es.
 Para recuperar el texto completo de una versión anterior:
 
 ```bash
-git show contrato-v0.8:docs/contrato_de_interfaz.md
+git show contrato-v0.9:docs/contrato_de_interfaz.md
 ```
 
 > Las versiones 0.1 y 0.2 son anteriores a que el contrato entrara a control de
@@ -18,6 +18,32 @@ git show contrato-v0.8:docs/contrato_de_interfaz.md
 
 Sin enmiendas acumuladas. Las próximas se anotan en
 [`enmiendas_pendientes.md`](enmiendas_pendientes.md).
+
+---
+
+## [0.10] — La frontera HTTP existe: API + HITL implementados
+
+Una enmienda: los dos esquemas que el Contrato de API nombraba desde v0.2
+sin especificar (`PolicyRead`, `PredicateSpec`) quedan documentados en detalle
+ahora que tienen implementación real.
+
+| # | Enmienda | Toca | Por qué |
+|---|---|---|---|
+| 1 | §2.5 gana las tablas de campos de **`PolicyRead`** y **`PredicateSpec`/`ParamSpecRead`** | §2.5 | Los dos tipos estaban nombrados en la tabla de endpoints desde v0.2 (§2.3) pero nunca se documentó su forma — no había implementación que la fijara. `GET /api/v1/policies` y `GET /api/v1/predicates` ahora existen, y el contrato es la fuente de verdad de schemas: tiene que decir qué campos trae cada uno. |
+
+**No hay enmiendas de comportamiento.** Los cuatro puntos de escritura (W0–W3,
+§7.3), la idempotencia de `POST /cases` (§2.4) y los endpoints mismos ya
+estaban especificados desde v0.2; esta etapa es implementación, no diseño —
+ver [ADR-0017](adr/0017-el-catalogo-por-api-es-de-solo-lectura-hasta-la-fase-3.md).
+
+**Deliberadamente afuera de esta versión**: `POST /api/v1/policies` (ADR-0017,
+espera la Fase 3 del catálogo) y autenticación de los endpoints HITL —el
+reto no la exige (no aparece en la rúbrica) y abriría preguntas de diseño que
+el proyecto no ha resuelto en ningún otro lado—. Las dos quedan como deuda
+declarada, no como omisión silenciosa.
+
+Detrás: [ADR-0017](adr/0017-el-catalogo-por-api-es-de-solo-lectura-hasta-la-fase-3.md)
+y el acta [`reviews/09-api-hitl.md`](reviews/09-api-hitl.md).
 
 ---
 

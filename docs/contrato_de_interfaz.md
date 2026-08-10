@@ -1,5 +1,5 @@
 # Contrato de Interfaz — Sistema Multi-Agente de Detección de Fraude
-**Versión 0.9 — El Arbiter con LLM escala el piso determinista, nunca lo cruza**
+**Versión 0.10 — La frontera HTTP existe: API + HITL implementados**
 
 > Define las **fronteras** entre el motor de agentes (yo), la infraestructura (mi
 > compañero) y el dashboard del analista.
@@ -569,6 +569,46 @@ Los tres campos anteriores **más `resolved_at`** (`datetime`, lo acuña el serv
 | `limit` | `int` |
 | `offset` | `int` |
 
+#### `PolicyRead` — respuesta de `GET /api/v1/policies` 🆕
+
+| Campo | Tipo | Notas |
+|---|---|---|
+| `policy_id` | `str` | |
+| `version` | `str` | del documento normativo, no del catálogo |
+| `text` | `str` | la norma tal como la indexa el RAG |
+| `state` | `active \| excluded \| pending \| stale` | |
+| `action` | `DecisionType \| null` | `null` si no hay vinculación activa |
+| `evaluable` | `bool` | derivado — `true` sólo si `state == active` |
+| `excluded_reason` | `str \| null` | |
+| `bound_by` | `str \| null` | quién dio de alta la vinculación |
+
+Sólo lectura esta etapa, sobre el catálogo de Fase 2 —dos archivos versionados,
+no una tabla— (ADR-0017). `POST /api/v1/policies` no existe todavía: escribir
+una política en runtime necesita un destino seguro para escrituras
+concurrentes que un archivo no da. El día que la Fase 3 (tablas) se
+implemente, este esquema no cambia — sólo su fuente.
+
+#### `PredicateSpec` — respuesta de `GET /api/v1/predicates` 🆕
+
+| Campo | Tipo | Notas |
+|---|---|---|
+| `name` | `str` | |
+| `requires` | `list[str]` | insumos que el predicado necesita, orden estable |
+| `severity` | `Severity` | |
+| `params` | `dict[str, ParamSpecRead]` | uno por parámetro que el predicado acepta |
+| `description` | `str` | |
+
+**`ParamSpecRead`**: `kind` (`number \| integer \| choice`), `label` (`str`),
+`minimum`/`maximum` (`float \| null`), `choices` (`list[str]`, sólo si
+`kind == choice`).
+
+Sin `fn` —no serializable— ni el valor crudo de `signal`: en `count_in_window`
+el código de señal depende de los parámetros (`DEVICE_VELOCITY` o
+`CUSTOMER_VELOCITY` según el eje), y mostrar sólo el caso estático confundiría
+más de lo que informa. Es la biblioteca completa —quince predicados—, la misma
+que usa el motor para evaluar: no hay una segunda lista mantenida a mano para
+el compositor del dashboard.
+
 ### 2.6 Serialización — reglas de la frontera JSON
 
 | Tipo Python | JSON | Ejemplo |
@@ -988,13 +1028,14 @@ c558fd490ae6  (pgvector)
 
 ---
 
-**Estado**: v0.9 — `debate_pro_fraud`, `debate_pro_customer` y `decision_arbiter`
-dejaron de ser stubs. El Arbiter con LLM decide el veredicto final sobre un piso
-determinista (`prescribed_action`) que sólo puede escalar, nunca bajar (ADR-0016,
-guarda 4 de §7.3); `confidence` ya no tiene el delta acotado que v0.2–v0.8
-anticipaban, sino un valor libre en `[0, 1]` con justificación obligatoria ante
-cualquier desvío. Sin migraciones ni sellos nuevos: `arbiter_prompt_version` y
-`debate_prompt_version` quedaron deliberadamente afuera de esta versión.
+**Estado**: v0.10 — el Contrato de API deja de ser sólo especificación:
+`POST /cases`, `GET /cases`, `GET /cases/{id}`, `POST .../resolution`,
+`GET /policies` (sólo lectura, ADR-0017) y `GET /predicates` están
+implementados y corren de punta a punta contra Postgres y el grafo real
+(`scripts/smoke_api.py`). Los cuatro puntos de escritura de §7.3 —W0 a W3—
+tienen ahora cada uno su endpoint o su wrapper. Sin `POST /api/v1/policies`
+todavía (ADR-0017); sin autenticación, declarada como deuda explícita, no
+como omisión silenciosa.
 
 **§1 validado por el compañero.** ADR-0008 a ADR-0010 siguen **aceptados**.
 **Valido yo**: §2–§4, §7.

@@ -10,12 +10,14 @@ requires-python = ">=3.12"
 dependencies = [
     "alembic>=1.18.5",
     "anthropic>=0.120.2",
+    "fastapi>=0.141.1",
     "google-genai>=2.16.0",
     "langgraph>=1.2.10",
     "pgvector>=0.5.0",
     "psycopg[binary]>=3.3.4",
     "pydantic-settings>=2.14.2",
     "sqlalchemy>=2.0.51",
+    "uvicorn[standard]>=0.52.1",
 ]
 
 [project.scripts]
@@ -27,6 +29,7 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "httpx>=0.28.1",
     "numpy>=2.5.1",
     "pandas>=3.0.5",
     "pytest>=8.4.2",

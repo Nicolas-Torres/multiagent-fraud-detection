@@ -4,7 +4,7 @@
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
-                <mxCell id="title" value="C4 — Vista Container · estado al cerrar &lt;b&gt;feature/llm-agents&lt;/b&gt;" style="text;html=1;fontSize=20;fontStyle=1;align=left;verticalAlign=middle;" parent="1" vertex="1">
+                <mxCell id="title" value="C4 — Vista Container · estado al cerrar &lt;b&gt;feature/api-hitl&lt;/b&gt;" style="text;html=1;fontSize=20;fontStyle=1;align=left;verticalAlign=middle;" parent="1" vertex="1">
                     <mxGeometry x="-79" y="23" width="900" height="30" as="geometry"/>
                 </mxCell>
                 <mxCell id="subtitle" value="Verde = construido y verificado · Gris discontinuo = pendiente · Azul = externo" style="text;html=1;fontSize=12;fontStyle=2;align=left;verticalAlign=middle;" parent="1" vertex="1">
@@ -19,8 +19,8 @@
                 <mxCell id="sys" value="Sistema Multi-Agente de Detección de Fraude — un solo contenedor desplegable (monolito en-proceso, sin broker)" style="swimlane;startSize=34;html=1;fontSize=12;fontStyle=1;fillColor=#fafafa;strokeColor=#666666;dashed=1;" parent="1" vertex="1">
                     <mxGeometry x="270" y="130" width="973" height="763" as="geometry"/>
                 </mxCell>
-                <mxCell id="c_api" value="API FastAPI&#xa;&#xa;POST /cases · GET /cases&#xa;/health · /ready" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=none;strokeColor=#999999;dashed=1;fontColor=#666666;" parent="sys" vertex="1">
-                    <mxGeometry x="30" y="50" width="200" height="100" as="geometry"/>
+                <mxCell id="c_api" value="&lt;b&gt;API FastAPI&lt;/b&gt;&#xa;&#xa;POST /cases · GET /cases(/{id})&#xa;POST .../resolution&#xa;GET /policies (solo lectura) · /predicates&#xa;/health · /ready&#xa;sin auth (deuda declarada)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#d5e8d4;strokeColor=#82b366;align=left;spacingLeft=8;" parent="sys" vertex="1">
+                    <mxGeometry x="30" y="50" width="230" height="140" as="geometry"/>
                 </mxCell>
                 <mxCell id="c_graph" value="&lt;b&gt;Grafo de agentes (LangGraph)&lt;/b&gt;&#xa;&#xa;Context · Behavioral · Policy RAG&#xa;Threat Intel · Aggregation&#xa;Debate ×2 · Arbiter (LLM sobre piso&#xa;determinístico, ADR-0016) · Explainability&#xa;Sin checkpointer: PENDING_HUMAN es&#xa;terminal, la resolución es HTTP (W3)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#d5e8d4;strokeColor=#82b366;align=left;spacingLeft=8;" parent="sys" vertex="1">
                     <mxGeometry x="526" y="50" width="280" height="140" as="geometry"/>
@@ -73,13 +73,13 @@
                         </Array>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="e_api_graph" value="dispara en&#xa;segundo plano" style="fontSize=10;strokeWidth=2;dashed=1;strokeColor=#999999;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="c_api" target="c_graph" edge="1">
+                <mxCell id="e_api_graph" value="dispara en&#xa;segundo plano" style="fontSize=10;strokeWidth=2;strokeColor=#82b366;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="c_api" target="c_graph" edge="1">
                     <mxGeometry x="-0.027" y="18" relative="1" as="geometry">
                         <mxPoint as="offset"/>
                         <Array as="points"/>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="e_api_dom" value="valida y serializa" style="fontSize=10;strokeWidth=2;dashed=1;strokeColor=#999999;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="c_api" target="d_pyd" edge="1">
+                <mxCell id="e_api_dom" value="valida y serializa" style="fontSize=10;strokeWidth=2;strokeColor=#82b366;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="c_api" target="d_pyd" edge="1">
                     <mxGeometry x="0.0718" y="53" relative="1" as="geometry">
                         <mxPoint as="offset"/>
                         <Array as="points">
@@ -140,7 +140,7 @@
                         <Array as="points"/>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="n_next" value="&lt;b&gt;SIGUIENTE ETAPA: API FastAPI + HITL&lt;/b&gt;&lt;br&gt;&lt;br&gt;Endpoints ya especificados en el contrato §2.3 — esta etapa es sobre todo implementación, no diseño desde cero.&lt;br&gt;&lt;br&gt;Decidir: &lt;b&gt;cómo arranca el grafo en segundo plano&lt;/b&gt; desde POST /cases (BackgroundTasks vs cola), y si &lt;b&gt;GET/POST /policies&lt;/b&gt; fuerza la Fase 3 del catálogo (hoy son archivos, ADR-0007)." style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;align=left;spacingLeft=10;fillColor=#fff2cc;strokeColor=#d6b656;verticalAlign=middle;" parent="1" vertex="1">
+                <mxCell id="n_next" value="&lt;b&gt;SIGUIENTE ETAPA: Dashboard del analista&lt;/b&gt;&lt;br&gt;&lt;br&gt;El reto pide 'web App (Backend + Frontend)'; hasta acá sólo se construyó el backend. El contrato §3 ya especifica qué consume: cola, detalle de caso, vista de políticas — no es diseño desde cero.&lt;br&gt;&lt;br&gt;Después: &lt;b&gt;CI, imagen y despliegue&lt;/b&gt;, para tener algo completo que desplegar." style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;align=left;spacingLeft=10;fillColor=#fff2cc;strokeColor=#d6b656;verticalAlign=middle;" parent="1" vertex="1">
                     <mxGeometry x="-99" y="512" width="200" height="240" as="geometry"/>
                 </mxCell>
             </root>
