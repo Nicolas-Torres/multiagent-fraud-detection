@@ -44,6 +44,9 @@ class DecisionRead(BaseModel):
     scoring_version: ScoringVersion | None = None
     matched_policies: list[str] = []
     policy_catalog_version: str | None = None
+    retrieval_index_version: str | None = None
+    explanation_prompt_version: str | None = None
+    threat_intel_version: str | None = None
     signals: list[SignalRead]
     citations_internal: list[InternalCitation]
     citations_external: list[ExternalCitation]
