@@ -56,7 +56,7 @@ es la referencia:
 | **Cola** | `GET /cases?status=PENDING_HUMAN` → `Page[CaseSummary]` | lista paginada, filtrable por estado |
 | **Detalle** | `GET /cases/{id}` → `CaseDetail` | transacción, contexto del cliente (`null` = *"cliente sin perfil previo"*, no un hueco), señales con severidad, citas internas y externas, debate pro/contra, riesgo + confianza + explicación de auditoría, explicación al cliente, acción (Aprobar/Rechazar + notas → `POST .../resolution`) |
 | **Vista de políticas** | `GET /api/v1/policies` → `list[PolicyRead]` | cada política con estado (activa/excluida/pendiente/obsoleta); alta **no disponible** todavía (ADR-0017) |
-| Compositor de vinculación | `GET /api/v1/predicates` → `list[PredicateSpec]` | biblioteca de predicados con sus parámetros, para armar `condition` — sin consumidor real hasta que exista el formulario de alta (bloqueado por ADR-0017, igual que la fila de arriba) |
+| ~~Compositor de vinculación~~ | `GET /api/v1/predicates` → `list[PredicateSpec]` | **omitido esta etapa** (§4.3): sin formulario de alta que lo consuma, el endpoint queda listo pero sin UI hasta que exista la Fase 3 del catálogo (ADR-0017) |
 
 **El detalle tiene dos casos que la interfaz tiene que manejar
 explícitamente**: `customer: null` (mostrar *"cliente sin perfil previo"*,
@@ -100,13 +100,21 @@ el stack.
 El contrato ya lo resolvió (§5, decisión 3): **polling en v1**, WebSocket
 como mejora futura (entregable 10). No hay que reabrir esto.
 
-### 4.3 Qué hace el formulario de alta de políticas si `POST` no existe
+### 4.3 Formulario de alta de políticas — omitido esta etapa
 
-`GET /predicates` ya está listo para alimentar un compositor, pero
-`POST /api/v1/policies` no existe (ADR-0017). ¿Se construye la UI de alta
-igual —deshabilitada, con la razón visible— para demostrar el diseño, o se
-omite del todo hasta que la Fase 3 exista? Afecta si esta etapa toca la
-Fase 3 del catálogo o la sigue dejando fuera.
+**Decidido**: no se construye, ni siquiera deshabilitado. `POST
+/api/v1/policies` no existe (ADR-0017: la Fase 3 —tablas, altas
+dinámicas— "se decide y ejecuta en una etapa aparte, cuando haya una
+necesidad real... no sólo la promesa del contrato"). Un formulario de alta
+necesitaría el compositor de condiciones compuestas —predicados +
+parámetros tipados por `ParamSpecRead.kind`— para un envío que no puede
+llegar a ningún lado: media implementación para un requisito de una fase
+que todavía no tiene ni ADR de esquema propio.
+
+`GET /predicates` queda sin consumidor de frontend esta etapa —el endpoint
+ya demuestra que el backend está listo; no necesita una UI que lo consuma
+para probarlo—. La vista de políticas se limita a la lista de sólo lectura
+(`GET /policies`); el compositor se retoma el día que la Fase 3 exista.
 
 ### 4.4 Cómo se prueba una interfaz
 
