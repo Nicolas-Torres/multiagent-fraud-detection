@@ -12,4 +12,12 @@ export default defineConfig({
       '@': path.resolve(import.meta.dirname, './src'),
     },
   },
+  server: {
+    // Sólo para `npm run dev`: en producción el dashboard y el API viven en
+    // la misma imagen (StaticFiles montado detrás de las rutas del API,
+    // §0/§4.1 del briefing), así que esto no hace falta ahí.
+    proxy: {
+      '/api': 'http://127.0.0.1:8000',
+    },
+  },
 })
