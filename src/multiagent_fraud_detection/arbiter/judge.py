@@ -71,6 +71,7 @@ class AnthropicJudge:
     def _cliente(self) -> Any:
         if self._client is None:
             from anthropic import Anthropic
+            from langsmith.wrappers import wrap_anthropic
 
             clave = self.api_key or settings.anthropic_api_key
             if not clave:
@@ -80,11 +81,25 @@ class AnthropicJudge:
                     "en `env`, para que la versión declarada en este módulo "
                     "no pueda mentir sobre qué los produjo."
                 )
-            self._client = Anthropic(api_key=clave)
+            # Mismo criterio que `AnthropicNarrator._cliente`: envolver es
+            # no-op sin `LANGSMITH_TRACING` en `os.environ`.
+            self._client = wrap_anthropic(Anthropic(api_key=clave))
         return self._client
 
     def judge(self, system: str, user: str) -> ArbiterVerdict:
-        respuesta = self._cliente().messages.parse(
+        # `wrap_anthropic` no alcanza acá: sólo parchea `messages.create` y
+        # `beta.messages.parse`, y `messages.parse` (el estable, el que
+        # usamos) llama a `self._post` directo por debajo — quedaría sin
+        # trazar en silencio. `traceable` envuelve la llamada puntual en vez
+        # de migrar a la rama beta sólo por observabilidad. Importado acá
+        # adentro, no arriba del módulo: mismo criterio de import perezoso
+        # que `anthropic`.
+        from langsmith import traceable
+
+        parse = traceable(run_type="llm", name="AnthropicJudge.judge")(
+            self._cliente().messages.parse
+        )
+        respuesta = parse(
             model=self.model,
             max_tokens=self.max_tokens,
             system=system,
