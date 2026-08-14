@@ -12,6 +12,30 @@
 
 ---
 
+## 0. Temas previos:
+Ya tienes migrations/, scripts/ y alembic.ini como hermanos de raíz que no son parte del paquete Python. Una carpeta dashboard/ se suma a esa lista; no es una reestructuración, es un directorio más. No hay que tocar pyproject.toml, ni el layout src/, ni nada del backend.
+
+Y ahí sí los ejes se acoplan: con dashboard/ como hermano, un Dockerfile multi-etapa (node:22-alpine → npm run build → COPY --from del dist/) te da una imagen, una URL, cero CORS.
+Recomendación: Dashboard/ como hermano de raíz, toolchain propio, build multi-etapa, StaticFiles montado después de las rutas del API. Una imagen para tu compañero, una URL para la demo del entregable 8.
+
+Considerar lo siguiente:
+1. Contrato de datos antes que código. Genera tipos con openapi-typescript. Claude Code alucina endpoints y formas de payload cuando no tiene tipos reales; con ellos el porcentaje de código que compila a la primera sube muchísimo.
+2. Fixtures reales, no lorem ipsum. Un fixtures.json con 25–30 transacciones que cubran los cuatro veredictos (APPROVE / CHALLENGE / BLOCK / ESCALATE_TO_HUMAN) y los seis estados. Sin datos concretos el diseño sale genérico: tablas vacías, cards de "métrica" sin sentido. Con datos, el layout se adapta a lo que de verdad tienes que mostrar.
+3. Loop visual. Esto es lo grande. Sin capacidad de ver lo que construye, Claude Code escribe UI a ciegas. Agrega Playwright como MCP local:
+    ```
+    claude mcp add playwright npx @playwright/mcp@latest
+    ```
+   Con eso navega tu dev server, toma screenshots y se autocorrige. Es la diferencia entre "hizo algo que funciona" y "hizo algo que se ve bien".
+4. build estático: Vite + React + TypeScript + Tailwind + shadcn/ui, con TanStack Query para el fetching y Recharts para los gráficos.
+5. trace del razonamiento: 
+   1. Operación: tabla filtrable de transacciones con veredicto y estado → al hacer clic, panel de detalle con el recorrido por el grafo LangGraph: qué aportó cada nodo, el debate pro-fraude vs pro-cliente enfrentado en dos columnas, la decisión del árbitro y las políticas citadas por el RAG.
+   2. Evaluación: distribución de decisiones, latencia y costo por nodo, tasa de escalamiento a humano, y los resultados del benchmark de modelos.
+   
+   Esa vista de debate lado a lado es tu mejor activo de demo; ninguna skill te la va a proponer sola, tienes que pedirla.
+6. skills y plugins:
+   - Plantear un borrador usando el conector Figma y vamos iterando
+   - Hacer uso del skill "frontend-design"
+
 ## 1. Por qué esta etapa y no CI/despliegue
 
 El reto pide explícitamente *"web App (**Backend + Frontend**)"*. Hasta acá
@@ -58,17 +82,18 @@ API real contra la que este frontend va a hablar.
 
 ## 4. Lo primero que hay que decidir
 
-### 4.1 Stack del frontend
+### 4.1 Stack del frontend — resuelto en §0
 
-El proyecto no tiene precedente: todo el código hasta acá es Python. El reto
-no exige un framework específico ("Backend + Frontend", sin más detalle).
-Opciones razonables: algo server-rendered simple (Jinja2 servido por la
-misma app FastAPI, sin build step, sin CORS que configurar) versus un SPA
-separado (React/Vue, consumo por `fetch`, necesita CORS y un origen propio).
-Dado que **no hay autenticación todavía** (deuda declarada, acta 09 §6.1) y
-el reto valora sobre todo que la app funcione end-to-end y sea demostrable
-en video, la opción server-rendered reduce superficie de decisiones nuevas
-—sin CORS, sin build pipeline, sin un segundo proceso que orquestar—.
+**Decidido**: SPA (Vite + React + TypeScript + Tailwind + shadcn/ui) en
+`dashboard/`, hermano de raíz con toolchain propio. Dockerfile multi-etapa
+(`node:22-alpine` → `npm run build` → `COPY --from` del `dist/`), montado
+con `StaticFiles` detrás de las rutas del API, en la misma imagen.
+
+Esto resuelve la disyuntiva que esta sección planteaba —server-rendered
+para evitar CORS— por otra vía: **una sola imagen, un solo origen**, así
+que el SPA tampoco necesita CORS. El argumento de **no hay autenticación
+todavía** (deuda declarada, acta 09 §6.1) sigue vigente, pero ya no decide
+el stack.
 
 ### 4.2 Notificación de la cola: polling, ya decidido
 
@@ -89,6 +114,34 @@ El proyecto no tiene precedente de testing de UI. Al menos verificar a mano
 —capturas o video, que la rúbrica pide (ítem 8)— que las dos vistas
 principales funcionan contra la API real, con casos que ejerciten
 `customer: null` y un caso con `degraded_agents` no vacío.
+
+### 4.5 Fuente de datos de la vista de Evaluación (§0, punto 5.2)
+
+El punto 5.2 de §0 agrega una vista de Evaluación —distribución de
+decisiones, **latencia y costo por nodo**, tasa de escalamiento a humano,
+resultados del benchmark de modelos— que **no tiene endpoint en el
+contrato** (§2.3) ni respaldo en `Decision`/`CaseDetail`. Entra en el
+alcance de esta etapa (confirmado), pero falta decidir de dónde sale cada
+dato:
+
+- **Distribución de decisiones** y **tasa de escalamiento**: derivables hoy
+  de `GET /cases` (agregación en el cliente, o un endpoint de agregación
+  nuevo). No dependen de LangSmith.
+- **Latencia y costo por nodo**: no existen en ningún lado todavía.
+  LangSmith es la capa declarada para esto desde v0.1 del contrato
+  (ADR-0013), pero **nunca se conectó** — ver deuda en §7. Implementar el
+  wiring es prerequisito de esta parte de la vista, no un detalle de UI.
+- **Benchmark de modelos**: ubicar dónde vive ese resultado hoy (¿DeepEval?
+  ¿un script suelto?) antes de asumir que hay algo que servir.
+
+**Decisión pendiente**: ¿esta etapa incluye el wiring de LangSmith (alcance
+nuevo, no sólo frontend) o la vista de Evaluación arranca sólo con lo que
+ya es servible (distribución + escalamiento), y "latencia/costo por nodo"
+queda declarado como *sin datos todavía*?
+
+> La forma de conectar LangSmith, si se hace, ya está resuelta:
+> `wrap_anthropic()` sobre los tres clientes, no migrar a `ChatAnthropic`
+> (ver §7). Lo que sigue abierto es únicamente el *cuándo*.
 
 ---
 
@@ -133,6 +186,7 @@ principales funcionan contra la API real, con casos que ejerciten
 | Sin autenticación en los endpoints HITL | acta 09 §6.1 |
 | `POST /api/v1/policies` no existe (Fase 3 del catálogo) | acta 09 §6.2 / ADR-0017 |
 | Un restart de proceso a mitad de un caso lo deja atascado en `ANALYZING` | acta 09 §6.3 |
+| **LangSmith declarado desde v0.1 y "ya decidido" (ADR-0013) como capa de observabilidad de los entregables 6 y 7, pero nunca conectado**: `settings.py` no lee `LANGSMITH_*`; `narrator.py`, `judge.py` y `searcher.py` usan el SDK crudo de Anthropic. **Resuelto cómo, no cuándo**: envolver los tres clientes con `langsmith.wrappers.wrap_anthropic` — no migrar a `ChatAnthropic`, que exigiría rehacer la salida estructurada nativa de `judge.py` (`messages.parse`) y la herramienta de búsqueda web nativa de `searcher.py` (`web_search_20250305`), ninguna con equivalente maduro en LangChain hoy. La migración a `ChatAnthropic` queda **anotada como exploración futura, con su propio ADR si se retoma** — no es parte de esta etapa | hallazgo 2026-08-13, ver §4.5 |
 
 ---
 
