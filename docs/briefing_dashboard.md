@@ -35,6 +35,20 @@ Considerar lo siguiente:
 6. skills y plugins:
    - Plantear un borrador usando el conector Figma y vamos iterando
    - Hacer uso del skill "frontend-design"
+7. Visualización del grafo: React Flow para el panel de detalle del punto 5.1 —
+   representar la topología real de LangGraph (nodos y aristas) y, superpuesta,
+   la ejecución del caso puntual (qué corrió, qué se degradó). La topología no
+   se dibuja a mano: se deriva de `build_graph().get_graph()`, el mismo origen
+   que ya usa `scripts/export_graph_diagram.py` para el PNG del README — un
+   script hermano exporta esa estructura como JSON para que React Flow la
+   consuma, en vez de mantener dos copias de la topología que puedan
+   desincronizarse. La ejecución por caso sale de `agent_route` y
+   `degraded_agents` de `CaseDetail`, ya en el contrato — sin endpoint nuevo.
+   Importante: `agent_route` es una secuencia de supersteps **aplanada**, y la
+   adyacencia dentro de un grupo no implica precedencia causal (§2.5 del
+   contrato) — dibujar la topología real (con sus ramas paralelas) y sólo
+   superponerle el estado de ejecución evita ese error por construcción, en
+   vez de dibujar `agent_route` como si fuera una cadena.
 
 ## 1. Por qué esta etapa y no CI/despliegue
 
