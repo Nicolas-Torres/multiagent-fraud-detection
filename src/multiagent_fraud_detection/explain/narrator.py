@@ -77,6 +77,7 @@ class AnthropicNarrator:
     def _cliente(self) -> Any:
         if self._client is None:
             from anthropic import Anthropic
+            from langsmith.wrappers import wrap_anthropic
 
             clave = self.api_key or settings.anthropic_api_key
             if not clave:
@@ -86,7 +87,11 @@ class AnthropicNarrator:
                     "porque cambiarlos por `env` haría mentir a "
                     "`explanation_prompt_version`."
                 )
-            self._client = Anthropic(api_key=clave)
+            # No-op si `LANGSMITH_TRACING` no esta en `os.environ`
+            # (`config.settings` lo propaga sólo cuando hay clave y flag
+            # encendida) — envolver siempre es más simple que duplicar ese
+            # chequeo acá.
+            self._client = wrap_anthropic(Anthropic(api_key=clave))
         return self._client
 
     def narrate(self, system: str, user: str) -> str:

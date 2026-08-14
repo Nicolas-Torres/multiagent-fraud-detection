@@ -87,6 +87,7 @@ class AnthropicSearcher:
     def _cliente(self) -> Any:
         if self._client is None:
             from anthropic import Anthropic
+            from langsmith.wrappers import wrap_anthropic
 
             clave = self.api_key or settings.anthropic_api_key
             if not clave:
@@ -96,7 +97,9 @@ class AnthropicSearcher:
                     "código, porque cambiarlos por `env` haría mentir a "
                     "`threat_intel_version`."
                 )
-            self._client = Anthropic(api_key=clave)
+            # Mismo criterio que `AnthropicNarrator._cliente`: envolver es
+            # no-op sin `LANGSMITH_TRACING` en `os.environ`.
+            self._client = wrap_anthropic(Anthropic(api_key=clave))
         return self._client
 
     def search(

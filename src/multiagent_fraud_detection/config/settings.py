@@ -1,3 +1,5 @@
+import os
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
@@ -43,6 +45,18 @@ class Settings(BaseSettings):
     # prevista en una caida.
     anthropic_api_key: str | None = None
 
+    # ADR-0013: LangSmith es la capa de observabilidad del grafo (entregable
+    # 6). Declaradas aca por la misma razon que el resto del contrato
+    # operativo (§1.4) — para que queden validadas y documentadas — aunque
+    # LangGraph y `langsmith.wrappers.wrap_anthropic` no las leen de `Settings`
+    # sino de `os.environ` directo: es el unico canal que esas librerias
+    # entienden, asi que `__post_init__`-like abajo las propaga una vez por
+    # proceso. Ausentes o `langsmith_tracing=False` → no se traza nada, mismo
+    # criterio de "opcional, no rompe" que `gemini_api_key`.
+    langsmith_api_key: str | None = None
+    langsmith_tracing: bool = False
+    langsmith_project: str | None = None
+
     @property
     def permite_operaciones_destructivas(self) -> bool:
         """Lista blanca: solo `local`.
@@ -55,4 +69,27 @@ class Settings(BaseSettings):
         return self.environment == "local"
 
 
+def propagar_langsmith(cfg: Settings) -> None:
+    """Traduce `Settings` a `os.environ`, el unico canal que LangGraph y
+    `langsmith.wrappers.wrap_anthropic` entienden — no aceptan la
+    configuracion como parametro.
+
+    Sin `langsmith_tracing` o sin clave, no toca `os.environ` en absoluto:
+    mismo criterio de "opcional, no rompe" que `gemini_api_key`.
+    `setdefault` para no pisar un `os.environ` ya seteado a mano (por
+    ejemplo, en CI).
+    """
+    if not (cfg.langsmith_tracing and cfg.langsmith_api_key):
+        return
+    os.environ.setdefault("LANGSMITH_TRACING", "true")
+    os.environ.setdefault("LANGSMITH_API_KEY", cfg.langsmith_api_key)
+    if cfg.langsmith_project:
+        os.environ.setdefault("LANGSMITH_PROJECT", cfg.langsmith_project)
+
+
 settings = Settings()
+
+# Unico punto donde esto corre: `config.settings` lo importa todo entry
+# point real (la app servida y cada script suelto) antes de tocar el grafo,
+# asi que esto pasa una vez por proceso, siempre a tiempo.
+propagar_langsmith(settings)
