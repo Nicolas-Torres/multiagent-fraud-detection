@@ -1,0 +1,124 @@
+{
+  "edges": [
+    {
+      "conditional": false,
+      "source": "__start__",
+      "target": "behavioral_pattern"
+    },
+    {
+      "conditional": false,
+      "source": "__start__",
+      "target": "external_threat_intel"
+    },
+    {
+      "conditional": false,
+      "source": "__start__",
+      "target": "transaction_context"
+    },
+    {
+      "conditional": false,
+      "source": "behavioral_pattern",
+      "target": "internal_policy_rag"
+    },
+    {
+      "conditional": false,
+      "source": "debate_pro_customer",
+      "target": "decision_arbiter"
+    },
+    {
+      "conditional": false,
+      "source": "debate_pro_fraud",
+      "target": "decision_arbiter"
+    },
+    {
+      "conditional": false,
+      "source": "decision_arbiter",
+      "target": "explainability"
+    },
+    {
+      "conditional": false,
+      "source": "evidence_aggregation",
+      "target": "debate_pro_customer"
+    },
+    {
+      "conditional": false,
+      "source": "evidence_aggregation",
+      "target": "debate_pro_fraud"
+    },
+    {
+      "conditional": false,
+      "source": "explainability",
+      "target": "persist_decision"
+    },
+    {
+      "conditional": false,
+      "source": "external_threat_intel",
+      "target": "internal_policy_rag"
+    },
+    {
+      "conditional": false,
+      "source": "internal_policy_rag",
+      "target": "evidence_aggregation"
+    },
+    {
+      "conditional": false,
+      "source": "persist_decision",
+      "target": "__end__"
+    },
+    {
+      "conditional": false,
+      "source": "transaction_context",
+      "target": "internal_policy_rag"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "__end__",
+      "synthetic": true
+    },
+    {
+      "id": "__start__",
+      "synthetic": true
+    },
+    {
+      "id": "behavioral_pattern",
+      "synthetic": false
+    },
+    {
+      "id": "debate_pro_customer",
+      "synthetic": false
+    },
+    {
+      "id": "debate_pro_fraud",
+      "synthetic": false
+    },
+    {
+      "id": "decision_arbiter",
+      "synthetic": false
+    },
+    {
+      "id": "evidence_aggregation",
+      "synthetic": false
+    },
+    {
+      "id": "explainability",
+      "synthetic": false
+    },
+    {
+      "id": "external_threat_intel",
+      "synthetic": false
+    },
+    {
+      "id": "internal_policy_rag",
+      "synthetic": false
+    },
+    {
+      "id": "persist_decision",
+      "synthetic": false
+    },
+    {
+      "id": "transaction_context",
+      "synthetic": false
+    }
+  ]
+}

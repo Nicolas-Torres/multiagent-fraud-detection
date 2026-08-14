@@ -12,6 +12,10 @@ dist
 dist-ssr
 *.local
 
+# Intermediario transitorio de `generate:api` — el producto committeado es
+# src/api/schema.d.ts, no el spec crudo.
+openapi.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
