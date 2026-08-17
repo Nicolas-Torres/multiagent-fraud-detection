@@ -3,9 +3,11 @@ import { NavLink, Outlet } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 
 const LINKS = [
-  { to: '/', label: 'Cola', end: true },
+  { to: '/', label: 'Inicio', end: true },
+  { to: '/queue', label: 'Cola (vista analista)', end: false },
   { to: '/policies', label: 'Políticas', end: false },
   { to: '/evaluation', label: 'Evaluación', end: false },
+  { to: '/architecture', label: 'Cómo se construyó', end: false },
 ]
 
 export function AppShell() {

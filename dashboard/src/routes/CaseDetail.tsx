@@ -2,12 +2,12 @@ import { useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 
 import { api } from '@/api/client'
-import { GraphPanel } from '@/components/GraphPanel'
+import { DecisionShowcase } from '@/components/DecisionShowcase'
+import { Field } from '@/components/Field'
 import { ResolutionForm } from '@/components/ResolutionForm'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { decisionVariant, severityVariant } from '@/lib/badges'
 import { formatAmount, formatDateTime } from '@/lib/format'
 
 export function CaseDetail() {
@@ -40,7 +40,7 @@ export function CaseDetail() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <Link to="/" className="text-sm text-muted-foreground hover:underline">
+          <Link to="/queue" className="text-sm text-muted-foreground hover:underline">
             ← Cola
           </Link>
           <h1 className="text-xl font-semibold">Caso {caso.case_id}</h1>
@@ -91,111 +91,7 @@ export function CaseDetail() {
         </CardContent>
       </Card>
 
-      {decision && (
-        <>
-          {decision.degraded_agents.length > 0 && (
-            <div className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-              Evidencia incompleta: {decision.degraded_agents.join(', ')} no completó su
-              análisis. La confianza refleja esta falla, no una señal de fraude.
-            </div>
-          )}
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                Decisión
-                <Badge variant={decisionVariant(decision.decision)}>{decision.decision}</Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
-                <Field label="Confianza" value={decision.confidence.toFixed(2)} />
-                {decision.confidence_rationale && (
-                  <Field label="Ajuste del árbitro" value={decision.confidence_rationale} wide />
-                )}
-              </div>
-
-              {decision.signals.length > 0 && (
-                <div>
-                  <h3 className="mb-2 text-sm font-medium">Señales</h3>
-                  <ul className="space-y-1">
-                    {decision.signals.map((s) => (
-                      <li key={s.code} className="flex items-center gap-2 text-sm">
-                        <Badge variant={severityVariant(s.severity)}>{s.severity}</Badge>
-                        {s.description}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {decision.citations_internal.length > 0 && (
-                <div>
-                  <h3 className="mb-2 text-sm font-medium">Políticas citadas</h3>
-                  <ul className="space-y-1 text-sm text-muted-foreground">
-                    {decision.citations_internal.map((c) => (
-                      <li key={c.policy_id}>
-                        {c.policy_id} (v{c.version})
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {decision.citations_external.length > 0 && (
-                <div>
-                  <h3 className="mb-2 text-sm font-medium">Fuentes externas</h3>
-                  <ul className="space-y-1 text-sm">
-                    {decision.citations_external.map((c) => (
-                      <li key={c.url}>
-                        <a
-                          href={c.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-primary hover:underline"
-                        >
-                          {c.summary}
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="rounded-md border p-3">
-                  <h3 className="mb-1 text-sm font-medium">A favor de investigar</h3>
-                  <p className="text-sm text-muted-foreground">{decision.debate.pro_fraud_argument}</p>
-                </div>
-                <div className="rounded-md border p-3">
-                  <h3 className="mb-1 text-sm font-medium">A favor del cliente</h3>
-                  <p className="text-sm text-muted-foreground">{decision.debate.pro_customer_argument}</p>
-                </div>
-              </div>
-
-              <div>
-                <h3 className="mb-1 text-sm font-medium">Explicación de auditoría</h3>
-                <p className="text-sm text-muted-foreground">{decision.explanation_audit}</p>
-              </div>
-
-              <div>
-                {/* Tal como la sirve `CaseDetail` — nunca reconstruida (§5). */}
-                <h3 className="mb-1 text-sm font-medium">Explicación al cliente</h3>
-                <p className="text-sm text-muted-foreground">{decision.explanation_customer}</p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Recorrido por el grafo</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <GraphPanel agentRoute={decision.agent_route} degradedAgents={decision.degraded_agents} />
-            </CardContent>
-          </Card>
-        </>
-      )}
+      {decision && <DecisionShowcase decision={decision} />}
 
       {human_resolution ? (
         <Card>
@@ -212,15 +108,6 @@ export function CaseDetail() {
       ) : (
         caso.status === 'PENDING_HUMAN' && <ResolutionForm caseId={caso.case_id} />
       )}
-    </div>
-  )
-}
-
-function Field({ label, value, wide }: { label: string; value: string; wide?: boolean }) {
-  return (
-    <div className={wide ? 'col-span-full' : undefined}>
-      <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd>{value}</dd>
     </div>
   )
 }
