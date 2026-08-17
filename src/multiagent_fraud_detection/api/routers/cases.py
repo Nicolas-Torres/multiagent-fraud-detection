@@ -6,6 +6,7 @@ la del request ya devolvió para cuando el grafo termina.
 from __future__ import annotations
 
 import logging
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
@@ -26,6 +27,44 @@ from multiagent_fraud_detection.schemas.transaction import TransactionIn
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["cases"])
+
+# Cooldown de la demo pública del dashboard (portafolio, sin autenticación):
+# protege el costo de LLM de un visitante que clickea "ejecutar" repetido,
+# no es dato de negocio ni parte del contrato documentado de `POST /cases`
+# — por eso vive en memoria del proceso, y por eso sólo mira
+# `transaction_id` con el prefijo `LIVE-` que arma el frontend para los
+# escenarios ejecutables. Cualquier otro llamador de este endpoint (el
+# real, el que describe el contrato) nunca pasa por acá.
+#
+# Global por escenario, no por IP: sin sesiones ni autenticación no hay con
+# qué identificar visitantes, y global es más simple y ya cubre el riesgo
+# real (gasto de API, no abuso dirigido a una persona).
+LIVE_PREFIX = "LIVE-"
+LIVE_COOLDOWN = timedelta(minutes=10)
+_ultima_corrida_por_escenario: dict[str, datetime] = {}
+
+
+def _escenario_de(transaction_id: str) -> str | None:
+    if not transaction_id.startswith(LIVE_PREFIX):
+        return None
+    return transaction_id.removeprefix(LIVE_PREFIX).split("-", 1)[0]
+
+
+def _cooldown_restante(transaction_id: str) -> timedelta | None:
+    escenario = _escenario_de(transaction_id)
+    if escenario is None:
+        return None
+    ultima = _ultima_corrida_por_escenario.get(escenario)
+    if ultima is None:
+        return None
+    restante = LIVE_COOLDOWN - (datetime.now(UTC) - ultima)
+    return restante if restante > timedelta(0) else None
+
+
+def _marcar_corrida(transaction_id: str) -> None:
+    escenario = _escenario_de(transaction_id)
+    if escenario is not None:
+        _ultima_corrida_por_escenario[escenario] = datetime.now(UTC)
 
 
 async def _marcar(contexto: GraphContext, case_id: UUID, status_: CaseStatus) -> None:
@@ -86,6 +125,16 @@ async def crear_caso(
     base (`cases_transaction_id_key`), no este chequeo, que sólo evita la
     vuelta al grafo en el caso común.
     """
+    restante = _cooldown_restante(transaction.transaction_id)
+    if restante is not None:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=(
+                "este escenario de demo se corrió hace poco, "
+                f"reintentá en {int(restante.total_seconds())}s"
+            ),
+        )
+
     existente = await _caso_existente(session, transaction.transaction_id)
     if existente is not None:
         response.status_code = status.HTTP_200_OK
@@ -109,6 +158,7 @@ async def crear_caso(
 
     await session.refresh(caso)
 
+    _marcar_corrida(transaction.transaction_id)
     background_tasks.add_task(
         _correr_grafo, graph, contexto, caso.case_id, transaction
     )
