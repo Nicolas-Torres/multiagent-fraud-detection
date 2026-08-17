@@ -1,0 +1,27 @@
+[
+  {
+    "case_id": "064fae8c-9ccf-45bc-9f48-3763785b61d9",
+    "transaction_id": "T-2579",
+    "label": "Aprobación limpia"
+  },
+  {
+    "case_id": "c9065a38-9883-4297-ab1d-408c9bf3b2f2",
+    "transaction_id": "T-1809",
+    "label": "Monto y horario inusual (FP-01)"
+  },
+  {
+    "case_id": "2b495d92-6e99-4999-9359-b6f1ab6cea44",
+    "transaction_id": "T-4445",
+    "label": "Perfil modificado antes de operar (FP-09)"
+  },
+  {
+    "case_id": "9c3d78d6-5dcd-4ebc-a79a-c0511aba2d97",
+    "transaction_id": "T-1313",
+    "label": "Cuenta nueva, monto grande (FP-08)"
+  },
+  {
+    "case_id": "699acbdd-5969-487e-83d0-3c49b30c3065",
+    "transaction_id": "T-5816",
+    "label": "Escalado y resuelto por un analista"
+  }
+]
