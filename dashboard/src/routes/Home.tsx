@@ -7,7 +7,7 @@ import { DecisionShowcase } from '@/components/DecisionShowcase'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { LIVE_SCENARIOS, transactionIdParaEscenario } from '@/data/liveScenarios'
+import { LIVE_SCENARIOS, transaccionParaCorridaEnVivo } from '@/data/liveScenarios'
 import showcaseCasesRaw from '@/data/showcase_cases.json'
 import { cn } from '@/lib/utils'
 
@@ -49,10 +49,7 @@ export function Home() {
     mutationFn: async (escenarioId: string) => {
       const escenario = LIVE_SCENARIOS.find((e) => e.id === escenarioId)!
       const { data, error, response } = await api.POST('/api/v1/cases', {
-        body: {
-          ...escenario.payload,
-          transaction_id: transactionIdParaEscenario(escenarioId),
-        },
+        body: transaccionParaCorridaEnVivo(escenario),
       })
       if (error) {
         if (response.status === 429) {

@@ -28,14 +28,22 @@ export const LIVE_SCENARIOS: LiveScenario[] = [
     label: 'Aprobación limpia',
     description: 'Monto y horario dentro de lo habitual del cliente — sin señales.',
     payload: {
-      customer_id: 'CU-0643',
-      amount: '864.07',
+      // No CU-0643/T-2579 (el de la vitrina precalculada): ese cliente ya
+      // tiene una transacción real sembrada a las 01:45 en PE, y el país
+      // habitual del cliente es ES — cualquier corrida en vivo con un país
+      // distinto de PE dispara FP-05 (geolocalización imposible) contra esa
+      // fila ya existente, y con PE arriesga FP-02 al sufijar el
+      // dispositivo (abajo). CU-0426/T-1047 no tiene ese problema: país y
+      // dispositivo ya coinciden con su perfil habitual desde el dataset
+      // real, sin parches.
+      customer_id: 'CU-0426',
+      amount: '3248.53',
       currency: 'EUR',
-      country: 'PE',
+      country: 'ES',
       channel: 'web',
-      device_id: 'D-0643',
-      timestamp: '2025-12-01T01:45:00+00:00',
-      merchant_id: 'M-038',
+      device_id: 'D-0426',
+      timestamp: '2025-12-01T01:59:00+00:00',
+      merchant_id: 'M-022',
       issuer_bank: null,
     },
   },
@@ -73,6 +81,31 @@ export const LIVE_SCENARIOS: LiveScenario[] = [
   },
 ]
 
-export function transactionIdParaEscenario(escenarioId: string): string {
-  return `LIVE-${escenarioId}-${Date.now()}`
+/**
+ * Arma la transacción completa para una corrida en vivo, con
+ * `transaction_id`, `device_id` y `merchant_id` sufijados con el mismo
+ * token único.
+ *
+ * El timestamp queda fijo (arriba), pero cada clic sí escribe una
+ * transacción real y permanente (W0 siempre persiste). Sin este sufijo,
+ * varias corridas del mismo escenario —de visitantes distintos, en
+ * momentos distintos— acumulan el mismo dispositivo y el mismo comercio en
+ * la misma ventana fija, y el motor ve eso correctamente como velocity real
+ * (FP-03) o suma diaria real (FP-11): el escenario "Monto y horario
+ * inusual" empezaba a derivar hacia BLOCK con el uso, no por un bug sino
+ * por evidencia que el propio uso de la demo iba generando.
+ *
+ * Seguro para los tres escenarios — verificado contra los perfiles reales:
+ * ninguno depende de que el dispositivo o el comercio sean "habituales"
+ * para producir su veredicto (a diferencia del país, que si importa para
+ * FP-02 — por eso el escenario "approve" usa el país real del cliente).
+ */
+export function transaccionParaCorridaEnVivo(escenario: LiveScenario): TransactionIn {
+  const token = Date.now()
+  return {
+    ...escenario.payload,
+    transaction_id: `LIVE-${escenario.id}-${token}`,
+    device_id: `${escenario.payload.device_id}-${token}`,
+    merchant_id: `${escenario.payload.merchant_id}-${token}`,
+  }
 }
