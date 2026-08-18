@@ -72,7 +72,11 @@ export function layoutTopology(topology: Topology): { nodes: Node[]; edges: Edge
     return {
       id: n.id,
       position: { x: lvl * COL_GAP, y: (idx - offset) * ROW_GAP },
-      data: { label: n.id },
+      // `level` viaja en `data` para que `GraphPanel` pueda escalonar la
+      // animación de "analizando" en el mismo orden topológico que ya
+      // gobierna el layout — un nodo no puede "pulsar antes" que sus
+      // padres sin contradecir lo que el propio grafo garantiza.
+      data: { label: n.id, level: lvl },
       // Estilo real (color por estado de ejecución) lo aplica GraphPanel;
       // acá sólo la geometría.
       style: { width: 170 },

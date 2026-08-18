@@ -2,8 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 
 import { api } from '@/api/client'
+import { AnalyzingPanel } from '@/components/AnalyzingPanel'
 import { DecisionShowcase } from '@/components/DecisionShowcase'
-import { GraphPanel } from '@/components/GraphPanel'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -81,36 +81,6 @@ export function Home() {
         </p>
       </div>
 
-      {/* Panel fijo: reacciona al caso elegido o al que está corriendo. */}
-      <section>
-        {!selectedId && (
-          <p className="text-muted-foreground">Elegí un caso de la lista para verlo acá.</p>
-        )}
-        {selectedId && detalle.isLoading && <Skeleton className="h-96 w-full" />}
-        {selectedId && detalle.isError && (
-          <p className="text-destructive">No se pudo cargar el caso.</p>
-        )}
-        {selectedId && detalle.data && !detalle.data.decision && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Analizando…</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="mb-4 text-sm text-muted-foreground">
-                Estado: {detalle.data.status}. Nueve agentes en marcha — señales
-                determinísticas, recuperación de políticas por similitud, debate
-                pro-fraude/pro-cliente y el árbitro con LLM. Esto tarda entre 10 y 20
-                segundos porque son llamadas reales, no una simulación.
-              </p>
-              <GraphPanel agentRoute={[]} degradedAgents={[]} />
-            </CardContent>
-          </Card>
-        )}
-        {selectedId && detalle.data?.decision && (
-          <DecisionShowcase decision={detalle.data.decision} />
-        )}
-      </section>
-
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">Casos reales</h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -157,6 +127,25 @@ export function Home() {
         </div>
         {errorEjecucion && <p className="text-sm text-destructive">{errorEjecucion}</p>}
       </section>
+      
+      {/* Panel fijo: reacciona al caso elegido o al que está corriendo. */}
+      <section>
+        {!selectedId && (
+          <p className="text-muted-foreground">Elegí un caso de la lista para verlo acá.</p>
+        )}
+        {selectedId && detalle.isLoading && <Skeleton className="h-96 w-full" />}
+        {selectedId && detalle.isError && (
+          <p className="text-destructive">No se pudo cargar el caso.</p>
+        )}
+        {selectedId && detalle.data && !detalle.data.decision && (
+          <AnalyzingPanel status={detalle.data.status} />
+        )}
+        {selectedId && detalle.data?.decision && (
+          <DecisionShowcase decision={detalle.data.decision} />
+        )}
+      </section>
+
+
     </div>
   )
 }

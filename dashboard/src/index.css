@@ -128,3 +128,12 @@
     @apply font-sans;
     }
 }
+
+/* Barrido indeterminado del panel de grafo mientras un caso está
+   analizándose en vivo (Home). No representa progreso real -W2 escribe
+   todo en un solo commit, no hay estado intermedio que leer (contrato
+   §7.3)-, sólo transmite que el proceso sigue vivo. */
+@keyframes node-pulse {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}

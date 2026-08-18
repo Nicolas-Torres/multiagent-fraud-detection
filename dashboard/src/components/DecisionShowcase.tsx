@@ -96,6 +96,8 @@ export function DecisionShowcase({ decision }: { decision: DecisionRead }) {
             </div>
           </div>
 
+          <SellosAuditoria decision={decision} />
+
           <div>
             <h3 className="mb-1 text-sm font-medium">Explicación de auditoría</h3>
             <p className="text-sm text-muted-foreground">{decision.explanation_audit}</p>
@@ -118,5 +120,36 @@ export function DecisionShowcase({ decision }: { decision: DecisionRead }) {
         </CardContent>
       </Card>
     </>
+  )
+}
+
+const SELLOS: { key: keyof DecisionRead; label: string }[] = [
+  { key: 'scoring_version', label: 'Fórmula de riesgo' },
+  { key: 'policy_catalog_version', label: 'Catálogo de políticas' },
+  { key: 'retrieval_index_version', label: 'Índice de recuperación' },
+  { key: 'explanation_prompt_version', label: 'Prompt de explicación' },
+  { key: 'threat_intel_version', label: 'Snapshot de inteligencia externa' },
+]
+
+/**
+ * La misma información que ya viaja al final de `explanation_audit`
+ * —ruta de agentes y los cinco sellos de versión (contrato §2.5)—, pero
+ * como campos tipados en vez de una oración corrida. `explanation_audit`
+ * sigue mostrándose completo abajo: nada se oculta, esto sólo lo hace
+ * legible de un vistazo antes del párrafo de auditoría.
+ */
+function SellosAuditoria({ decision }: { decision: DecisionRead }) {
+  const presentes = SELLOS.filter((s) => decision[s.key] != null)
+  if (presentes.length === 0) return null
+
+  return (
+    <div>
+      <h3 className="mb-2 text-sm font-medium">Sellos de auditoría</h3>
+      <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">
+        {presentes.map((s) => (
+          <Field key={s.key} label={s.label} value={String(decision[s.key])} />
+        ))}
+      </div>
+    </div>
   )
 }

@@ -9,6 +9,13 @@ import { cn } from '@/lib/utils'
 interface GraphPanelProps {
   agentRoute: string[]
   degradedAgents: string[]
+  /**
+   * Barrido indeterminado en vez de coloreo por estado — para el caso en
+   * que todavía no hay `agent_route` porque el grafo sigue corriendo
+   * (Home, mientras un escenario en vivo está en `ANALYZING`). No indica
+   * progreso real: W2 no deja nada leíble hasta que termina (§7.3).
+   */
+  animating?: boolean
 }
 
 type NodeStatus = 'ran' | 'degraded' | 'not-run' | 'synthetic'
@@ -32,7 +39,7 @@ function estadoDe(nodeId: string, synthetic: boolean, ran: Set<string>, degraded
   return 'not-run'
 }
 
-export function GraphPanel({ agentRoute, degradedAgents }: GraphPanelProps) {
+export function GraphPanel({ agentRoute, degradedAgents, animating = false }: GraphPanelProps) {
   const { nodes, edges } = useMemo(() => {
     const base = layoutTopology(topology)
     const ran = new Set(agentRoute)
@@ -40,6 +47,21 @@ export function GraphPanel({ agentRoute, degradedAgents }: GraphPanelProps) {
     const synthById = new Map(topology.nodes.map((n) => [n.id, n.synthetic]))
 
     const nodes: Node[] = base.nodes.map((n) => {
+      if (animating) {
+        const level = (n.data as { level?: number }).level ?? 0
+        return {
+          ...n,
+          className: cn(
+            'rounded-md border px-3 py-2 text-center text-sm font-medium',
+            'border-primary bg-secondary text-secondary-foreground',
+          ),
+          style: {
+            ...n.style,
+            animation: 'node-pulse 1.8s ease-in-out infinite',
+            animationDelay: `${level * 0.3}s`,
+          },
+        }
+      }
       const status = estadoDe(n.id, synthById.get(n.id) ?? false, ran, degraded)
       return {
         ...n,
@@ -51,7 +73,7 @@ export function GraphPanel({ agentRoute, degradedAgents }: GraphPanelProps) {
     })
 
     return { nodes, edges: base.edges }
-  }, [agentRoute, degradedAgents])
+  }, [agentRoute, degradedAgents, animating])
 
   return (
     <div className="h-80 w-full rounded-md border">
