@@ -3,10 +3,9 @@ import { useEffect, useState } from 'react'
 import { GraphPanel } from '@/components/GraphPanel'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
-// Puramente ilustrativas — no reflejan en qué nodo está el grafo de verdad.
-// No hay forma honesta de saberlo desde el cliente: W2 escribe todo en un
-// solo commit al terminar, sin estados intermedios persistidos (§7.3 del
-// contrato). Van en el orden típico de un superstep a otro, nada más.
+// Acompañan al progreso real (ADR-0018), no lo reemplazan: el stream dice
+// qué nodo terminó, pero no narra qué está haciendo mientras corre. Van en
+// el orden típico de un superstep a otro, nada más.
 const FRASES = [
   'Leyendo el contexto de la transacción...',
   'Comparando contra el comportamiento habitual del cliente...',
@@ -17,7 +16,13 @@ const FRASES = [
 ]
 const INTERVALO_MS = 2_500
 
-export function AnalyzingPanel({ status }: { status: string }) {
+interface AnalyzingPanelProps {
+  status: string
+  ranNodes: string[]
+  connected: boolean
+}
+
+export function AnalyzingPanel({ status, ranNodes, connected }: AnalyzingPanelProps) {
   const [frase, setFrase] = useState(0)
 
   useEffect(() => {
@@ -36,11 +41,15 @@ export function AnalyzingPanel({ status }: { status: string }) {
         </p>
         <p className="mb-4 text-xs text-muted-foreground">
           Entre 10 y 20 segundos — son llamadas reales a los proveedores, no una
-          simulación. El barrido de abajo marca que el proceso sigue vivo; el
-          sistema no expone qué nodo está corriendo en cada instante porque
-          escribe el resultado completo recién al terminar, nunca en partes.
+          simulación. {connected
+            ? 'Cada nodo se ilumina apenas termina, en vivo (SSE).'
+            : 'Conectando el progreso en vivo — el barrido de abajo sólo marca que el proceso sigue corriendo.'}
         </p>
-        <GraphPanel agentRoute={[]} degradedAgents={[]} animating />
+        {connected ? (
+          <GraphPanel agentRoute={ranNodes} degradedAgents={[]} />
+        ) : (
+          <GraphPanel agentRoute={[]} degradedAgents={[]} animating />
+        )}
       </CardContent>
     </Card>
   )

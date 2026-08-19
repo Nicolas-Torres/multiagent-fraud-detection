@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { LIVE_SCENARIOS, transaccionParaCorridaEnVivo } from '@/data/liveScenarios'
 import showcaseCasesRaw from '@/data/showcase_cases.json'
+import { useCaseProgress } from '@/hooks/useCaseProgress'
 import { cn } from '@/lib/utils'
 
 interface ShowcaseCase {
@@ -41,9 +42,18 @@ export function Home() {
     enabled: !!selectedId,
     // Mientras no haya decisión el caso puede seguir avanzando
     // (RECEIVED → ANALYZING → DECIDED/PENDING_HUMAN) — se deja de sondear
-    // apenas hay veredicto. Polling, nunca WebSocket (§4.2, ya decidido).
+    // apenas hay veredicto. El polling sigue siendo la fuente de verdad del
+    // veredicto (§4.2); el stream de abajo sólo adelanta el progreso visual.
     refetchInterval: (query) => (query.state.data?.decision ? false : 3_000),
   })
+
+  // Sólo mientras el caso todavía no tiene veredicto: un caso ya decidido
+  // no necesita progreso, y el endpoint del stream ya responde "done" de
+  // una para un caso terminal (ADR-0018) — esto evita esa ida y vuelta
+  // extra en el caso común de elegir un caso de la vitrina ya resuelto.
+  const progreso = useCaseProgress(
+    selectedId && !detalle.data?.decision ? selectedId : null,
+  )
 
   const ejecutar = useMutation({
     mutationFn: async (escenarioId: string) => {
@@ -135,7 +145,11 @@ export function Home() {
           <p className="text-destructive">No se pudo cargar el caso.</p>
         )}
         {selectedId && detalle.data && !detalle.data.decision && (
-          <AnalyzingPanel status={detalle.data.status} />
+          <AnalyzingPanel
+            status={detalle.data.status}
+            ranNodes={progreso.ranNodes}
+            connected={progreso.connected}
+          />
         )}
         {selectedId && detalle.data?.decision && (
           <DecisionShowcase decision={detalle.data.decision} />

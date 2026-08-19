@@ -79,6 +79,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/cases/{case_id}/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Progreso Caso
+         * @description No es fuente de verdad (§7.3 del contrato) — `GET /cases/{case_id}`
+         *     sigue siendo la única forma confiable de conocer el veredicto; esto es
+         *     puramente un agregado visual para la demo en vivo del dashboard.
+         */
+        get: operations["progreso_caso_api_v1_cases__case_id__stream_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/policies": {
         parameters: {
             query?: never;
@@ -155,6 +177,30 @@ export interface paths {
          *     tocar Postgres — ver `tests/test_api_health.py`.
          */
         get: operations["ready_ready_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/{full_path}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Dashboard Spa
+         * @description Sirve el SPA. Un archivo real del root de `dist/` (p.ej.
+         *     `favicon.svg`) se sirve por su nombre exacto; cualquier otra ruta
+         *     es del router del lado del cliente (React Router) y cae a
+         *     `index.html` — `StaticFiles(html=True)` sólo resuelve URLs de
+         *     directorio, no rutas profundas como `/cases/{id}`.
+         */
+        get: operations["dashboard_spa__full_path__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -704,6 +750,37 @@ export interface operations {
             };
         };
     };
+    progreso_caso_api_v1_cases__case_id__stream_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     listar_politicas_api_v1_policies_get: {
         parameters: {
             query?: never;
@@ -784,6 +861,37 @@ export interface operations {
                     "application/json": {
                         [key: string]: string;
                     };
+                };
+            };
+        };
+    };
+    dashboard_spa__full_path__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                full_path: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
