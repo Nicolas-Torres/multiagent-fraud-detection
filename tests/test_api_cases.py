@@ -77,13 +77,19 @@ class _SesionFake:
 
 class _GrafoFake:
     """No corre nada real: sólo registra si lo llamaron, para probar que el
-    endpoint lo agenda sin esperarlo."""
+    endpoint lo agenda sin esperarlo. `astream` -no `ainvoke`- porque W1
+    consume el grafo en modo streaming desde ADR-0018; por defecto entrega
+    un único paso, suficiente para las pruebas que no miran el streaming en
+    sí (esas usan `test_case_progress.py`)."""
 
-    def __init__(self):
+    def __init__(self, pasos: list[dict] | None = None):
         self.invocado = False
+        self._pasos = pasos if pasos is not None else [{"transaction_context": {}}]
 
-    async def ainvoke(self, entrada, context):
+    async def astream(self, entrada, context, stream_mode):
         self.invocado = True
+        for paso in self._pasos:
+            yield paso
 
 
 class _CtxManager:
@@ -182,8 +188,9 @@ def test_el_grafo_que_lanza_deja_el_caso_en_failed():
     `FAILED`, y lo escribe el wrapper, no el grafo."""
 
     class _GrafoRoto:
-        async def ainvoke(self, entrada, context):
+        async def astream(self, entrada, context, stream_mode):
             raise RuntimeError("el grafo entero reventó")
+            yield  # pragma: no cover - nunca se alcanza; hace de esto un generador
 
     sesion = _SesionFake(existente=None)
     contexto = _ContextoFake()

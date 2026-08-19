@@ -5,16 +5,20 @@ la del request ya devolvió para cuando el grafo termina.
 
 from __future__ import annotations
 
+import json
 import logging
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Response, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from multiagent_fraud_detection.api import case_progress
 from multiagent_fraud_detection.api.deps import get_graph, get_graph_context, get_session
 from multiagent_fraud_detection.db.models import Case, HumanResolution, Transaction
 from multiagent_fraud_detection.enums import CaseStatus
@@ -85,15 +89,27 @@ async def _correr_grafo(
     `FAILED`: ningún nodo lo hace, porque un agente caído degrada, no
     aborta (`@degrades`). `FAILED` es exclusivamente para una excepción que
     escapó del grafo entero, la que este `try` atrapa.
+
+    `astream(stream_mode="updates")` en vez de `ainvoke()` (ADR-0018): cada
+    paso entrega un dict de una sola clave -el nombre del nodo que acaba de
+    terminar-, incluso para nodos que corrieron en el mismo superstep
+    paralelo. Publicarlo es puramente un efecto secundario para la demo en
+    vivo del dashboard; el resultado que W2 persiste no cambia en nada.
     """
     await _marcar(contexto, case_id, CaseStatus.ANALYZING)
     try:
-        await graph.ainvoke(
-            {"case_id": case_id, "transaction": transaction}, context=contexto
-        )
+        async for actualizacion in graph.astream(
+            {"case_id": case_id, "transaction": transaction},
+            context=contexto,
+            stream_mode="updates",
+        ):
+            for nodo in actualizacion:
+                case_progress.publicar(case_id, nodo)
     except Exception:  # noqa: BLE001 - es exactamente lo que W1 existe para atrapar
         logger.exception("caso %s no llegó a un veredicto", case_id)
         await _marcar(contexto, case_id, CaseStatus.FAILED)
+    finally:
+        case_progress.cerrar(case_id)
 
 
 async def _caso_existente(session: AsyncSession, transaction_id: str) -> Case | None:
@@ -203,6 +219,52 @@ async def detalle_caso(
     if caso is None:
         raise HTTPException(status_code=404, detail="caso no encontrado")
     return CaseDetail.model_validate(caso)
+
+
+_ESTADOS_EN_CURSO = frozenset({CaseStatus.RECEIVED, CaseStatus.ANALYZING})
+
+
+async def _eventos_de_progreso(
+    case_id: UUID, contexto: GraphContext
+) -> AsyncIterator[str]:
+    """Cuerpo `text/event-stream` de `GET /cases/{case_id}/stream` (ADR-0018).
+
+    Se suscribe **antes** de mirar el estado en base -no al revés-: si se
+    mirara primero, un caso podría pasar de `ANALYZING` a terminal en la
+    ventana entre esa lectura y la suscripción, y el evento `done` que
+    `_correr_grafo` publica en su `finally` se perdería para siempre. Con la
+    suscripción primero, ese evento -si llega a tiempo- se encola igual.
+    """
+    cola = case_progress.suscribirse(case_id)
+    try:
+        async with contexto.session_factory() as session:
+            caso = await session.get(Case, case_id)
+
+        if caso is None or caso.status not in _ESTADOS_EN_CURSO:
+            yield "event: done\ndata: {}\n\n"
+            return
+
+        while True:
+            item = await cola.get()
+            if item is case_progress.FIN:
+                yield "event: done\ndata: {}\n\n"
+                return
+            yield f"event: node\ndata: {json.dumps({'node': item})}\n\n"
+    finally:
+        case_progress.desuscribirse(case_id, cola)
+
+
+@router.get("/cases/{case_id}/stream")
+async def progreso_caso(
+    case_id: UUID, contexto: GraphContext = Depends(get_graph_context)
+) -> StreamingResponse:
+    """No es fuente de verdad (§7.3 del contrato) — `GET /cases/{case_id}`
+    sigue siendo la única forma confiable de conocer el veredicto; esto es
+    puramente un agregado visual para la demo en vivo del dashboard.
+    """
+    return StreamingResponse(
+        _eventos_de_progreso(case_id, contexto), media_type="text/event-stream"
+    )
 
 
 @router.post("/cases/{case_id}/resolution", response_model=CaseDetail)
