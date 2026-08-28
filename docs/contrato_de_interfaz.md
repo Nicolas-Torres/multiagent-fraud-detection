@@ -1,5 +1,5 @@
 # Contrato de Interfaz — Sistema Multi-Agente de Detección de Fraude
-**Versión 0.10 — La frontera HTTP existe: API + HITL implementados**
+**Versión 0.11 — El progreso en vivo se transmite por SSE**
 
 > Define las **fronteras** entre el motor de agentes (yo), la infraestructura (mi
 > compañero) y el dashboard del analista.
@@ -298,8 +298,19 @@ mediría la discrepancia de reglas en vez de la calidad del sistema.
 | `GET` | `/api/v1/policies` | 🆕 Catálogo con estado de cada política | — | `list[PolicyRead]` | `200` |
 | `POST` | `/api/v1/policies` | 🆕 Alta de política (norma + vinculación opcional) | `PolicyIn` | `PolicyRead` | `201` |
 | `GET` | `/api/v1/predicates` | 🆕 La biblioteca, para el compositor del dashboard | — | `list[PredicateSpec]` | `200` |
+| `GET` | `/api/v1/cases/{case_id}/stream` | 🆕 Progreso en vivo del grafo, por SSE (ADR-0018) | — | `text/event-stream` | `200` |
 | `GET` | `/health` | Liveness | — | `{status}` | `200` |
 | `GET` | `/ready` | Readiness (Postgres) | — | `{status}` | `200` |
+
+`GET /api/v1/cases/{case_id}/stream` emite eventos `node`
+(`{"node": "<nombre>"}`, uno por nodo del grafo que termina, incluidos los
+que corren en el mismo superstep paralelo) y `done` (cierre — el caso ya
+está en estado terminal, con o sin haber emitido ningún `node`). Es
+puramente efímero, en memoria del proceso: **no** es fuente de verdad del
+veredicto, que sigue siendo exclusivamente `GET /cases/{case_id}` (§2.3);
+esto no cambia en absoluto, sólo lo complementa con progreso visual. Sin
+autenticación, misma deuda declarada que el resto de los endpoints HITL
+(acta 09 §6.1).
 
 ### 2.4 Idempotencia en `POST /cases`
 
@@ -765,7 +776,7 @@ Job `fetch-intel` una vez por corrida de build, no el grafo (§4).
 |---|---|---|
 | 1 | Cálculo de confianza | **Híbrida**: determinístico (`base_confidence`) + ajuste acotado del Arbiter con justificación |
 | 2 | Payload del `POST /cases` | **Solo `Transaction`**; el grafo recupera el perfil |
-| 3 | Notificación al dashboard | **Polling** en v1; WebSocket = mejora (entregable 10) |
+| 3 | Notificación al dashboard | **Polling** como fuente de verdad; 🆕 progreso en vivo por **SSE** (ADR-0018, no WebSocket literal — ver §2.3) como agregado visual, nunca reemplazo |
 | 4 | Allowlist de búsqueda web | **Tabla gobernada** con audit trail |
 | 5 | Duplicados | **Idempotencia** por `transaction_id` |
 | 6 | `signals` | **Tabla relacional** (unidad de evaluación) |
