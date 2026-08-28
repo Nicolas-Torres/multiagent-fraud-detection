@@ -26,3 +26,5 @@ openapi.json
 *.njsproj
 *.sln
 *.sw?
+
+img/
