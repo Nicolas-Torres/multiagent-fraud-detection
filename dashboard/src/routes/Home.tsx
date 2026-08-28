@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { api } from '@/api/client'
 import { AnalyzingPanel } from '@/components/AnalyzingPanel'
@@ -25,10 +25,42 @@ const showcaseCases = showcaseCasesRaw as ShowcaseCase[]
 // la vitrina queda a un clic.
 const CASO_INICIAL = showcaseCases[1]?.case_id ?? showcaseCases[0]?.case_id ?? null
 
+// Espejo, sólo para la UI, del cooldown real del backend
+// (`LIVE_COOLDOWN` en `api/routers/cases.py`) — ese es el que manda, esto
+// sólo evita el silencio confuso de clickear "Ejecutar", que el POST
+// devuelva 429, y que el panel de abajo se quede mostrando el caso que ya
+// estaba seleccionado sin ninguna pista de por qué no pasó nada. No sabe
+// de corridas disparadas desde otro navegador — en ese caso, cae al
+// mensaje de error reactivo que ya existía.
+const COOLDOWN_MS = 10 * 60 * 1000
+const STORAGE_KEY = 'ultima-corrida-en-vivo'
+
+function leerUltimasCorridas(): Record<string, number> {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}') as Record<string, number>
+  } catch {
+    return {}
+  }
+}
+
+function formatoRestante(ms: number): string {
+  const totalSeg = Math.ceil(ms / 1000)
+  const min = Math.floor(totalSeg / 60)
+  const seg = totalSeg % 60
+  return `${min}:${String(seg).padStart(2, '0')}`
+}
+
 export function Home() {
   const [selectedId, setSelectedId] = useState<string | null>(CASO_INICIAL)
   const [errorEjecucion, setErrorEjecucion] = useState<string | null>(null)
+  const [ultimasCorridas, setUltimasCorridas] = useState<Record<string, number>>(leerUltimasCorridas)
+  const [ahora, setAhora] = useState(() => Date.now())
   const queryClient = useQueryClient()
+
+  useEffect(() => {
+    const id = setInterval(() => setAhora(Date.now()), 1_000)
+    return () => clearInterval(id)
+  }, [])
 
   const detalle = useQuery({
     queryKey: ['case', selectedId],
@@ -69,13 +101,24 @@ export function Home() {
       }
       return data
     },
-    onSuccess: (data) => {
+    onSuccess: (data, escenarioId) => {
       setErrorEjecucion(null)
       setSelectedId(data.case_id)
       queryClient.invalidateQueries({ queryKey: ['cases'] })
+      setUltimasCorridas((previas) => {
+        const actualizadas = { ...previas, [escenarioId]: Date.now() }
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(actualizadas))
+        return actualizadas
+      })
     },
     onError: (error: Error) => setErrorEjecucion(error.message),
   })
+
+  function restanteMs(escenarioId: string): number {
+    const ultima = ultimasCorridas[escenarioId]
+    if (!ultima) return 0
+    return Math.max(0, COOLDOWN_MS - (ahora - ultima))
+  }
 
   return (
     <div className="space-y-8">
@@ -114,23 +157,27 @@ export function Home() {
           nueva, ahora mismo, para que veas el análisis completo en vivo.
         </p>
         <div className="grid gap-3 sm:grid-cols-3">
-          {LIVE_SCENARIOS.map((escenario) => (
-            <Card key={escenario.id}>
-              <CardHeader>
-                <CardTitle className="text-sm">{escenario.label}</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <p className="text-xs text-muted-foreground">{escenario.description}</p>
-                <Button
-                  size="sm"
-                  onClick={() => ejecutar.mutate(escenario.id)}
-                  disabled={ejecutar.isPending}
-                >
-                  Ejecutar
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
+          {LIVE_SCENARIOS.map((escenario) => {
+            const restante = restanteMs(escenario.id)
+            const enCooldown = restante > 0
+            return (
+              <Card key={escenario.id} className={enCooldown ? 'opacity-60' : undefined}>
+                <CardHeader>
+                  <CardTitle className="text-sm">{escenario.label}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <p className="text-xs text-muted-foreground">{escenario.description}</p>
+                  <Button
+                    size="sm"
+                    onClick={() => ejecutar.mutate(escenario.id)}
+                    disabled={ejecutar.isPending || enCooldown}
+                  >
+                    {enCooldown ? `Disponible en ${formatoRestante(restante)}` : 'Ejecutar'}
+                  </Button>
+                </CardContent>
+              </Card>
+            )
+          })}
         </div>
         {errorEjecucion && <p className="text-sm text-destructive">{errorEjecucion}</p>}
       </section>
