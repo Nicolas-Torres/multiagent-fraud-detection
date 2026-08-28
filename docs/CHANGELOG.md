@@ -21,6 +21,25 @@ Sin enmiendas acumuladas. Las próximas se anotan en
 
 ---
 
+## [0.11] — El progreso en vivo se transmite por SSE
+
+Una enmienda, salida de construir el dashboard del analista y notar que el
+contrato ya la anticipaba desde v0.2.
+
+| # | Enmienda | Toca | Por qué |
+|---|---|---|---|
+| 1 | 🆕 **`GET /api/v1/cases/{case_id}/stream`** — progreso en vivo por SSE | §2.3, §5 | Implementa la mejora que §5 decisión 3 ya anticipaba ("WebSocket = mejora, entregable 10") — con SSE en vez de WebSocket literal: el caso de uso es estrictamente unidireccional (el servidor avisa qué nodo terminó, el cliente nunca contesta), así que un canal bidireccional sería complejidad sin necesidad. Puramente efímero, en memoria del proceso — el polling sobre `GET /cases/{id}` sigue siendo la única fuente de verdad del veredicto. |
+
+**Deliberadamente afuera de esta versión**: autenticación del endpoint
+—mismo criterio que el resto de los endpoints HITL desde v0.10— y
+persistencia de estados intermedios del grafo, que rompería la garantía de
+W2 de "reemplazo del agregado, nunca acumulación" (§7.3).
+
+Detrás: [ADR-0018](adr/0018-el-progreso-en-vivo-se-transmite-por-sse.md)
+y el acta [`reviews/10-dashboard.md`](reviews/10-dashboard.md).
+
+---
+
 ## [0.10] — La frontera HTTP existe: API + HITL implementados
 
 Una enmienda: los dos esquemas que el Contrato de API nombraba desde v0.2

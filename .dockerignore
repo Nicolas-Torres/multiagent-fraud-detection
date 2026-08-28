@@ -1,0 +1,18 @@
+.git
+.venv
+.env
+.env.cloud
+.env.example
+
+__pycache__
+*.pyc
+.pytest_cache
+
+dashboard/node_modules
+dashboard/dist
+
+docs
+
+# `data/` NO va acá: `scripts/seed.py` la lee en runtime, dentro del
+# contenedor, cuando el Job de seed corre contra la imagen desplegada
+# (contrato §1.2) — no es sólo un insumo de desarrollo local.

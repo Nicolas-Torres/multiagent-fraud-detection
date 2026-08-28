@@ -11,12 +11,24 @@ de punta a punta, con el grafo corriendo de verdad, lo verifica
 from datetime import UTC, datetime
 from uuid import uuid4
 
+import pytest
 from fastapi.testclient import TestClient
 
 from multiagent_fraud_detection.api.app import app
 from multiagent_fraud_detection.api.deps import get_graph, get_graph_context, get_session
+from multiagent_fraud_detection.api.routers import cases as cases_router
 from multiagent_fraud_detection.db.models import Case
 from multiagent_fraud_detection.enums import CaseStatus
+
+
+@pytest.fixture(autouse=True)
+def _sin_cooldown_previo():
+    """El cooldown de la demo vive en un dict a nivel de módulo — sin
+    limpiarlo, el orden de los tests decidiría cuál ve un escenario "usado"
+    por otro test, no el código bajo prueba."""
+    cases_router._ultima_corrida_por_escenario.clear()
+    yield
+    cases_router._ultima_corrida_por_escenario.clear()
 
 PAYLOAD = {
     "transaction_id": "T-API-TEST",
@@ -65,13 +77,19 @@ class _SesionFake:
 
 class _GrafoFake:
     """No corre nada real: sólo registra si lo llamaron, para probar que el
-    endpoint lo agenda sin esperarlo."""
+    endpoint lo agenda sin esperarlo. `astream` -no `ainvoke`- porque W1
+    consume el grafo en modo streaming desde ADR-0018; por defecto entrega
+    un único paso, suficiente para las pruebas que no miran el streaming en
+    sí (esas usan `test_case_progress.py`)."""
 
-    def __init__(self):
+    def __init__(self, pasos: list[dict] | None = None):
         self.invocado = False
+        self._pasos = pasos if pasos is not None else [{"transaction_context": {}}]
 
-    async def ainvoke(self, entrada, context):
+    async def astream(self, entrada, context, stream_mode):
         self.invocado = True
+        for paso in self._pasos:
+            yield paso
 
 
 class _CtxManager:
@@ -170,8 +188,9 @@ def test_el_grafo_que_lanza_deja_el_caso_en_failed():
     `FAILED`, y lo escribe el wrapper, no el grafo."""
 
     class _GrafoRoto:
-        async def ainvoke(self, entrada, context):
+        async def astream(self, entrada, context, stream_mode):
             raise RuntimeError("el grafo entero reventó")
+            yield  # pragma: no cover - nunca se alcanza; hace de esto un generador
 
     sesion = _SesionFake(existente=None)
     contexto = _ContextoFake()
@@ -185,3 +204,70 @@ def test_el_grafo_que_lanza_deja_el_caso_en_failed():
     assert respuesta.status_code == 202
     # Dos marcas: ANALYZING antes de invocar, FAILED al capturar la excepción.
     assert len(contexto.marcas) == 2
+
+
+def _payload_live(transaction_id: str) -> dict:
+    return {**PAYLOAD, "transaction_id": transaction_id}
+
+
+def test_segundo_disparo_del_mismo_escenario_da_429():
+    sesion = _SesionFake(existente=None)
+    grafo = _GrafoFake()
+    contexto = _ContextoFake()
+    _override(sesion, grafo, contexto)
+    try:
+        with TestClient(app) as client:
+            primera = client.post("/api/v1/cases", json=_payload_live("LIVE-approve-1"))
+            segunda = client.post("/api/v1/cases", json=_payload_live("LIVE-approve-2"))
+    finally:
+        app.dependency_overrides.clear()
+
+    assert primera.status_code == 202
+    assert segunda.status_code == 429
+    # El grafo sólo corrió una vez: la segunda ni siquiera llegó a agendarse.
+    assert grafo.invocado
+    assert len(contexto.marcas) == 1
+
+
+def test_otro_escenario_no_se_ve_afectado_por_el_cooldown_del_primero():
+    sesion = _SesionFake(existente=None)
+    grafo = _GrafoFake()
+    contexto = _ContextoFake()
+    _override(sesion, grafo, contexto)
+    try:
+        with TestClient(app) as client:
+            client.post("/api/v1/cases", json=_payload_live("LIVE-approve-1"))
+            otro = client.post("/api/v1/cases", json=_payload_live("LIVE-challenge-1"))
+    finally:
+        app.dependency_overrides.clear()
+
+    assert otro.status_code == 202
+
+
+def test_transaction_id_sin_prefijo_live_nunca_tiene_cooldown():
+    """El contrato documentado de `POST /cases` no sabe que este cooldown
+    existe — sólo lo ven los `transaction_id` que arma el propio frontend
+    de la demo."""
+    sesion = _SesionFake(existente=None)
+    grafo = _GrafoFake()
+    contexto = _ContextoFake()
+    _override(sesion, grafo, contexto)
+    try:
+        with TestClient(app) as client:
+            primera = client.post("/api/v1/cases", json=_payload_live("T-REAL-1"))
+    finally:
+        app.dependency_overrides.clear()
+
+    assert primera.status_code == 202
+
+    sesion2 = _SesionFake(existente=None)
+    grafo2 = _GrafoFake()
+    contexto2 = _ContextoFake()
+    _override(sesion2, grafo2, contexto2)
+    try:
+        with TestClient(app) as client:
+            segunda = client.post("/api/v1/cases", json=_payload_live("T-REAL-2"))
+    finally:
+        app.dependency_overrides.clear()
+
+    assert segunda.status_code == 202

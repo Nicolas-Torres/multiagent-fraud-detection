@@ -3,3 +3,8 @@ __pycache__/
 *.pyc
 .env
 .env.cloud
+
+dashboard/node_modules/
+dashboard/dist/
+docs/mejoras.md
+docs/temp/*

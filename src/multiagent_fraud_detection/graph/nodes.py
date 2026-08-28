@@ -874,8 +874,23 @@ async def persist_decision(
                 )
             )
 
+            # `customer_snapshot` lo calculó `behavioral_pattern` y viaja en el
+            # estado desde entonces — este es el único punto que lo transcribe
+            # a `cases`. Antes de este fix el `UPDATE` sólo tocaba `status`, así
+            # que el snapshot nunca llegaba a la fila: todo caso real mostraba
+            # `customer: null` en la API sin importar si el cliente tenía
+            # perfil. `model_dump(mode="json")`: mismo motivo que
+            # `citations_internal`/`citations_external` arriba.
+            perfil = state.get("customer_snapshot")
             await session.execute(
-                update(Case).where(Case.case_id == case_id).values(status=estado)
+                update(Case)
+                .where(Case.case_id == case_id)
+                .values(
+                    status=estado,
+                    customer_snapshot=(
+                        perfil.model_dump(mode="json") if perfil is not None else None
+                    ),
+                )
             )
 
     # No se agrega a `agent_route`: ese campo es el rastro de los AGENTES, y

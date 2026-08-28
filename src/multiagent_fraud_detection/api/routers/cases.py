@@ -5,15 +5,20 @@ la del request ya devolvió para cuando el grafo termina.
 
 from __future__ import annotations
 
+import json
 import logging
+from collections.abc import AsyncIterator
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Response, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from multiagent_fraud_detection.api import case_progress
 from multiagent_fraud_detection.api.deps import get_graph, get_graph_context, get_session
 from multiagent_fraud_detection.db.models import Case, HumanResolution, Transaction
 from multiagent_fraud_detection.enums import CaseStatus
@@ -26,6 +31,44 @@ from multiagent_fraud_detection.schemas.transaction import TransactionIn
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["cases"])
+
+# Cooldown de la demo pública del dashboard (portafolio, sin autenticación):
+# protege el costo de LLM de un visitante que clickea "ejecutar" repetido,
+# no es dato de negocio ni parte del contrato documentado de `POST /cases`
+# — por eso vive en memoria del proceso, y por eso sólo mira
+# `transaction_id` con el prefijo `LIVE-` que arma el frontend para los
+# escenarios ejecutables. Cualquier otro llamador de este endpoint (el
+# real, el que describe el contrato) nunca pasa por acá.
+#
+# Global por escenario, no por IP: sin sesiones ni autenticación no hay con
+# qué identificar visitantes, y global es más simple y ya cubre el riesgo
+# real (gasto de API, no abuso dirigido a una persona).
+LIVE_PREFIX = "LIVE-"
+LIVE_COOLDOWN = timedelta(minutes=1)
+_ultima_corrida_por_escenario: dict[str, datetime] = {}
+
+
+def _escenario_de(transaction_id: str) -> str | None:
+    if not transaction_id.startswith(LIVE_PREFIX):
+        return None
+    return transaction_id.removeprefix(LIVE_PREFIX).split("-", 1)[0]
+
+
+def _cooldown_restante(transaction_id: str) -> timedelta | None:
+    escenario = _escenario_de(transaction_id)
+    if escenario is None:
+        return None
+    ultima = _ultima_corrida_por_escenario.get(escenario)
+    if ultima is None:
+        return None
+    restante = LIVE_COOLDOWN - (datetime.now(UTC) - ultima)
+    return restante if restante > timedelta(0) else None
+
+
+def _marcar_corrida(transaction_id: str) -> None:
+    escenario = _escenario_de(transaction_id)
+    if escenario is not None:
+        _ultima_corrida_por_escenario[escenario] = datetime.now(UTC)
 
 
 async def _marcar(contexto: GraphContext, case_id: UUID, status_: CaseStatus) -> None:
@@ -46,15 +89,27 @@ async def _correr_grafo(
     `FAILED`: ningún nodo lo hace, porque un agente caído degrada, no
     aborta (`@degrades`). `FAILED` es exclusivamente para una excepción que
     escapó del grafo entero, la que este `try` atrapa.
+
+    `astream(stream_mode="updates")` en vez de `ainvoke()` (ADR-0018): cada
+    paso entrega un dict de una sola clave -el nombre del nodo que acaba de
+    terminar-, incluso para nodos que corrieron en el mismo superstep
+    paralelo. Publicarlo es puramente un efecto secundario para la demo en
+    vivo del dashboard; el resultado que W2 persiste no cambia en nada.
     """
     await _marcar(contexto, case_id, CaseStatus.ANALYZING)
     try:
-        await graph.ainvoke(
-            {"case_id": case_id, "transaction": transaction}, context=contexto
-        )
+        async for actualizacion in graph.astream(
+            {"case_id": case_id, "transaction": transaction},
+            context=contexto,
+            stream_mode="updates",
+        ):
+            for nodo in actualizacion:
+                case_progress.publicar(case_id, nodo)
     except Exception:  # noqa: BLE001 - es exactamente lo que W1 existe para atrapar
         logger.exception("caso %s no llegó a un veredicto", case_id)
         await _marcar(contexto, case_id, CaseStatus.FAILED)
+    finally:
+        case_progress.cerrar(case_id)
 
 
 async def _caso_existente(session: AsyncSession, transaction_id: str) -> Case | None:
@@ -86,6 +141,16 @@ async def crear_caso(
     base (`cases_transaction_id_key`), no este chequeo, que sólo evita la
     vuelta al grafo en el caso común.
     """
+    restante = _cooldown_restante(transaction.transaction_id)
+    if restante is not None:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=(
+                "este escenario de demo se corrió hace poco, "
+                f"reintentá en {int(restante.total_seconds())}s"
+            ),
+        )
+
     existente = await _caso_existente(session, transaction.transaction_id)
     if existente is not None:
         response.status_code = status.HTTP_200_OK
@@ -109,6 +174,7 @@ async def crear_caso(
 
     await session.refresh(caso)
 
+    _marcar_corrida(transaction.transaction_id)
     background_tasks.add_task(
         _correr_grafo, graph, contexto, caso.case_id, transaction
     )
@@ -153,6 +219,60 @@ async def detalle_caso(
     if caso is None:
         raise HTTPException(status_code=404, detail="caso no encontrado")
     return CaseDetail.model_validate(caso)
+
+
+_ESTADOS_EN_CURSO = frozenset({CaseStatus.RECEIVED, CaseStatus.ANALYZING})
+
+
+async def _eventos_de_progreso(
+    case_id: UUID, contexto: GraphContext
+) -> AsyncIterator[str]:
+    """Cuerpo `text/event-stream` de `GET /cases/{case_id}/stream` (ADR-0018).
+
+    Se suscribe **antes** de mirar el estado en base -no al revés-: si se
+    mirara primero, un caso podría pasar de `ANALYZING` a terminal en la
+    ventana entre esa lectura y la suscripción, y el evento `done` que
+    `_correr_grafo` publica en su `finally` se perdería para siempre. Con la
+    suscripción primero, ese evento -si llega a tiempo- se encola igual.
+
+    El primer superstep del grafo (reglas deterministas) suele terminar
+    antes de que el navegador cierre el handshake del `EventSource` -por
+    eso `suscribirse` también entrega el historial acumulado hasta ese
+    instante, y acá se reproduce antes de pasar a esperar eventos nuevos.
+    """
+    cola, historial = case_progress.suscribirse(case_id)
+    try:
+        async with contexto.session_factory() as session:
+            caso = await session.get(Case, case_id)
+
+        if caso is None or caso.status not in _ESTADOS_EN_CURSO:
+            yield "event: done\ndata: {}\n\n"
+            return
+
+        for nodo in historial:
+            yield f"event: node\ndata: {json.dumps({'node': nodo})}\n\n"
+
+        while True:
+            item = await cola.get()
+            if item is case_progress.FIN:
+                yield "event: done\ndata: {}\n\n"
+                return
+            yield f"event: node\ndata: {json.dumps({'node': item})}\n\n"
+    finally:
+        case_progress.desuscribirse(case_id, cola)
+
+
+@router.get("/cases/{case_id}/stream")
+async def progreso_caso(
+    case_id: UUID, contexto: GraphContext = Depends(get_graph_context)
+) -> StreamingResponse:
+    """No es fuente de verdad (§7.3 del contrato) — `GET /cases/{case_id}`
+    sigue siendo la única forma confiable de conocer el veredicto; esto es
+    puramente un agregado visual para la demo en vivo del dashboard.
+    """
+    return StreamingResponse(
+        _eventos_de_progreso(case_id, contexto), media_type="text/event-stream"
+    )
 
 
 @router.post("/cases/{case_id}/resolution", response_model=CaseDetail)

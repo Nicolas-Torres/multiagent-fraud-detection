@@ -1,6 +1,6 @@
 # Enmiendas pendientes — Contrato de Interfaz
 
-**Estado**: sin enmiendas acumuladas. Vigente: v0.10.
+**Estado**: sin enmiendas acumuladas. Vigente: v0.11.
 
 > Documento de trabajo: se **vacía** al publicar una versión, no se archiva.
 > Nunca hay dos.
@@ -8,15 +8,14 @@
 > Para recuperar el texto anterior:
 >
 > ```bash
-> git show contrato-v0.9:docs/contrato_de_interfaz.md
+> git show contrato-v0.10:docs/contrato_de_interfaz.md
 > ```
 
 ---
 
 ## 1. Decididas — listas para redactar
 
-*(ninguna; las de esta versión ya se redactaron y publicaron — ver
-CHANGELOG.md v0.10)*
+*(ninguna)*
 
 ---
 
