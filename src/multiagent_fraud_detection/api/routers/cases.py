@@ -44,7 +44,7 @@ router = APIRouter(tags=["cases"])
 # qué identificar visitantes, y global es más simple y ya cubre el riesgo
 # real (gasto de API, no abuso dirigido a una persona).
 LIVE_PREFIX = "LIVE-"
-LIVE_COOLDOWN = timedelta(minutes=10)
+LIVE_COOLDOWN = timedelta(minutes=1)
 _ultima_corrida_por_escenario: dict[str, datetime] = {}
 
 
@@ -234,8 +234,13 @@ async def _eventos_de_progreso(
     ventana entre esa lectura y la suscripción, y el evento `done` que
     `_correr_grafo` publica en su `finally` se perdería para siempre. Con la
     suscripción primero, ese evento -si llega a tiempo- se encola igual.
+
+    El primer superstep del grafo (reglas deterministas) suele terminar
+    antes de que el navegador cierre el handshake del `EventSource` -por
+    eso `suscribirse` también entrega el historial acumulado hasta ese
+    instante, y acá se reproduce antes de pasar a esperar eventos nuevos.
     """
-    cola = case_progress.suscribirse(case_id)
+    cola, historial = case_progress.suscribirse(case_id)
     try:
         async with contexto.session_factory() as session:
             caso = await session.get(Case, case_id)
@@ -243,6 +248,9 @@ async def _eventos_de_progreso(
         if caso is None or caso.status not in _ESTADOS_EN_CURSO:
             yield "event: done\ndata: {}\n\n"
             return
+
+        for nodo in historial:
+            yield f"event: node\ndata: {json.dumps({'node': nodo})}\n\n"
 
         while True:
             item = await cola.get()

@@ -24,13 +24,16 @@ def _registro_limpio():
     """El registro vive a nivel de módulo — un caso de un test no puede
     quedar suscrito cuando corre el siguiente."""
     case_progress._suscriptores.clear()
+    case_progress._historial.clear()
     yield
     case_progress._suscriptores.clear()
+    case_progress._historial.clear()
 
 
 async def test_publicar_llega_a_un_solo_suscriptor():
     case_id = uuid4()
-    cola = case_progress.suscribirse(case_id)
+    cola, historial = case_progress.suscribirse(case_id)
+    assert historial == []
 
     case_progress.publicar(case_id, "transaction_context")
 
@@ -41,8 +44,8 @@ async def test_publicar_llega_a_varios_suscriptores_a_la_vez():
     """Dos pestañas mirando el mismo caso ven los mismos eventos, cada una
     por su propia cola -no se reparten los eventos entre sí."""
     case_id = uuid4()
-    cola_a = case_progress.suscribirse(case_id)
-    cola_b = case_progress.suscribirse(case_id)
+    cola_a, _ = case_progress.suscribirse(case_id)
+    cola_b, _ = case_progress.suscribirse(case_id)
 
     case_progress.publicar(case_id, "behavioral_pattern")
 
@@ -56,18 +59,19 @@ async def test_publicar_a_un_caso_sin_suscriptores_no_revienta():
 
 async def test_cerrar_manda_el_sentinel_de_fin_y_limpia_el_registro():
     case_id = uuid4()
-    cola = case_progress.suscribirse(case_id)
+    cola, _ = case_progress.suscribirse(case_id)
 
     case_progress.cerrar(case_id)
 
     assert await cola.get() is case_progress.FIN
     assert case_id not in case_progress._suscriptores
+    assert case_id not in case_progress._historial
 
 
 def test_desuscribirse_saca_la_cola_sin_afectar_a_las_demas():
     case_id = uuid4()
-    cola_a = case_progress.suscribirse(case_id)
-    cola_b = case_progress.suscribirse(case_id)
+    cola_a, _ = case_progress.suscribirse(case_id)
+    cola_b, _ = case_progress.suscribirse(case_id)
 
     case_progress.desuscribirse(case_id, cola_a)
 
@@ -76,7 +80,7 @@ def test_desuscribirse_saca_la_cola_sin_afectar_a_las_demas():
 
 def test_desuscribirse_el_ultimo_borra_la_entrada_del_caso():
     case_id = uuid4()
-    cola = case_progress.suscribirse(case_id)
+    cola, _ = case_progress.suscribirse(case_id)
 
     case_progress.desuscribirse(case_id, cola)
 
@@ -94,7 +98,7 @@ def test_orden_de_eventos_se_preserva_por_suscriptor():
 
     async def _correr():
         case_id = uuid4()
-        cola = case_progress.suscribirse(case_id)
+        cola, _ = case_progress.suscribirse(case_id)
         for nodo in ["transaction_context", "behavioral_pattern", "external_threat_intel"]:
             case_progress.publicar(case_id, nodo)
         case_progress.cerrar(case_id)
@@ -109,6 +113,31 @@ def test_orden_de_eventos_se_preserva_por_suscriptor():
 
     vistos = asyncio.run(_correr())
     assert vistos == ["transaction_context", "behavioral_pattern", "external_threat_intel"]
+
+
+def test_un_suscriptor_tardio_recibe_el_historial_acumulado():
+    """El bug real: el primer superstep (sin LLM) suele terminar antes de
+    que el navegador termine el handshake del `EventSource` -sin este
+    historial, esos nodos nunca llegan a iluminarse en la demo."""
+    case_id = uuid4()
+    case_progress.publicar(case_id, "transaction_context")
+    case_progress.publicar(case_id, "behavioral_pattern")
+
+    _, historial = case_progress.suscribirse(case_id)
+
+    assert historial == ["transaction_context", "behavioral_pattern"]
+
+
+def test_el_historial_no_duplica_lo_que_ya_llega_por_la_cola():
+    case_id = uuid4()
+    case_progress.publicar(case_id, "transaction_context")
+
+    cola, historial = case_progress.suscribirse(case_id)
+    case_progress.publicar(case_id, "behavioral_pattern")
+
+    assert historial == ["transaction_context"]
+    assert cola.get_nowait() == "behavioral_pattern"
+    assert cola.empty()
 
 
 # --- El endpoint HTTP ---------------------------------------------------
@@ -223,3 +252,25 @@ async def test_stream_de_un_caso_en_curso_entrega_los_nodos_y_termina_al_cerrar(
 
     # `finally` corrió al agotarse el generador: nada queda suscrito.
     assert caso.case_id not in case_progress._suscriptores
+
+
+async def test_stream_reproduce_los_nodos_que_ya_habian_terminado_antes_de_conectarse():
+    """El bug real de esta demo: el primer superstep suele terminar antes
+    de que el navegador conecte el `EventSource`. El endpoint tiene que
+    reproducir ese historial antes de esperar eventos nuevos."""
+    caso = _caso(CaseStatus.ANALYZING)
+    contexto = _ContextoFake(caso)
+    case_progress.publicar(caso.case_id, "transaction_context")
+    case_progress.publicar(caso.case_id, "behavioral_pattern")
+
+    from multiagent_fraud_detection.api.routers.cases import _eventos_de_progreso
+
+    gen = _eventos_de_progreso(caso.case_id, contexto)
+    primero = await gen.__anext__()
+    segundo = await gen.__anext__()
+
+    assert '"node": "transaction_context"' in primero
+    assert '"node": "behavioral_pattern"' in segundo
+
+    case_progress.cerrar(caso.case_id)
+    assert await gen.__anext__() == "event: done\ndata: {}\n\n"

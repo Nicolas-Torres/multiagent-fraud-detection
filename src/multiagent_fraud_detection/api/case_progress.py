@@ -8,6 +8,15 @@ Un registro por proceso, no por réplica: con N réplicas cada una sólo ve el
 progreso de los casos que ella misma corre. Aceptable a propósito — es un
 agregado visual, no un dato que el sistema tenga que reconciliar entre
 instancias.
+
+Guarda también un historial corto por caso: el primer superstep del grafo
+(reglas deterministas, sin LLM) suele terminar en milisegundos, antes de
+que el `EventSource` del navegador siquiera termine el handshake -sin
+historial esos nodos jamás llegan a mostrarse. `suscribirse` entrega el
+historial acumulado hasta ese instante junto con la cola, de forma atómica
+respecto al event loop (nada hace `await` entre leerlo y registrar la
+cola), así que ningún nodo publicado después queda ni duplicado ni perdido
+entre el historial y la cola.
 """
 
 from __future__ import annotations
@@ -17,16 +26,17 @@ from collections import defaultdict
 from uuid import UUID
 
 _suscriptores: dict[UUID, list[asyncio.Queue]] = defaultdict(list)
+_historial: dict[UUID, list[str]] = defaultdict(list)
 
 # Sentinel de cierre — un objeto propio, no `None` ni un string: un nodo
 # real nunca puede confundirse con "se acabó".
 FIN = object()
 
 
-def suscribirse(case_id: UUID) -> asyncio.Queue:
+def suscribirse(case_id: UUID) -> tuple[asyncio.Queue, list[str]]:
     cola: asyncio.Queue = asyncio.Queue()
     _suscriptores[case_id].append(cola)
-    return cola
+    return cola, list(_historial.get(case_id, ()))
 
 
 def desuscribirse(case_id: UUID, cola: asyncio.Queue) -> None:
@@ -40,6 +50,7 @@ def desuscribirse(case_id: UUID, cola: asyncio.Queue) -> None:
 
 
 def publicar(case_id: UUID, nodo: str) -> None:
+    _historial[case_id].append(nodo)
     for cola in _suscriptores.get(case_id, ()):
         cola.put_nowait(nodo)
 
@@ -51,3 +62,4 @@ def cerrar(case_id: UUID) -> None:
     for cola in _suscriptores.get(case_id, ()):
         cola.put_nowait(FIN)
     _suscriptores.pop(case_id, None)
+    _historial.pop(case_id, None)
