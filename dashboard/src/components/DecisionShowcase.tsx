@@ -25,6 +25,15 @@ export function DecisionShowcase({ decision }: { decision: DecisionRead }) {
 
       <Card>
         <CardHeader>
+          <CardTitle>Recorrido por el grafo</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <GraphPanel agentRoute={decision.agent_route} degradedAgents={decision.degraded_agents} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle className="flex items-center gap-2">
             Decisión
             <Badge variant={decisionVariant(decision.decision)}>{decision.decision}</Badge>
@@ -111,14 +120,7 @@ export function DecisionShowcase({ decision }: { decision: DecisionRead }) {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Recorrido por el grafo</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <GraphPanel agentRoute={decision.agent_route} degradedAgents={decision.degraded_agents} />
-        </CardContent>
-      </Card>
+
     </>
   )
 }
