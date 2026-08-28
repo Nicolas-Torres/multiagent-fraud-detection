@@ -30,9 +30,7 @@ export function Evaluation() {
   const tasaEscalamiento =
     conVeredicto.length > 0
       ? (
-          (conVeredicto.filter((i) => i.decision === 'ESCALATE_TO_HUMAN').length /
-            conVeredicto.length) *
-          100
+          (conVeredicto.filter((i) => i.decision === 'ESCALATE_TO_HUMAN').length / conVeredicto.length) * 100
         ).toFixed(1)
       : null
 

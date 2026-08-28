@@ -46,7 +46,7 @@ export function AnalyzingPanel({ status, ranNodes, connected }: AnalyzingPanelPr
             : 'Conectando el progreso en vivo — el barrido de abajo sólo marca que el proceso sigue corriendo.'}
         </p>
         {connected ? (
-          <GraphPanel agentRoute={ranNodes} degradedAgents={[]} />
+          <GraphPanel agentRoute={ranNodes} degradedAgents={[]} caseDecided={false} />
         ) : (
           <GraphPanel agentRoute={[]} degradedAgents={[]} animating />
         )}
