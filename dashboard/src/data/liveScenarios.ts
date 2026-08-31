@@ -99,8 +99,16 @@ export const LIVE_SCENARIOS: LiveScenario[] = [
  * ninguno depende de que el dispositivo o el comercio sean "habituales"
  * para producir su veredicto (a diferencia del país, que si importa para
  * FP-02 — por eso el escenario "approve" usa el país real del cliente).
+ *
+ * Tipo de entrada acotado a `id`/`payload` a propósito: además de
+ * `LIVE_SCENARIOS`, la toman los 5 casos reales de la vitrina (que tienen
+ * `case_id`/`transaction_id` de más, no `description`) y los escenarios
+ * diversos generados — ninguno de los tres necesita traer la forma
+ * completa de `LiveScenario` para esto.
  */
-export function transaccionParaCorridaEnVivo(escenario: LiveScenario): TransactionIn {
+export function transaccionParaCorridaEnVivo(
+  escenario: Pick<LiveScenario, 'id' | 'payload'>,
+): TransactionIn {
   const token = Date.now()
   return {
     ...escenario.payload,
