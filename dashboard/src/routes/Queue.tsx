@@ -93,12 +93,13 @@ export function Queue() {
               <TableHead>Monto</TableHead>
               <TableHead>Cliente</TableHead>
               <TableHead>Creado</TableHead>
+              <TableHead>Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {query.data?.items.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground">
+                <TableCell colSpan={7} className="text-center text-muted-foreground">
                   Sin casos para este filtro.
                 </TableCell>
               </TableRow>
@@ -124,6 +125,13 @@ export function Queue() {
                 <TableCell>{item.customer_id}</TableCell>
                 <TableCell className="text-muted-foreground">
                   {formatDateTime(item.created_at)}
+                </TableCell>
+                <TableCell>
+                  {item.status === 'PENDING_HUMAN' ? (
+                    <Badge variant="default">revisar</Badge>
+                  ) : (
+                    <Badge variant="secondary">revisado</Badge>
+                  )}
                 </TableCell>
               </TableRow>
             ))}

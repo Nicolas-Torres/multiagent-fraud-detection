@@ -61,6 +61,7 @@ export function Policies() {
               <TableHead>Versión</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead>Acción</TableHead>
+              <TableHead>Rule</TableHead>
               <TableHead>Detalle</TableHead>
             </TableRow>
           </TableHeader>
@@ -73,6 +74,7 @@ export function Policies() {
                   <Badge variant={STATE_VARIANT[p.state]}>{STATE_LABEL[p.state]}</Badge>
                 </TableCell>
                 <TableCell>{p.action ?? '—'}</TableCell>
+                <TableCell className="max-w-md text-sm text-muted-foreground">{p.text}</TableCell>
                 <TableCell className="text-sm text-muted-foreground">
                   {p.excluded_reason ?? (p.evaluable ? 'se evalúa' : '—')}
                 </TableCell>
