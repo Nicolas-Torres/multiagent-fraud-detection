@@ -6,10 +6,10 @@ import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import { AppShell } from '@/components/AppShell'
 import { Architecture } from '@/routes/Architecture'
 import { CaseDetail } from '@/routes/CaseDetail'
-import { Evaluation } from '@/routes/Evaluation'
-import { Home } from '@/routes/Home'
+import { Dashboard } from '@/routes/Dashboard'
 import { Policies } from '@/routes/Policies'
 import { Queue } from '@/routes/Queue'
+import { Transactions } from '@/routes/Transactions'
 
 import './index.css'
 
@@ -20,11 +20,11 @@ const router = createBrowserRouter([
     path: '/',
     element: <AppShell />,
     children: [
-      { index: true, element: <Home /> },
+      { index: true, element: <Dashboard /> },
+      { path: 'transactions', element: <Transactions /> },
       { path: 'queue', element: <Queue /> },
       { path: 'cases/:caseId', element: <CaseDetail /> },
       { path: 'policies', element: <Policies /> },
-      { path: 'evaluation', element: <Evaluation /> },
       { path: 'architecture', element: <Architecture /> },
     ],
   },
