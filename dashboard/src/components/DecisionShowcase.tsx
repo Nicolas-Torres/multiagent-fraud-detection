@@ -42,6 +42,20 @@ export function DecisionShowcase({ decision }: { decision: DecisionRead }) {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
             <Field label="Confianza" value={decision.confidence.toFixed(2)} />
+            {decision.risk_score != null && (
+              <Field label="Riesgo determinístico" value={decision.risk_score.toFixed(2)} />
+            )}
+            {decision.base_confidence != null && (
+              <Field label="Confianza base" value={decision.base_confidence.toFixed(2)} />
+            )}
+            <Field label="Ruta de agentes" value={decision.agent_route.join(' → ')} wide />
+            {decision.matched_policies.length > 0 && (
+              <Field
+                label="Política aplicada"
+                value={decision.matched_policies.join(', ')}
+                wide
+              />
+            )}
             {decision.confidence_rationale && (
               <Field label="Ajuste del árbitro" value={decision.confidence_rationale} wide />
             )}
@@ -107,10 +121,17 @@ export function DecisionShowcase({ decision }: { decision: DecisionRead }) {
 
           <SellosAuditoria decision={decision} />
 
-          <div>
-            <h3 className="mb-1 text-sm font-medium">Explicación de auditoría</h3>
-            <p className="text-sm text-muted-foreground">{decision.explanation_audit}</p>
-          </div>
+          {/* Los campos de arriba (señales, políticas, debate, sellos) son
+              la misma información que este párrafo narra en prosa — se
+              arma así para el registro de auditoría (texto plano, §2.5),
+              no para leerse de un vistazo. Colapsado por defecto para
+              quien de verdad lo necesite completo, no oculto. */}
+          <details className="rounded-md border p-3">
+            <summary className="cursor-pointer text-sm font-medium">
+              Ver texto completo de auditoría
+            </summary>
+            <p className="mt-2 text-sm text-muted-foreground">{decision.explanation_audit}</p>
+          </details>
 
           <div>
             {/* Tal como la sirve `CaseDetail` — nunca reconstruida (§5). */}
