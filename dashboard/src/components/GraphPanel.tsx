@@ -157,6 +157,10 @@ export function GraphPanel({
         nodesDraggable={false}
         nodesConnectable={false}
         elementsSelectable={true}
+        panOnDrag={false}
+        zoomOnScroll={false}
+        zoomOnPinch={false}
+        zoomOnDoubleClick={false}
         proOptions={{ hideAttribution: true }}
       >
         <Background />
