@@ -42,12 +42,9 @@ export function Policies() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold">Catálogo de políticas</h1>
-        <p className="text-sm text-muted-foreground">
-          Sólo lectura esta etapa (ADR-0017) — el alta no está disponible todavía.
-        </p>
-      </div>
+      <p className="text-sm text-muted-foreground">
+        Sólo lectura esta etapa (ADR-0017) — el alta no está disponible todavía.
+      </p>
 
       {query.isLoading ? (
         <Skeleton className="h-64 w-full" />
@@ -74,8 +71,8 @@ export function Policies() {
                   <Badge variant={STATE_VARIANT[p.state]}>{STATE_LABEL[p.state]}</Badge>
                 </TableCell>
                 <TableCell>{p.action ?? '—'}</TableCell>
-                <TableCell className="max-w-md text-sm text-muted-foreground">{p.text}</TableCell>
-                <TableCell className="text-sm text-muted-foreground">
+                <TableCell className="text-sm text-muted-foreground">{p.text}</TableCell>
+                <TableCell>
                   {p.excluded_reason ?? (p.evaluable ? 'se evalúa' : '—')}
                 </TableCell>
               </TableRow>

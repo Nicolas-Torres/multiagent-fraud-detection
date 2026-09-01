@@ -65,8 +65,6 @@ export function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold">Dashboard</h1>
-
       {cargando ? (
         <Skeleton className="h-24 w-full" />
       ) : conError ? (

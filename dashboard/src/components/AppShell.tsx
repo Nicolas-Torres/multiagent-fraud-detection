@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
 import { useTheme } from '@/hooks/useTheme'
@@ -12,17 +12,29 @@ const LINKS = [
   { to: '/architecture', label: 'Cómo se construyó', end: false },
 ]
 
+// `/cases/:caseId` no está en `LINKS` -no es un link de nav, se llega
+// clickeando una fila- y su título real es dinámico (incluye el UUID del
+// caso); ese texto se queda donde ya está, dentro del contenido
+// scrolleable de `CaseDetail`. Acá sólo hace falta un título genérico
+// para el header fijo.
+function tituloDe(pathname: string): string {
+  if (pathname.startsWith('/cases/')) return 'Detalle del caso'
+  const link = LINKS.find((l) => (l.end ? pathname === l.to : pathname.startsWith(l.to)))
+  return link?.label ?? 'Detección de Fraude'
+}
+
 export function AppShell() {
   const [tema, alternarTema] = useTheme()
+  const location = useLocation()
 
   return (
-    <div className="flex min-h-svh bg-background text-foreground">
+    <div className="flex h-svh overflow-hidden bg-background text-foreground">
       <aside className="flex w-56 shrink-0 flex-col border-r">
         <div className="border-b px-4 py-4">
           <span className="font-semibold">Detección de Fraude</span>
           <p className="text-xs text-muted-foreground">Dashboard del analista</p>
         </div>
-        <nav className="flex flex-1 flex-col gap-1 p-3 text-sm">
+        <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3 text-sm">
           {LINKS.map((link) => (
             <NavLink
               key={link.to}
@@ -45,11 +57,17 @@ export function AppShell() {
           </Button>
         </div>
       </aside>
-      <main className="min-w-0 flex-1 overflow-x-auto px-6 py-6">
-        <div className="mx-auto max-w-6xl">
+      {/* Segunda región de scroll, independiente del `<aside>`: el shell
+          entero queda fijo a la altura del viewport (`h-svh overflow-hidden`
+          arriba) y sólo esto -el `<main>` de abajo- scrollea. */}
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <header className="shrink-0 border-b px-6 py-4">
+          <h1 className="text-xl font-semibold">{tituloDe(location.pathname)}</h1>
+        </header>
+        <main className="flex-1 overflow-y-auto overflow-x-auto px-6 py-6">
           <Outlet />
-        </div>
-      </main>
+        </main>
+      </div>
     </div>
   )
 }

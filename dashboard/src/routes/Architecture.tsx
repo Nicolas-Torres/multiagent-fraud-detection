@@ -1,6 +1,5 @@
 import { useState } from 'react'
 
-import { GraphPanel } from '@/components/GraphPanel'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 const GITHUB_ADR_BASE =
@@ -70,26 +69,14 @@ function DiagramaC4() {
 export function Architecture() {
   return (
     <div className="space-y-10">
-      <div>
-        <h1 className="text-2xl font-semibold">Cómo se construyó</h1>
-        <p className="text-muted-foreground">
-          Diecisiete decisiones de diseño respaldan este sistema. Estas cuatro son las
-          que mejor explican por qué el resultado se ve como se ve.
-        </p>
-      </div>
+      <p className="text-muted-foreground">
+        Diecisiete decisiones de diseño respaldan este sistema. Estas cuatro son las
+        que mejor explican por qué el resultado se ve como se ve.
+      </p>
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">Arquitectura de contenedores</h2>
         <DiagramaC4 />
-      </section>
-
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold">El grafo de agentes</h2>
-        <p className="text-sm text-muted-foreground">
-          La misma topología que corre en cada caso real — nueve nodos, tres
-          supersteps paralelos, sin dibujar a mano.
-        </p>
-        <GraphPanel agentRoute={[]} degradedAgents={[]} />
       </section>
 
       <section className="space-y-3">

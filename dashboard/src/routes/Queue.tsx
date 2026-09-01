@@ -62,8 +62,7 @@ export function Queue() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Cola de casos</h1>
+      <div className="flex justify-end">
         <Select value={status} onValueChange={(v) => setStatus(v as CaseStatus | 'ALL')}>
           <SelectTrigger className="w-56">
             <SelectValue />
