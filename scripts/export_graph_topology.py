@@ -23,11 +23,25 @@ JSON_PATH = (
     Path(__file__).resolve().parents[1] / "dashboard" / "src" / "data" / "graph_topology.json"
 )
 
-# Sólo para exhibición: el id real (`__start__`/`__end__`) sigue viajando
-# tal cual en `id` -el frontend lo usa para lógica real (raíz del BFS de
-# layout, chequeo de "predecesor listo")-, nunca se reemplaza. `label` es
-# lo único que un visitante ve.
-ETIQUETAS = {"__start__": "START", "__end__": "END"}
+# Sólo para exhibición: el id real (`__start__`/`__end__`, o el nombre del
+# agente) sigue viajando tal cual en `id` -el frontend lo usa para lógica
+# real (raíz del BFS de layout, chequeo de "predecesor listo")-, nunca se
+# reemplaza. `label` es lo único que un visitante ve. Ids de agente tomados
+# de `graph/nodes.py`.
+ETIQUETAS = {
+    "__start__": "START",
+    "__end__": "END",
+    "transaction_context": "Transaction Context",
+    "behavioral_pattern": "Behavioral Pattern",
+    "external_threat_intel": "External Threat Intel",
+    "internal_policy_rag": "Internal Policy RAG",
+    "evidence_aggregation": "Evidence Aggregation",
+    "debate_pro_fraud": "Debate — Pro Fraud",
+    "debate_pro_customer": "Debate — Pro Customer",
+    "decision_arbiter": "Decision Arbiter",
+    "explainability": "Explainability",
+    "persist_decision": "Persist Decision",
+}
 
 
 def main() -> None:
