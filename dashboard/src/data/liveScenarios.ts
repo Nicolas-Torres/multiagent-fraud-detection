@@ -44,7 +44,7 @@ export const LIVE_SCENARIOS: LiveScenario[] = [
       device_id: 'D-0426',
       timestamp: '2025-12-01T01:59:00+00:00',
       merchant_id: 'M-022',
-      issuer_bank: null,
+      issuer_bank: 'BBVA',
     },
   },
   {
@@ -60,7 +60,7 @@ export const LIVE_SCENARIOS: LiveScenario[] = [
       device_id: 'D-0587',
       timestamp: '2025-12-02T01:14:00+00:00',
       merchant_id: 'M-035',
-      issuer_bank: null,
+      issuer_bank: 'SAN',
     },
   },
   {
@@ -76,7 +76,7 @@ export const LIVE_SCENARIOS: LiveScenario[] = [
       device_id: 'D-0054',
       timestamp: '2025-12-01T18:36:00+00:00',
       merchant_id: 'M-009',
-      issuer_bank: null,
+      issuer_bank: 'BAC',
     },
   },
 ]

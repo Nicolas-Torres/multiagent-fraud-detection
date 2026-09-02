@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { ChevronDownIcon } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 import { api } from '@/api/client'
@@ -40,6 +41,12 @@ const NUM_COLUMNAS = 11
 const showcaseCases = showcaseCasesRaw as ShowcaseCase[]
 const diverseScenarios = diverseScenariosRaw as LiveScenario[]
 
+// Un solo grupo "Ejecutar en vivo": los tres escenarios ancla y los
+// generados desde el dataset real se disparan y se muestran exactamente
+// igual — separarlos en dos encabezados no comunicaba ninguna diferencia
+// visible.
+const escenariosEnVivo: LiveScenario[] = [...LIVE_SCENARIOS, ...diverseScenarios]
+
 // El desafiado (CHALLENGE) es el más representativo para el primer vistazo:
 // tiene señal, cita, debate y confianza intermedia — el resto queda a un
 // click en la tabla de abajo.
@@ -61,6 +68,20 @@ function leerUltimasCorridas(): Record<string, number> {
   }
 }
 
+// Mismo motivo que `ultimasCorridas`: sin esto, el `case_id` de una fila en
+// vivo/diversa vive sólo en memoria y se pierde al cambiar de pestaña — la
+// fila vuelve a mostrar "—" como si nunca se hubiera ejecutado, aunque el
+// caso ya esté decidido en el backend.
+const CASE_IDS_STORAGE_KEY = 'ultimo-case-id-por-escenario'
+
+function leerCaseIdsPorEscenario(): Record<string, string> {
+  try {
+    return JSON.parse(localStorage.getItem(CASE_IDS_STORAGE_KEY) ?? '{}') as Record<string, string>
+  } catch {
+    return {}
+  }
+}
+
 function formatoRestante(ms: number): string {
   const totalSeg = Math.ceil(ms / 1000)
   const min = Math.floor(totalSeg / 60)
@@ -75,7 +96,8 @@ export function Transactions() {
   // Sólo para las filas en vivo/diversas: no tienen `case_id` hasta el
   // primer "Ejecutar" — una vez que lo tienen, esta fila puede consultar y
   // mostrar su propia "Decisión del LLM" igual que una de vitrina.
-  const [caseIdPorEscenario, setCaseIdPorEscenario] = useState<Record<string, string>>({})
+  const [caseIdPorEscenario, setCaseIdPorEscenario] =
+    useState<Record<string, string>>(leerCaseIdsPorEscenario)
   const [ahora, setAhora] = useState(() => Date.now())
   const queryClient = useQueryClient()
 
@@ -122,7 +144,11 @@ export function Transactions() {
     onSuccess: (data, escenario) => {
       setErrorEjecucion(null)
       setSelectedId(data.case_id)
-      setCaseIdPorEscenario((previos) => ({ ...previos, [escenario.id]: data.case_id }))
+      setCaseIdPorEscenario((previos) => {
+        const actualizados = { ...previos, [escenario.id]: data.case_id }
+        localStorage.setItem(CASE_IDS_STORAGE_KEY, JSON.stringify(actualizados))
+        return actualizados
+      })
       queryClient.invalidateQueries({ queryKey: ['cases'] })
       setUltimasCorridas((previas) => {
         const actualizadas = { ...previas, [escenario.id]: Date.now() }
@@ -177,7 +203,7 @@ export function Transactions() {
               <TableHead>Escenario</TableHead>
               <TableHead>Cliente</TableHead>
               <TableHead>Monto</TableHead>
-              <TableHead>Dispositivo</TableHead>
+              <TableHead>Canal</TableHead>
               <TableHead>País</TableHead>
               <TableHead>Banco</TableHead>
               <TableHead>Fecha</TableHead>
@@ -206,25 +232,7 @@ export function Transactions() {
             ))}
 
             <SeccionFila titulo="Ejecutar en vivo" />
-            {LIVE_SCENARIOS.map((escenario) => (
-              <FilaTransaccion
-                key={escenario.id}
-                claveEscenario={escenario.id}
-                transactionId={null}
-                label={escenario.label}
-                description={escenario.description}
-                payload={escenario.payload}
-                caseId={caseIdPorEscenario[escenario.id] ?? null}
-                seleccionado={false}
-                restante={restanteMs(escenario.id)}
-                accionLabel="Ejecutar"
-                onEjecutar={() => ejecutar.mutate(escenario)}
-                ejecutando={ejecutar.isPending}
-              />
-            ))}
-
-            <SeccionFila titulo="Más escenarios reales" />
-            {diverseScenarios.map((escenario) => (
+            {escenariosEnVivo.map((escenario) => (
               <FilaTransaccion
                 key={escenario.id}
                 claveEscenario={escenario.id}
@@ -318,7 +326,9 @@ function FilaTransaccion({
         className={cn(onSeleccionar && 'cursor-pointer', seleccionado && 'bg-secondary')}
         onClick={onSeleccionar}
       >
-        <TableCell className="text-muted-foreground">{transactionId ?? '—'}</TableCell>
+        <TableCell className="text-muted-foreground">
+          {detalle.data?.transaction.transaction_id ?? transactionId ?? '—'}
+        </TableCell>
         <TableCell className="font-medium">
           {label}
           {description && (
@@ -327,7 +337,7 @@ function FilaTransaccion({
         </TableCell>
         <TableCell className="text-muted-foreground">{payload.customer_id}</TableCell>
         <TableCell>{formatAmount(String(payload.amount), payload.currency)}</TableCell>
-        <TableCell className="text-muted-foreground">{payload.device_id}</TableCell>
+        <TableCell className="text-muted-foreground">{payload.channel.toUpperCase()}</TableCell>
         <TableCell className="text-muted-foreground">{payload.country}</TableCell>
         <TableCell className="text-muted-foreground">{payload.issuer_bank ?? '—'}</TableCell>
         <TableCell className="text-muted-foreground">
@@ -346,7 +356,7 @@ function FilaTransaccion({
           {detalle.data?.decision ? (
             <button
               type="button"
-              className="cursor-pointer"
+              className="flex cursor-pointer items-center gap-1"
               onClick={(e) => {
                 e.stopPropagation()
                 setDetalleAbierto((v) => !v)
@@ -355,6 +365,12 @@ function FilaTransaccion({
               <Badge variant={decisionVariant(detalle.data.decision.decision)}>
                 {detalle.data.decision.decision}
               </Badge>
+              <ChevronDownIcon
+                className={cn(
+                  'size-4 text-muted-foreground transition-transform',
+                  detalleAbierto && 'rotate-180',
+                )}
+              />
             </button>
           ) : (
             <span className="text-muted-foreground">—</span>
