@@ -104,30 +104,51 @@ def elegir() -> list[dict]:
 
     elegidos: list[dict] = []
     for decision, cupo in CUPOS.items():
-        candidatos = sorted(
-            tid
-            for tid, gt in ground_truth.items()
-            if gt["decision"] == decision
-            and gt["policies"]
-            and tid in por_id
-            and por_id[tid].customer_id not in CLIENTES_EN_USO
+        # Agrupados por combinación de políticas -no una lista plana por
+        # id- para poder recorrer una política distinta por ronda antes de
+        # repetir. Sin esto, tomar los primeros `cupo` candidatos por id
+        # converge siempre en la política más numerosa del dataset (visto
+        # en la práctica: CHALLENGE daba sólo FP-01, nunca FP-06).
+        candidatos_por_politica: dict[tuple[str, ...], list[str]] = {}
+        for tid in sorted(ground_truth):
+            gt = ground_truth[tid]
+            if (
+                gt["decision"] == decision
+                and gt["policies"]
+                and tid in por_id
+                and por_id[tid].customer_id not in CLIENTES_EN_USO
+            ):
+                candidatos_por_politica.setdefault(tuple(gt["policies"]), []).append(tid)
+
+        # Orden de las políticas dentro de la ronda: señales de una sola
+        # política antes que combinaciones raras (más representativas para
+        # una demo), y entre señales del mismo tamaño, la más frecuente en
+        # el dataset primero. El id ordena sólo como desempate determinista.
+        politicas = sorted(
+            candidatos_por_politica,
+            key=lambda p: (len(p), -len(candidatos_por_politica[p]), p),
         )
 
         encontrados = 0
-        for tid in candidatos:
-            if encontrados >= cupo:
-                break
-            txn = por_id[tid]
-            if _hay_colision(txn, transacciones):
-                continue
-            label, description = _texto(ground_truth[tid]["policies"])
-            elegidos.append({
-                "id": _id_corto(tid),
-                "label": label,
-                "description": description,
-                "payload": txn.model_dump(mode="json", exclude={"transaction_id"}),
-            })
-            encontrados += 1
+        while encontrados < cupo and any(candidatos_por_politica[p] for p in politicas):
+            for politica in politicas:
+                if encontrados >= cupo:
+                    break
+                cola = candidatos_por_politica[politica]
+                while cola:
+                    tid = cola.pop(0)
+                    txn = por_id[tid]
+                    if _hay_colision(txn, transacciones):
+                        continue
+                    label, description = _texto(ground_truth[tid]["policies"])
+                    elegidos.append({
+                        "id": _id_corto(tid),
+                        "label": label,
+                        "description": description,
+                        "payload": txn.model_dump(mode="json", exclude={"transaction_id"}),
+                    })
+                    encontrados += 1
+                    break
 
         if encontrados < cupo:
             print(

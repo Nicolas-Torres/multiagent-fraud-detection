@@ -16,19 +16,19 @@
     }
   },
   {
-    "id": "t1033",
-    "label": "Monto y horario fuera de lo habitual",
-    "description": "Señal real del dataset: monto y horario fuera de lo habitual (FP-01).",
+    "id": "t1165",
+    "label": "Canal nuevo con monto que duplica el promedio",
+    "description": "Señal real del dataset: canal nuevo con monto que duplica el promedio (FP-06).",
     "payload": {
-      "customer_id": "CU-0173",
-      "amount": "1587.74",
-      "currency": "EUR",
-      "country": "ES",
-      "channel": "web",
-      "device_id": "D-0173",
-      "timestamp": "2025-12-02T03:14:00Z",
-      "merchant_id": "M-002",
-      "issuer_bank": "BBVA"
+      "customer_id": "CU-0014",
+      "amount": "16701519.56",
+      "currency": "COP",
+      "country": "CO",
+      "channel": "mobile",
+      "device_id": "D-0014",
+      "timestamp": "2025-12-23T13:38:00Z",
+      "merchant_id": "M-036",
+      "issuer_bank": "BOG"
     }
   },
   {
@@ -64,6 +64,22 @@
     }
   },
   {
+    "id": "t1249",
+    "label": "Comercio con historial de fraude",
+    "description": "Señal real del dataset: comercio con historial de fraude (FP-07).",
+    "payload": {
+      "customer_id": "CU-0038",
+      "amount": "352.68",
+      "currency": "EUR",
+      "country": "ES",
+      "channel": "web",
+      "device_id": "D-0038",
+      "timestamp": "2025-12-06T11:15:00Z",
+      "merchant_id": "M-999",
+      "issuer_bank": "CABK"
+    }
+  },
+  {
     "id": "t1026",
     "label": "Canal nuevo con monto alto",
     "description": "Señal real del dataset: canal nuevo con monto alto (FP-02).",
@@ -77,22 +93,6 @@
       "timestamp": "2025-12-07T14:23:00Z",
       "merchant_id": "M-034",
       "issuer_bank": "SAN"
-    }
-  },
-  {
-    "id": "t1145",
-    "label": "Canal nuevo con monto alto",
-    "description": "Señal real del dataset: canal nuevo con monto alto (FP-02).",
-    "payload": {
-      "customer_id": "CU-0014",
-      "amount": "8125059.65",
-      "currency": "COP",
-      "country": "RU",
-      "channel": "web",
-      "device_id": "D-999713",
-      "timestamp": "2025-12-14T13:08:00Z",
-      "merchant_id": "M-017",
-      "issuer_bank": "BOG"
     }
   }
 ]
