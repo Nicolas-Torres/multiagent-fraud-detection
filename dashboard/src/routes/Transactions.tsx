@@ -36,7 +36,7 @@ interface ShowcaseCase {
   payload: Omit<TransactionIn, 'transaction_id'>
 }
 
-const NUM_COLUMNAS = 11
+const NUM_COLUMNAS = 10
 
 const showcaseCases = showcaseCasesRaw as ShowcaseCase[]
 const diverseScenarios = diverseScenariosRaw as LiveScenario[]
@@ -199,49 +199,40 @@ export function Transactions() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Transacción</TableHead>
-              <TableHead>Escenario</TableHead>
+              <TableHead>Acción</TableHead>
+              <TableHead>Estado</TableHead>
+              <TableHead>Decisión del LLM</TableHead>
+              <TableHead className="border-l">Transacción</TableHead>
               <TableHead>Cliente</TableHead>
               <TableHead>Monto</TableHead>
               <TableHead>Canal</TableHead>
               <TableHead>País</TableHead>
               <TableHead>Banco</TableHead>
               <TableHead>Fecha</TableHead>
-              <TableHead className="border-l">Estado</TableHead>
-              <TableHead>Decisión del LLM</TableHead>
-              <TableHead>Acción</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            <SeccionFila titulo="Casos reales" />
             {showcaseCases.map((item) => (
               <FilaTransaccion
                 key={item.case_id}
                 claveEscenario={item.id}
                 transactionId={item.transaction_id}
-                label={item.label}
                 payload={item.payload}
                 caseId={item.case_id}
-                seleccionado={selectedId === item.case_id}
                 restante={restanteMs(item.id)}
-                accionLabel="Volver a ejecutar"
-                onSeleccionar={() => setSelectedId(item.case_id)}
+                accionLabel="Ejecutar"
                 onEjecutar={() => ejecutar.mutate(item)}
                 ejecutando={ejecutar.isPending}
               />
             ))}
 
-            <SeccionFila titulo="Ejecutar en vivo" />
             {escenariosEnVivo.map((escenario) => (
               <FilaTransaccion
                 key={escenario.id}
                 claveEscenario={escenario.id}
                 transactionId={null}
-                label={escenario.label}
-                description={escenario.description}
                 payload={escenario.payload}
                 caseId={caseIdPorEscenario[escenario.id] ?? null}
-                seleccionado={false}
                 restante={restanteMs(escenario.id)}
                 accionLabel="Ejecutar"
                 onEjecutar={() => ejecutar.mutate(escenario)}
@@ -256,19 +247,6 @@ export function Transactions() {
   )
 }
 
-function SeccionFila({ titulo }: { titulo: string }) {
-  return (
-    <TableRow className="hover:bg-transparent">
-      <TableCell
-        colSpan={NUM_COLUMNAS}
-        className="bg-muted/50 text-xs font-medium text-muted-foreground"
-      >
-        {titulo}
-      </TableCell>
-    </TableRow>
-  )
-}
-
 /**
  * Una fila por transacción, real o candidata a ejecutarse — reemplaza a
  * `FilaVitrina`/`FilaEscenario`, que hoy están casi duplicadas. La
@@ -279,27 +257,19 @@ function SeccionFila({ titulo }: { titulo: string }) {
 function FilaTransaccion({
   claveEscenario,
   transactionId,
-  label,
-  description,
   payload,
   caseId,
-  seleccionado,
   restante,
   accionLabel,
-  onSeleccionar,
   onEjecutar,
   ejecutando,
 }: {
   claveEscenario: string
   transactionId: string | null
-  label: string
-  description?: string
   payload: Omit<TransactionIn, 'transaction_id'>
   caseId: string | null
-  seleccionado: boolean
   restante: number
   accionLabel: string
-  onSeleccionar?: () => void
   onEjecutar: () => void
   ejecutando: boolean
 }) {
@@ -322,28 +292,19 @@ function FilaTransaccion({
 
   return (
     <>
-      <TableRow
-        className={cn(onSeleccionar && 'cursor-pointer', seleccionado && 'bg-secondary')}
-        onClick={onSeleccionar}
-      >
-        <TableCell className="text-muted-foreground">
-          {formatTransactionId(detalle.data?.transaction.transaction_id ?? transactionId ?? '—')}
+      <TableRow>
+        <TableCell>
+          <Button
+            className="cursor-pointer"
+            size="sm"
+            variant="outline"
+            onClick={onEjecutar}
+            disabled={ejecutando || enCooldown}
+          >
+            {enCooldown ? formatoRestante(restante) : accionLabel}
+          </Button>
         </TableCell>
-        <TableCell className="font-medium">
-          {label}
-          {description && (
-            <p className="text-xs font-normal text-muted-foreground">{description}</p>
-          )}
-        </TableCell>
-        <TableCell className="text-muted-foreground">{payload.customer_id}</TableCell>
-        <TableCell>{formatAmount(String(payload.amount), payload.currency)}</TableCell>
-        <TableCell className="text-muted-foreground">{payload.channel.toUpperCase()}</TableCell>
-        <TableCell className="text-muted-foreground">{payload.country}</TableCell>
-        <TableCell className="text-muted-foreground">{payload.issuer_bank ?? '—'}</TableCell>
-        <TableCell className="text-muted-foreground">
-          {formatDateTime(payload.timestamp)}
-        </TableCell>
-        <TableCell className="border-l">
+        <TableCell>
           {!caseId ? (
             <span className="text-muted-foreground">—</span>
           ) : detalle.isLoading ? (
@@ -357,10 +318,7 @@ function FilaTransaccion({
             <button
               type="button"
               className="flex cursor-pointer items-center gap-1"
-              onClick={(e) => {
-                e.stopPropagation()
-                setDetalleAbierto((v) => !v)
-              }}
+              onClick={() => setDetalleAbierto((v) => !v)}
             >
               <Badge variant={decisionVariant(detalle.data.decision.decision)}>
                 {detalle.data.decision.decision}
@@ -376,18 +334,16 @@ function FilaTransaccion({
             <span className="text-muted-foreground">—</span>
           )}
         </TableCell>
-        <TableCell>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={(e) => {
-              e.stopPropagation()
-              onEjecutar()
-            }}
-            disabled={ejecutando || enCooldown}
-          >
-            {enCooldown ? formatoRestante(restante) : accionLabel}
-          </Button>
+        <TableCell className="text-muted-foreground border-l">
+          {formatTransactionId(detalle.data?.transaction.transaction_id ?? transactionId ?? '—')}
+        </TableCell>
+        <TableCell className="text-muted-foreground">{payload.customer_id}</TableCell>
+        <TableCell>{formatAmount(String(payload.amount), payload.currency)}</TableCell>
+        <TableCell className="text-muted-foreground">{payload.channel.toUpperCase()}</TableCell>
+        <TableCell className="text-muted-foreground">{payload.country}</TableCell>
+        <TableCell className="text-muted-foreground">{payload.issuer_bank ?? '—'}</TableCell>
+        <TableCell className="text-muted-foreground">
+          {formatDateTime(payload.timestamp)}
         </TableCell>
       </TableRow>
       {detalleAbierto && detalle.data?.decision && (
@@ -396,7 +352,7 @@ function FilaTransaccion({
               `TableCell` (pensado para datos tabulares) — si no, cada
               párrafo/valor del detalle se estira en una sola línea sin
               cortar. El tope de ancho evita que ese contenido, que no es
-              tabular, herede el ancho completo de una tabla de 11 columnas
+              tabular, herede el ancho completo de una tabla de 10 columnas
               (más ancha que la página) y obligue a scrollear para leerlo. */}
           <TableCell
             colSpan={NUM_COLUMNAS}
