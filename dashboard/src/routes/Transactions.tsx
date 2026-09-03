@@ -22,7 +22,7 @@ import { LIVE_SCENARIOS, type LiveScenario, transaccionParaCorridaEnVivo } from 
 import showcaseCasesRaw from '@/data/showcase_cases.json'
 import { useCaseProgress } from '@/hooks/useCaseProgress'
 import { decisionVariant } from '@/lib/badges'
-import { formatAmount, formatDateTime } from '@/lib/format'
+import { formatAmount, formatDateTime, formatTransactionId } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 type TransactionIn = components['schemas']['TransactionIn']
@@ -327,7 +327,7 @@ function FilaTransaccion({
         onClick={onSeleccionar}
       >
         <TableCell className="text-muted-foreground">
-          {detalle.data?.transaction.transaction_id ?? transactionId ?? '—'}
+          {formatTransactionId(detalle.data?.transaction.transaction_id ?? transactionId ?? '—')}
         </TableCell>
         <TableCell className="font-medium">
           {label}
