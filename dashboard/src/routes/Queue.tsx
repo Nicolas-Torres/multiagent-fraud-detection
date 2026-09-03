@@ -127,9 +127,9 @@ export function Queue() {
                 </TableCell>
                 <TableCell>
                   {item.status === 'PENDING_HUMAN' ? (
-                    <Badge variant="default">revisar</Badge>
+                    <Badge variant="default">Revisar</Badge>
                   ) : (
-                    <Badge variant="secondary">revisado</Badge>
+                    <Badge variant="secondary">Revisado</Badge>
                   )}
                 </TableCell>
               </TableRow>

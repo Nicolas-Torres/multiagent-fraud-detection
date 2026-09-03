@@ -73,7 +73,7 @@ export function Policies() {
                 <TableCell>{p.action ?? '—'}</TableCell>
                 <TableCell className="text-sm text-muted-foreground">{p.text}</TableCell>
                 <TableCell>
-                  {p.excluded_reason ?? (p.evaluable ? 'se evalúa' : '—')}
+                  {p.excluded_reason ?? (p.evaluable ? 'Se evalúa' : '—')}
                 </TableCell>
               </TableRow>
             ))}
