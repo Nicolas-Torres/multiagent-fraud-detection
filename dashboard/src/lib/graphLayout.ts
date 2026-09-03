@@ -3,6 +3,11 @@ import type { Edge, Node } from '@xyflow/react'
 interface TopologyNode {
   id: string
   synthetic: boolean
+  // Etiqueta de exhibición (`START`/`END` para los nodos sintéticos, el
+  // nombre del agente para el resto) — separada del `id` a propósito: la
+  // lógica de este archivo (raíz del BFS, más abajo) sigue comparando
+  // contra `id`, nunca contra esto.
+  label: string
 }
 
 interface TopologyEdge {
@@ -76,7 +81,7 @@ export function layoutTopology(topology: Topology): { nodes: Node[]; edges: Edge
       // animación de "analizando" en el mismo orden topológico que ya
       // gobierna el layout — un nodo no puede "pulsar antes" que sus
       // padres sin contradecir lo que el propio grafo garantiza.
-      data: { label: n.id, level: lvl },
+      data: { label: n.label, level: lvl },
       // Estilo real (color por estado de ejecución) lo aplica GraphPanel;
       // acá sólo la geometría.
       style: { width: 170 },

@@ -1,0 +1,98 @@
+[
+  {
+    "id": "t1012",
+    "label": "Monto y horario fuera de lo habitual",
+    "description": "Señal real del dataset: monto y horario fuera de lo habitual (FP-01).",
+    "payload": {
+      "customer_id": "CU-0093",
+      "amount": "14116304.64",
+      "currency": "COP",
+      "country": "CO",
+      "channel": "web",
+      "device_id": "D-0093",
+      "timestamp": "2025-12-30T08:41:00Z",
+      "merchant_id": "M-005",
+      "issuer_bank": "BOG"
+    }
+  },
+  {
+    "id": "t1165",
+    "label": "Canal nuevo con monto que duplica el promedio",
+    "description": "Señal real del dataset: canal nuevo con monto que duplica el promedio (FP-06).",
+    "payload": {
+      "customer_id": "CU-0014",
+      "amount": "16701519.56",
+      "currency": "COP",
+      "country": "CO",
+      "channel": "mobile",
+      "device_id": "D-0014",
+      "timestamp": "2025-12-23T13:38:00Z",
+      "merchant_id": "M-036",
+      "issuer_bank": "BOG"
+    }
+  },
+  {
+    "id": "t1125",
+    "label": "Cambio de datos justo antes de operar",
+    "description": "Señal real del dataset: cambio de datos justo antes de operar (FP-09).",
+    "payload": {
+      "customer_id": "CU-0240",
+      "amount": "11918182.55",
+      "currency": "COP",
+      "country": "CO",
+      "channel": "web",
+      "device_id": "D-0240",
+      "timestamp": "2025-12-10T21:43:23Z",
+      "merchant_id": "M-017",
+      "issuer_bank": "BAN"
+    }
+  },
+  {
+    "id": "t1281",
+    "label": "Cambio de datos justo antes de operar",
+    "description": "Señal real del dataset: cambio de datos justo antes de operar (FP-09).",
+    "payload": {
+      "customer_id": "CU-0531",
+      "amount": "2048386.55",
+      "currency": "COP",
+      "country": "CO",
+      "channel": "mobile",
+      "device_id": "D-0531",
+      "timestamp": "2025-12-22T03:06:03Z",
+      "merchant_id": "M-050",
+      "issuer_bank": "DAV"
+    }
+  },
+  {
+    "id": "t1249",
+    "label": "Comercio con historial de fraude",
+    "description": "Señal real del dataset: comercio con historial de fraude (FP-07).",
+    "payload": {
+      "customer_id": "CU-0038",
+      "amount": "352.68",
+      "currency": "EUR",
+      "country": "ES",
+      "channel": "web",
+      "device_id": "D-0038",
+      "timestamp": "2025-12-06T11:15:00Z",
+      "merchant_id": "M-999",
+      "issuer_bank": "CABK"
+    }
+  },
+  {
+    "id": "t1026",
+    "label": "Canal nuevo con monto alto",
+    "description": "Señal real del dataset: canal nuevo con monto alto (FP-02).",
+    "payload": {
+      "customer_id": "CU-0653",
+      "amount": "1962453.90",
+      "currency": "ARS",
+      "country": "RU",
+      "channel": "mobile",
+      "device_id": "D-999992",
+      "timestamp": "2025-12-07T14:23:00Z",
+      "merchant_id": "M-034",
+      "issuer_bank": "SAN"
+    }
+  }
+]

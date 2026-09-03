@@ -16,3 +16,15 @@ export function formatDateTime(iso: string): string {
     timeStyle: 'short',
   }).format(new Date(iso))
 }
+
+// Sólo cosmético: el id real de una corrida en vivo (`LIVE-approve-171...`)
+// sigue siendo el que viaja a la API y al link del caso -esto nunca lo
+// reemplaza-, pero como valor de columna se ve como ruido al lado de
+// "T-2579". Se homogeneiza al mismo formato tomando los últimos 4 dígitos
+// del token que generó la corrida (siempre al final del id, sin importar
+// si el escenario mismo trae dígitos como `t1012`).
+export function formatTransactionId(id: string): string {
+  if (!id.startsWith('LIVE-')) return id
+  const digitos = id.replace(/\D/g, '')
+  return `T-${digitos.slice(-4).padStart(4, '0')}`
+}

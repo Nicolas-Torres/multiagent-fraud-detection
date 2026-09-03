@@ -8,12 +8,32 @@ import { decisionVariant, severityVariant } from '@/lib/badges'
 type DecisionRead = components['schemas']['DecisionRead']
 
 /**
- * El debate, las señales, las citas y el recorrido por el grafo — el
- * núcleo "vistoso" de un caso decidido. Compartido entre `CaseDetail`
- * (el detalle completo, con transacción/cliente/resolución alrededor) y
- * `Home` (el panel fijo de la vitrina, donde es lo único que se muestra).
+ * Sólo el grafo — separado de `DecisionDetail` para que
+ * `routes/Transactions.tsx` pueda mostrarlo arriba (fijo, sin cambios de
+ * comportamiento) mientras el detalle de la decisión vive por fila, en la
+ * tabla. `DecisionShowcase`, más abajo, sigue componiendo las dos para
+ * quien las quiera juntas (`CaseDetail`).
  */
-export function DecisionShowcase({ decision }: { decision: DecisionRead }) {
+export function GraphSection({ decision }: { decision: DecisionRead }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Recorrido por el grafo</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <GraphPanel agentRoute={decision.agent_route} degradedAgents={decision.degraded_agents} />
+      </CardContent>
+    </Card>
+  )
+}
+
+/**
+ * Confianza, señales, políticas, debate, sellos y auditoría — todo lo que
+ * no es el grafo. El banner de "evidencia incompleta" va acá, no en
+ * `GraphSection`: habla de cuánto confiar en la decisión, no de qué nodos
+ * corrieron.
+ */
+export function DecisionDetail({ decision }: { decision: DecisionRead }) {
   return (
     <>
       {decision.degraded_agents.length > 0 && (
@@ -25,15 +45,6 @@ export function DecisionShowcase({ decision }: { decision: DecisionRead }) {
 
       <Card>
         <CardHeader>
-          <CardTitle>Recorrido por el grafo</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <GraphPanel agentRoute={decision.agent_route} degradedAgents={decision.degraded_agents} />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
           <CardTitle className="flex items-center gap-2">
             Decisión
             <Badge variant={decisionVariant(decision.decision)}>{decision.decision}</Badge>
@@ -42,6 +53,20 @@ export function DecisionShowcase({ decision }: { decision: DecisionRead }) {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
             <Field label="Confianza" value={decision.confidence.toFixed(2)} />
+            {decision.risk_score != null && (
+              <Field label="Riesgo determinístico" value={decision.risk_score.toFixed(2)} />
+            )}
+            {decision.base_confidence != null && (
+              <Field label="Confianza base" value={decision.base_confidence.toFixed(2)} />
+            )}
+            <Field label="Ruta de agentes" value={decision.agent_route.join(' → ')} wide />
+            {decision.matched_policies.length > 0 && (
+              <Field
+                label="Política aplicada"
+                value={decision.matched_policies.join(', ')}
+                wide
+              />
+            )}
             {decision.confidence_rationale && (
               <Field label="Ajuste del árbitro" value={decision.confidence_rationale} wide />
             )}
@@ -107,10 +132,17 @@ export function DecisionShowcase({ decision }: { decision: DecisionRead }) {
 
           <SellosAuditoria decision={decision} />
 
-          <div>
-            <h3 className="mb-1 text-sm font-medium">Explicación de auditoría</h3>
-            <p className="text-sm text-muted-foreground">{decision.explanation_audit}</p>
-          </div>
+          {/* Los campos de arriba (señales, políticas, debate, sellos) son
+              la misma información que este párrafo narra en prosa — se
+              arma así para el registro de auditoría (texto plano, §2.5),
+              no para leerse de un vistazo. Colapsado por defecto para
+              quien de verdad lo necesite completo, no oculto. */}
+          <details className="rounded-md border p-3">
+            <summary className="cursor-pointer text-sm font-medium">
+              Ver texto completo de auditoría
+            </summary>
+            <p className="mt-2 text-sm text-muted-foreground">{decision.explanation_audit}</p>
+          </details>
 
           <div>
             {/* Tal como la sirve `CaseDetail` — nunca reconstruida (§5). */}
@@ -119,8 +151,22 @@ export function DecisionShowcase({ decision }: { decision: DecisionRead }) {
           </div>
         </CardContent>
       </Card>
+    </>
+  )
+}
 
-
+/**
+ * El grafo y el detalle juntos — lo que `DecisionShowcase` mostraba antes
+ * de separarse en las dos piezas de arriba. `CaseDetail` (el detalle
+ * completo de un caso) las sigue queriendo juntas; `Transactions` ya no
+ * -el grafo se queda fijo arriba de la página, el detalle se muda a la
+ * tabla, por fila-.
+ */
+export function DecisionShowcase({ decision }: { decision: DecisionRead }) {
+  return (
+    <>
+      <GraphSection decision={decision} />
+      <DecisionDetail decision={decision} />
     </>
   )
 }

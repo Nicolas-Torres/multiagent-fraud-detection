@@ -74,50 +74,62 @@
   "nodes": [
     {
       "id": "__end__",
+      "label": "END",
       "synthetic": true
     },
     {
       "id": "__start__",
+      "label": "START",
       "synthetic": true
     },
     {
       "id": "behavioral_pattern",
+      "label": "Behavioral Pattern",
       "synthetic": false
     },
     {
       "id": "debate_pro_customer",
+      "label": "Debate \u2014 Pro Customer",
       "synthetic": false
     },
     {
       "id": "debate_pro_fraud",
+      "label": "Debate \u2014 Pro Fraud",
       "synthetic": false
     },
     {
       "id": "decision_arbiter",
+      "label": "Decision Arbiter",
       "synthetic": false
     },
     {
       "id": "evidence_aggregation",
+      "label": "Evidence Aggregation",
       "synthetic": false
     },
     {
       "id": "explainability",
+      "label": "Explainability",
       "synthetic": false
     },
     {
       "id": "external_threat_intel",
+      "label": "External Threat Intel",
       "synthetic": false
     },
     {
       "id": "internal_policy_rag",
+      "label": "Internal Policy RAG",
       "synthetic": false
     },
     {
       "id": "persist_decision",
+      "label": "Persist Decision",
       "synthetic": false
     },
     {
       "id": "transaction_context",
+      "label": "Transaction Context",
       "synthetic": false
     }
   ]

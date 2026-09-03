@@ -2,26 +2,86 @@
   {
     "case_id": "064fae8c-9ccf-45bc-9f48-3763785b61d9",
     "transaction_id": "T-2579",
-    "label": "Aprobación limpia"
+    "label": "Aprobación limpia",
+    "id": "t2579",
+    "payload": {
+      "customer_id": "CU-0643",
+      "amount": "864.07",
+      "currency": "EUR",
+      "country": "PE",
+      "channel": "web",
+      "device_id": "D-0643",
+      "timestamp": "2025-12-01T01:45:00Z",
+      "merchant_id": "M-038",
+      "issuer_bank": "CABK"
+    }
   },
   {
     "case_id": "c9065a38-9883-4297-ab1d-408c9bf3b2f2",
     "transaction_id": "T-1809",
-    "label": "Monto y horario inusual (FP-01)"
+    "label": "Monto y horario inusual (FP-01)",
+    "id": "t1809",
+    "payload": {
+      "customer_id": "CU-0587",
+      "amount": "7748.52",
+      "currency": "EUR",
+      "country": "ES",
+      "channel": "web",
+      "device_id": "D-0587",
+      "timestamp": "2025-12-02T01:14:00Z",
+      "merchant_id": "M-035",
+      "issuer_bank": "CABK"
+    }
   },
   {
     "case_id": "2b495d92-6e99-4999-9359-b6f1ab6cea44",
     "transaction_id": "T-4445",
-    "label": "Perfil modificado antes de operar (FP-09)"
+    "label": "Perfil modificado antes de operar (FP-09)",
+    "id": "t4445",
+    "payload": {
+      "customer_id": "CU-0543",
+      "amount": "2038.98",
+      "currency": "USD",
+      "country": "US",
+      "channel": "web",
+      "device_id": "D-0543",
+      "timestamp": "2025-12-01T08:20:43Z",
+      "merchant_id": "M-041",
+      "issuer_bank": "BAC"
+    }
   },
   {
     "case_id": "9c3d78d6-5dcd-4ebc-a79a-c0511aba2d97",
     "transaction_id": "T-1313",
-    "label": "Cuenta nueva, monto grande (FP-08)"
+    "label": "Cuenta nueva, monto grande (FP-08)",
+    "id": "t1313",
+    "payload": {
+      "customer_id": "CU-0054",
+      "amount": "11724.09",
+      "currency": "USD",
+      "country": "US",
+      "channel": "web",
+      "device_id": "D-0054",
+      "timestamp": "2025-12-01T18:36:00Z",
+      "merchant_id": "M-009",
+      "issuer_bank": "WFC"
+    }
   },
   {
     "case_id": "699acbdd-5969-487e-83d0-3c49b30c3065",
     "transaction_id": "T-5816",
-    "label": "Escalado y resuelto por un analista"
+    "label": "Escalado y resuelto por un analista",
+    "id": "t5816",
+    "payload": {
+      "customer_id": "CU-0364",
+      "amount": "112039106.21",
+      "currency": "COP",
+      "country": "CO",
+      "channel": "mobile",
+      "device_id": "D-0364",
+      "timestamp": "2025-12-01T16:43:00Z",
+      "merchant_id": "M-037",
+      "issuer_bank": "BOG"
+    }
   }
 ]

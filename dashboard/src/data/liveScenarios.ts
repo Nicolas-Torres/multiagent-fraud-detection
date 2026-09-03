@@ -44,7 +44,7 @@ export const LIVE_SCENARIOS: LiveScenario[] = [
       device_id: 'D-0426',
       timestamp: '2025-12-01T01:59:00+00:00',
       merchant_id: 'M-022',
-      issuer_bank: null,
+      issuer_bank: 'BBVA',
     },
   },
   {
@@ -60,7 +60,7 @@ export const LIVE_SCENARIOS: LiveScenario[] = [
       device_id: 'D-0587',
       timestamp: '2025-12-02T01:14:00+00:00',
       merchant_id: 'M-035',
-      issuer_bank: null,
+      issuer_bank: 'SAN',
     },
   },
   {
@@ -76,7 +76,7 @@ export const LIVE_SCENARIOS: LiveScenario[] = [
       device_id: 'D-0054',
       timestamp: '2025-12-01T18:36:00+00:00',
       merchant_id: 'M-009',
-      issuer_bank: null,
+      issuer_bank: 'BAC',
     },
   },
 ]
@@ -99,8 +99,16 @@ export const LIVE_SCENARIOS: LiveScenario[] = [
  * ninguno depende de que el dispositivo o el comercio sean "habituales"
  * para producir su veredicto (a diferencia del país, que si importa para
  * FP-02 — por eso el escenario "approve" usa el país real del cliente).
+ *
+ * Tipo de entrada acotado a `id`/`payload` a propósito: además de
+ * `LIVE_SCENARIOS`, la toman los 5 casos reales de la vitrina (que tienen
+ * `case_id`/`transaction_id` de más, no `description`) y los escenarios
+ * diversos generados — ninguno de los tres necesita traer la forma
+ * completa de `LiveScenario` para esto.
  */
-export function transaccionParaCorridaEnVivo(escenario: LiveScenario): TransactionIn {
+export function transaccionParaCorridaEnVivo(
+  escenario: Pick<LiveScenario, 'id' | 'payload'>,
+): TransactionIn {
   const token = Date.now()
   return {
     ...escenario.payload,

@@ -18,7 +18,11 @@ estos 5 casos, no toda la tabla).
 
 Escribe `dashboard/src/data/showcase_cases.json` con los `case_id`
 resultantes — el frontend los pide por `GET /cases/{id}`, sin necesitar un
-endpoint nuevo ni tocar el contrato.
+endpoint nuevo ni tocar el contrato. Cada entrada suma también `id` (slug
+corto para el cooldown de "volver a ejecutar") y `payload` (la transacción
+original, mismo shape que ya usa `LiveScenario` en `liveScenarios.ts`) — así
+el frontend puede reejecutar cualquiera de los 5 sin pedirle el detalle al
+backend primero.
 """
 
 import argparse
@@ -58,6 +62,21 @@ CASOS = {
 RESOLVER = "T-5816"
 
 ANALISTA_VITRINA = "vitrina-portafolio"
+
+
+def _id_corto(transaction_id: str) -> str:
+    """Slug sin guiones para la clave de cooldown: `_escenario_de` (en
+    `api/routers/cases.py`) parte el `transaction_id` en el primer `-` tras
+    `LIVE-` — un `id` con guión propio rompería ese parseo y mezclaría
+    cooldowns que tienen que quedar independientes."""
+    return transaction_id.lower().replace("-", "")
+
+
+def _payload_de(txn) -> dict:
+    """El mismo shape que `LiveScenario['payload']` en `liveScenarios.ts`:
+    la transacción completa, sin `transaction_id` -eso lo genera el
+    frontend fresco en cada corrida en vivo."""
+    return txn.model_dump(mode="json", exclude={"transaction_id"})
 
 
 async def _upsert_uno(session, modelo, valores: dict, pk: str) -> None:
@@ -137,7 +156,13 @@ async def sembrar(reset: bool) -> list[dict]:
         existente = await _caso_existente(tid)
         if existente is not None:
             print(f"  {tid}: ya existe ({existente}), no se vuelve a correr")
-            resultado.append({"case_id": str(existente), "transaction_id": tid, "label": etiqueta})
+            resultado.append({
+                "case_id": str(existente),
+                "transaction_id": tid,
+                "label": etiqueta,
+                "id": _id_corto(tid),
+                "payload": _payload_de(transacciones[tid]),
+            })
             continue
 
         case_id = uuid4()
@@ -166,7 +191,13 @@ async def sembrar(reset: bool) -> list[dict]:
                 f"previsto; queda como está, no es un error del script"
             )
 
-        resultado.append({"case_id": str(case_id), "transaction_id": tid, "label": etiqueta})
+        resultado.append({
+            "case_id": str(case_id),
+            "transaction_id": tid,
+            "label": etiqueta,
+            "id": _id_corto(tid),
+            "payload": _payload_de(transacciones[tid]),
+        })
 
     return resultado
 

@@ -62,8 +62,7 @@ export function Queue() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Cola de casos</h1>
+      <div className="flex justify-end">
         <Select value={status} onValueChange={(v) => setStatus(v as CaseStatus | 'ALL')}>
           <SelectTrigger className="w-56">
             <SelectValue />
@@ -93,12 +92,13 @@ export function Queue() {
               <TableHead>Monto</TableHead>
               <TableHead>Cliente</TableHead>
               <TableHead>Creado</TableHead>
+              <TableHead>Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {query.data?.items.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground">
+                <TableCell colSpan={7} className="text-center text-muted-foreground">
                   Sin casos para este filtro.
                 </TableCell>
               </TableRow>
@@ -124,6 +124,13 @@ export function Queue() {
                 <TableCell>{item.customer_id}</TableCell>
                 <TableCell className="text-muted-foreground">
                   {formatDateTime(item.created_at)}
+                </TableCell>
+                <TableCell>
+                  {item.status === 'PENDING_HUMAN' ? (
+                    <Badge variant="default">Revisar</Badge>
+                  ) : (
+                    <Badge variant="secondary">Revisado</Badge>
+                  )}
                 </TableCell>
               </TableRow>
             ))}
