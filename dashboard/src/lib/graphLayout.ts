@@ -1,4 +1,4 @@
-import type { Edge, Node } from '@xyflow/react'
+import { Position, type Edge, type Node } from '@xyflow/react'
 
 interface TopologyNode {
   id: string
@@ -85,6 +85,12 @@ export function layoutTopology(topology: Topology): { nodes: Node[]; edges: Edge
       // Estilo real (color por estado de ejecución) lo aplica GraphPanel;
       // acá sólo la geometría.
       style: { width: 170 },
+      // El layout es estrictamente izquierda→derecha (`x = nivel * COL_GAP`);
+      // sin esto, React Flow usa el default del tipo `default`
+      // (`Top`/`Bottom`), que dibuja cada conector saliendo por arriba/abajo
+      // del nodo y obliga a una curva innecesaria para volver a la horizontal.
+      sourcePosition: Position.Right,
+      targetPosition: Position.Left,
     }
   })
 

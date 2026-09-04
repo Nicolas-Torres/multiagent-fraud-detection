@@ -85,10 +85,16 @@ const ESTILOS: Record<NodeStatus, EstiloNodo> = {
     color: 'var(--destructive)',
   },
   'not-run': { border: '1px dashed var(--border)', backgroundColor: 'var(--muted)', color: 'var(--muted-foreground)' },
+  // Fijo, no `var(--border)`/`var(--background)`: esos dos coinciden por
+  // definición con el fondo del lienzo (mismo token), así que START/END
+  // quedaban sin ningún contraste de relleno, en modo claro y en oscuro por
+  // igual. Índigo en vez de gris para no competir con la semántica de
+  // estado (emerald/amber/rojo) ni confundirse con el gris punteado de
+  // `not-run`.
   synthetic: {
-    border: '1px solid var(--border)',
-    backgroundColor: 'var(--background)',
-    color: 'var(--muted-foreground)',
+    border: '1px solid #6366f1',
+    backgroundColor: '#eef2ff',
+    color: '#3730a3',
     fontSize: '0.75rem',
   },
 }
