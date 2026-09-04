@@ -1,5 +1,5 @@
 # Contrato de Interfaz — Sistema Multi-Agente de Detección de Fraude
-**Versión 0.11 — El progreso en vivo se transmite por SSE**
+**Versión 0.12 — El dashboard sirve costo y latencia desde LangSmith**
 
 > Define las **fronteras** entre el motor de agentes (yo), la infraestructura (mi
 > compañero) y el dashboard del analista.
@@ -299,6 +299,7 @@ mediría la discrepancia de reglas en vez de la calidad del sistema.
 | `POST` | `/api/v1/policies` | 🆕 Alta de política (norma + vinculación opcional) | `PolicyIn` | `PolicyRead` | `201` |
 | `GET` | `/api/v1/predicates` | 🆕 La biblioteca, para el compositor del dashboard | — | `list[PredicateSpec]` | `200` |
 | `GET` | `/api/v1/cases/{case_id}/stream` | 🆕 Progreso en vivo del grafo, por SSE (ADR-0018) | — | `text/event-stream` | `200` |
+| `GET` | `/api/v1/metrics/llm` | 🆕 Costo y latencia del grafo, leídos de LangSmith (ADR-0019) | — | `LlmMetricsRead` | `200` |
 | `GET` | `/health` | Liveness | — | `{status}` | `200` |
 | `GET` | `/ready` | Readiness (Postgres) | — | `{status}` | `200` |
 
@@ -311,6 +312,14 @@ veredicto, que sigue siendo exclusivamente `GET /cases/{case_id}` (§2.3);
 esto no cambia en absoluto, sólo lo complementa con progreso visual. Sin
 autenticación, misma deuda declarada que el resto de los endpoints HITL
 (acta 09 §6.1).
+
+`GET /api/v1/metrics/llm` lee costo, latencia y tokens directo de la API de
+lectura de LangSmith (ADR-0019) — no hay una tabla propia con este dato, ni
+la va a haber: sería una segunda fuente de verdad para algo que LangSmith ya
+mide mejor. `available: false` (con `summary`/`nodes` en `null`) si
+`LANGSMITH_TRACING`/`LANGSMITH_API_KEY` no están configurados o LangSmith no
+responde — **nunca** un `4xx`/`5xx` por esto. Cacheado en proceso (30s):
+no es un dato que necesite ser instantáneo.
 
 ### 2.4 Idempotencia en `POST /cases`
 
@@ -619,6 +628,24 @@ el código de señal depende de los parámetros (`DEVICE_VELOCITY` o
 más de lo que informa. Es la biblioteca completa —quince predicados—, la misma
 que usa el motor para evaluar: no hay una segunda lista mantenida a mano para
 el compositor del dashboard.
+
+#### `LlmMetricsRead` — respuesta de `GET /api/v1/metrics/llm` 🆕
+
+| Campo | Tipo | Notas |
+|---|---|---|
+| `available` | `bool` | `false` = sin datos todavía (LangSmith no configurado o no responde) |
+| `project` | `str \| null` | el proyecto de LangSmith consultado |
+| `summary` | `LlmMetricsSummary \| null` | `null` si `available` es `false` |
+| `nodes` | `list[LlmNodeMetrics] \| null` | `null` si `available` es `false` |
+
+**`LlmMetricsSummary`**: `run_count` (`int`), `total_cost`/`avg_cost_per_decision`
+(`float`, USD), `latency_p50_seconds`/`latency_p99_seconds` (`float`),
+`total_tokens` (`int`), `error_rate` (`float`, fracción 0–1).
+
+**`LlmNodeMetrics`** — uno por nodo real del grafo (`graph/nodes.py`), nunca
+por las llamadas LLM internas que ya viajan acumuladas dentro de su nodo
+padre (sumarlas aparte duplicaría el costo): `name` (`str`), `run_count`
+(`int`), `avg_latency_seconds`/`avg_tokens`/`avg_cost` (`float`).
 
 ### 2.6 Serialización — reglas de la frontera JSON
 
