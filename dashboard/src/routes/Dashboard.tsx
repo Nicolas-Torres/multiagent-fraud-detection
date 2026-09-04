@@ -1,9 +1,11 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect } from 'react'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis } from 'recharts'
 
 import { api } from '@/api/client'
 import type { components } from '@/api/schema'
 import { Field } from '@/components/Field'
+import { GraphPanel } from '@/components/GraphPanel'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
@@ -14,6 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { type CaseProgress, useCaseProgress } from '@/hooks/useCaseProgress'
 
 type DecisionType = components['schemas']['DecisionType']
 
@@ -56,6 +59,44 @@ export function Dashboard() {
     },
     refetchInterval: 30_000,
   })
+
+  const queryClient = useQueryClient()
+
+  // Descubre si hay algo corriendo ahora mismo — sin importar quién lo
+  // disparó ni desde qué pestaña (mismo filtro que ya usa la Cola,
+  // `Queue.tsx`). 8s: "se ve vivo" sin saturar la API.
+  const enCurso = useQuery({
+    queryKey: ['cases', 'ANALYZING'],
+    queryFn: async () => {
+      const { data, error } = await api.GET('/api/v1/cases', {
+        params: { query: { status: 'ANALYZING', limit: 1 } },
+      })
+      if (error) throw error
+      return data
+    },
+    refetchInterval: 8_000,
+  })
+  const caseIdEnCurso = enCurso.data?.items[0]?.case_id ?? null
+  const progreso = useCaseProgress(caseIdEnCurso)
+
+  // Al terminar, refresca la tabla de costo en el mismo instante en vez de
+  // esperar el próximo ciclo de 30s — pide el dato fresco con `force=true`
+  // (ADR-0020) y lo escribe directo en la caché de la query.
+  useEffect(() => {
+    if (!progreso.done) return
+    let cancelado = false
+    void (async () => {
+      const { data, error } = await api.GET('/api/v1/metrics/llm', {
+        params: { query: { force: true } },
+      })
+      if (!cancelado && !error) {
+        queryClient.setQueryData(['metrics', 'llm'], data)
+      }
+    })()
+    return () => {
+      cancelado = true
+    }
+  }, [progreso.done, queryClient])
 
   const cargando = casos.isLoading || politicas.isLoading
   const conError = casos.isError || politicas.isError
@@ -143,7 +184,11 @@ export function Dashboard() {
         </>
       )}
 
-      <LatenciaYCostoPorNodo metricas={metricas} />
+      <LatenciaYCostoPorNodo
+        metricas={metricas}
+        caseIdEnCurso={caseIdEnCurso}
+        progreso={progreso}
+      />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <PendingCard
@@ -163,67 +208,90 @@ function formatUsd(valor: number): string {
 
 function LatenciaYCostoPorNodo({
   metricas,
+  caseIdEnCurso,
+  progreso,
 }: {
   metricas: { isLoading: boolean; isError: boolean; data: LlmMetricsRead | undefined }
+  caseIdEnCurso: string | null
+  progreso: CaseProgress
 }) {
+  const enVivo = Boolean(caseIdEnCurso) && progreso.connected
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Costo y latencia por nodo</CardTitle>
       </CardHeader>
-      <CardContent>
-        {metricas.isLoading ? (
-          <Skeleton className="h-40 w-full" />
-        ) : metricas.isError || !metricas.data?.available ? (
-          <p className="text-sm text-muted-foreground">
-            Sin datos todavía. Requiere `LANGSMITH_TRACING`/`LANGSMITH_API_KEY`
-            configurados y que LangSmith responda — ver ADR-0019.
-          </p>
-        ) : (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
-              <Field label="Costo total" value={formatUsd(metricas.data.summary!.total_cost)} />
-              <Field
-                label="Costo / decisión"
-                value={formatUsd(metricas.data.summary!.avg_cost_per_decision)}
-              />
-              <Field
-                label="Latencia p50"
-                value={`${metricas.data.summary!.latency_p50_seconds.toFixed(1)}s`}
-              />
-              <Field
-                label="Tasa de error"
-                value={`${(metricas.data.summary!.error_rate * 100).toFixed(1)}%`}
-              />
-            </div>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nodo</TableHead>
-                  <TableHead>Corridas</TableHead>
-                  <TableHead>Latencia prom.</TableHead>
-                  <TableHead>Tokens prom.</TableHead>
-                  <TableHead>Costo prom.</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {metricas.data.nodes!.map((n) => (
-                  <TableRow key={n.name}>
-                    <TableCell className="font-mono text-xs">{n.name}</TableCell>
-                    <TableCell className="text-muted-foreground">{n.run_count}</TableCell>
-                    <TableCell>{n.avg_latency_seconds.toFixed(2)}s</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {n.avg_tokens > 0 ? Math.round(n.avg_tokens) : '—'}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {n.avg_cost > 0 ? formatUsd(n.avg_cost) : '—'}
-                    </TableCell>
+      <CardContent className="flex flex-col gap-4 lg:flex-row">
+        <div className="min-w-0 flex-1">
+          {metricas.isLoading ? (
+            <Skeleton className="h-40 w-full" />
+          ) : metricas.isError || !metricas.data?.available ? (
+            <p className="text-sm text-muted-foreground">
+              Sin datos todavía. Requiere `LANGSMITH_TRACING`/`LANGSMITH_API_KEY`
+              configurados y que LangSmith responda — ver ADR-0019.
+            </p>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
+                <Field label="Costo total" value={formatUsd(metricas.data.summary!.total_cost)} />
+                <Field
+                  label="Costo / decisión"
+                  value={formatUsd(metricas.data.summary!.avg_cost_per_decision)}
+                />
+                <Field
+                  label="Latencia p50"
+                  value={`${metricas.data.summary!.latency_p50_seconds.toFixed(1)}s`}
+                />
+                <Field
+                  label="Tasa de error"
+                  value={`${(metricas.data.summary!.error_rate * 100).toFixed(1)}%`}
+                />
+              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nodo</TableHead>
+                    <TableHead>Corridas</TableHead>
+                    <TableHead>Latencia prom.</TableHead>
+                    <TableHead>Tokens prom.</TableHead>
+                    <TableHead>Costo prom.</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
+                </TableHeader>
+                <TableBody>
+                  {metricas.data.nodes!.map((n) => (
+                    <TableRow key={n.name}>
+                      <TableCell className="font-mono text-xs">{n.name}</TableCell>
+                      <TableCell className="text-muted-foreground">{n.run_count}</TableCell>
+                      <TableCell>{n.avg_latency_seconds.toFixed(2)}s</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {n.avg_tokens > 0 ? Math.round(n.avg_tokens) : '—'}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {n.avg_cost > 0 ? formatUsd(n.avg_cost) : '—'}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </div>
+
+        {/* Independiente de si hay datos de LangSmith: el progreso en vivo
+            sale del mismo SSE que ya usa Transactions (ADR-0018), no de
+            LangSmith. En reposo (nadie corriendo) se queda igual visible,
+            apagado -no se oculta (pedido explícito). */}
+        <div className="shrink-0 lg:w-80">
+          <GraphPanel
+            agentRoute={enVivo ? progreso.ranNodes : []}
+            degradedAgents={[]}
+            caseDecided={false}
+            idle={!enVivo}
+            direction="vertical"
+            className="h-[560px] w-full rounded-md border"
+          />
+        </div>
       </CardContent>
     </Card>
   )

@@ -114,6 +114,12 @@ export interface paths {
          *     real del grafo. Cacheado en proceso (`CACHE_TTL_SEGUNDOS`) para no
          *     golpear la API de LangSmith en cada poll del dashboard si hay varias
          *     pestañas abiertas.
+         *
+         *     `force=true` (ADR-0020) salta el caché para esa llamada puntual —lo usa
+         *     el dashboard cuando el stream SSE de un caso avisa que terminó, para
+         *     reflejar su costo sin esperar hasta 30s— y **actualiza** el caché con
+         *     el resultado fresco, así el próximo poll normal de cualquier pestaña
+         *     también se beneficia en vez de volver a pedirlo.
          */
         get: operations["metricas_llm_api_v1_metrics_llm_get"];
         put?: never;
@@ -846,7 +852,9 @@ export interface operations {
     };
     metricas_llm_api_v1_metrics_llm_get: {
         parameters: {
-            query?: never;
+            query?: {
+                force?: boolean;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -860,6 +868,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LlmMetricsRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
