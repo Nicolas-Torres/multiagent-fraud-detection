@@ -24,6 +24,21 @@ interface GraphPanelProps {
    * un caso ya resuelto, donde no queda nada por empezar.
    */
   caseDecided?: boolean
+  /**
+   * Todos los nodos no sintéticos en `not-run`, sin mirar `agentRoute`/
+   * `degradedAgents`/`caseDecided` — el estado "en reposo" de Dashboard
+   * cuando no hay ningún caso en `ANALYZING`. Ninguno de los otros modos
+   * lo representa limpio: con `caseDecided` en cualquier valor y
+   * `agentRoute` vacío, `estadoDe` clasifica mal `persist_decision` (con
+   * `caseDecided=true`) o el primer superstep (con `caseDecided=false`,
+   * se ve "en progreso" sin que nada esté corriendo).
+   */
+  idle?: boolean
+  /** Horizontal por defecto (paneles anchos); vertical para un panel
+   * angosto y alto — ver `graphLayout.ts`. */
+  direction?: 'horizontal' | 'vertical'
+  /** Reemplaza el tamaño por defecto (`h-80 w-full`) del contenedor. */
+  className?: string
 }
 
 type NodeStatus = 'ran' | 'en-progreso' | 'degraded' | 'not-run' | 'synthetic'
@@ -116,14 +131,25 @@ export function GraphPanel({
   degradedAgents,
   animating = false,
   caseDecided = true,
+  idle = false,
+  direction = 'horizontal',
+  className,
 }: GraphPanelProps) {
   const { nodes, edges } = useMemo(() => {
-    const base = layoutTopology(topology)
+    const base = layoutTopology(topology, direction)
     const ran = new Set(agentRoute)
     const degraded = new Set(degradedAgents)
     const synthById = new Map(topology.nodes.map((n) => [n.id, n.synthetic]))
 
     const nodes: Node[] = base.nodes.map((n) => {
+      if (idle) {
+        const status: NodeStatus = synthById.get(n.id) ? 'synthetic' : 'not-run'
+        return {
+          ...n,
+          className: 'transition-colors duration-500',
+          style: { ...n.style, ...BASE, ...ESTILOS[status] },
+        }
+      }
       if (animating) {
         const level = (n.data as { level?: number }).level ?? 0
         return {
@@ -146,10 +172,10 @@ export function GraphPanel({
     })
 
     return { nodes, edges: base.edges }
-  }, [agentRoute, degradedAgents, animating, caseDecided])
+  }, [agentRoute, degradedAgents, animating, caseDecided, idle, direction])
 
   return (
-    <div className="h-80 w-full rounded-md border">
+    <div className={className ?? 'h-80 w-full rounded-md border'}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
