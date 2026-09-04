@@ -116,16 +116,26 @@ def _consultar_langsmith_sync() -> LlmMetricsRead:
 
 
 @router.get("/metrics/llm", response_model=LlmMetricsRead)
-async def metricas_llm() -> LlmMetricsRead:
+async def metricas_llm(force: bool = False) -> LlmMetricsRead:
     """Resumen (costo, latencia, tokens, tasa de error) + desglose por nodo
     real del grafo. Cacheado en proceso (`CACHE_TTL_SEGUNDOS`) para no
     golpear la API de LangSmith en cada poll del dashboard si hay varias
-    pestañas abiertas."""
+    pestañas abiertas.
+
+    `force=true` (ADR-0020) salta el caché para esa llamada puntual —lo usa
+    el dashboard cuando el stream SSE de un caso avisa que terminó, para
+    reflejar su costo sin esperar hasta 30s— y **actualiza** el caché con
+    el resultado fresco, así el próximo poll normal de cualquier pestaña
+    también se beneficia en vez de volver a pedirlo."""
     if not (settings.langsmith_tracing and settings.langsmith_api_key):
         return _sin_datos()
 
     ahora = time.monotonic()
-    if _cache["data"] is not None and ahora - _cache["fetched_at"] < CACHE_TTL_SEGUNDOS:
+    if (
+        not force
+        and _cache["data"] is not None
+        and ahora - _cache["fetched_at"] < CACHE_TTL_SEGUNDOS
+    ):
         return _cache["data"]
 
     try:

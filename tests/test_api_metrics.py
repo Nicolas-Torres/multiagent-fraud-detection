@@ -96,6 +96,31 @@ def test_con_datos_expone_resumen_y_nodos_y_cachea():
     assert cuerpo["nodes"][0]["name"] == "decision_arbiter"
 
 
+def test_force_salta_el_cache_y_lo_actualiza():
+    original = _con_langsmith_configurado(True, "ls-fake-key")
+    _reset_cache()
+    try:
+        primero = _resultado_de_prueba()
+        segundo = _resultado_de_prueba()
+        segundo.summary.run_count = 4  # type: ignore[union-attr]
+        with patch.object(
+            metrics, "_consultar_langsmith_sync", side_effect=[primero, segundo]
+        ) as mock_consulta:
+            with TestClient(app) as client:
+                sin_forzar = client.get("/api/v1/metrics/llm")
+                forzada = client.get("/api/v1/metrics/llm?force=true")
+                # El caché quedó actualizado con el resultado forzado -un
+                # tercer poll normal ya lo ve, sin pedirlo de nuevo.
+                siguiente_normal = client.get("/api/v1/metrics/llm")
+        assert mock_consulta.call_count == 2
+    finally:
+        settings.langsmith_tracing, settings.langsmith_api_key = original
+
+    assert sin_forzar.json()["summary"]["run_count"] == 3
+    assert forzada.json()["summary"]["run_count"] == 4
+    assert siguiente_normal.json()["summary"]["run_count"] == 4
+
+
 def test_si_langsmith_falla_no_rompe_el_endpoint():
     original = _con_langsmith_configurado(True, "ls-fake-key")
     _reset_cache()
