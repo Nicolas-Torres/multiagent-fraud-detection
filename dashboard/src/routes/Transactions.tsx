@@ -90,7 +90,6 @@ function formatoRestante(ms: number): string {
 }
 
 export function Transactions() {
-  const [selectedId, setSelectedId] = useState<string | null>(CASO_INICIAL)
   const [errorEjecucion, setErrorEjecucion] = useState<string | null>(null)
   const [ultimasCorridas, setUltimasCorridas] = useState<Record<string, number>>(leerUltimasCorridas)
   // Sólo para las filas en vivo/diversas: no tienen `case_id` hasta el
@@ -98,6 +97,13 @@ export function Transactions() {
   // mostrar su propia "Decisión del LLM" igual que una de vitrina.
   const [caseIdPorEscenario, setCaseIdPorEscenario] =
     useState<Record<string, string>>(leerCaseIdsPorEscenario)
+  // Casos que este tab disparó y todavía no llegaron a un veredicto — cada
+  // uno tiene su propia tarjeta con su propio grafo en vivo más abajo. Con
+  // más de un "Ejecutar" en simultáneo, ninguno se pisa con otro: antes
+  // había un solo `selectedId` que la ejecución más nueva le robaba a la
+  // anterior, y la que quedaba atrás terminaba sin ningún indicio visual de
+  // que había seguido corriendo (o ya había terminado).
+  const [casosEnCurso, setCasosEnCurso] = useState<string[]>([])
   const [ahora, setAhora] = useState(() => Date.now())
   const queryClient = useQueryClient()
 
@@ -106,27 +112,20 @@ export function Transactions() {
     return () => clearInterval(id)
   }, [])
 
-  // Panel fijo de arriba — sin cambios de comportamiento: reacciona a la
-  // fila de vitrina elegida o a la que se acaba de disparar en vivo.
+  // Panel fijo de arriba: siempre el caso curado de vitrina, ya decidido
+  // -nunca "el último que ejecuté" (eso vive en `casosEnCurso`, abajo). Es
+  // la primera prueba real que ve alguien que entra sin ejecutar nada.
   const detalle = useQuery({
-    queryKey: ['case', selectedId],
+    queryKey: ['case', CASO_INICIAL],
     queryFn: async () => {
       const { data, error } = await api.GET('/api/v1/cases/{case_id}', {
-        params: { path: { case_id: selectedId! } },
+        params: { path: { case_id: CASO_INICIAL! } },
       })
       if (error) throw error
       return data
     },
-    enabled: !!selectedId,
-    // Mientras no haya decisión el caso puede seguir avanzando — se deja de
-    // sondear apenas hay veredicto. El polling sigue siendo la fuente de
-    // verdad (§4.2); el stream de abajo sólo adelanta el progreso visual.
-    refetchInterval: (query) => (query.state.data?.decision ? false : 3_000),
+    enabled: !!CASO_INICIAL,
   })
-
-  const progreso = useCaseProgress(
-    selectedId && !detalle.data?.decision ? selectedId : null,
-  )
 
   const ejecutar = useMutation({
     mutationFn: async (escenario: Pick<LiveScenario, 'id' | 'payload'>) => {
@@ -143,7 +142,7 @@ export function Transactions() {
     },
     onSuccess: (data, escenario) => {
       setErrorEjecucion(null)
-      setSelectedId(data.case_id)
+      setCasosEnCurso((previos) => [...previos, data.case_id])
       setCaseIdPorEscenario((previos) => {
         const actualizados = { ...previos, [escenario.id]: data.case_id }
         localStorage.setItem(CASE_IDS_STORAGE_KEY, JSON.stringify(actualizados))
@@ -165,34 +164,25 @@ export function Transactions() {
     return Math.max(0, COOLDOWN_MS - (ahora - ultima))
   }
 
+  function quitarDeEnCurso(caseId: string) {
+    setCasosEnCurso((previos) => previos.filter((id) => id !== caseId))
+  }
+
   return (
     <div className="space-y-6">
-      <p className="text-muted-foreground">
-        Cada fila es una transacción real, evaluada por el grafo de agentes real.
-        Elegí una ya resuelta para ver su análisis, o ejecutá cualquiera en vivo y
-        mirá correr los nueve agentes.
-      </p>
+      {casosEnCurso.length > 0 && (
+        <section className="space-y-4">
+          {casosEnCurso.map((caseId) => (
+            <CasoEnCurso key={caseId} caseId={caseId} onDone={() => quitarDeEnCurso(caseId)} />
+          ))}
+        </section>
+      )}
 
-      {/* Panel fijo: reacciona a la fila elegida o a la que está corriendo
-          — mismo mecanismo de siempre, sin cambios. */}
+      {/* Panel fijo: siempre el caso de vitrina, ver comentario arriba. */}
       <section>
-        {!selectedId && (
-          <p className="text-muted-foreground">Elegí una fila de la tabla para verla acá.</p>
-        )}
-        {selectedId && detalle.isLoading && <Skeleton className="h-96 w-full" />}
-        {selectedId && detalle.isError && (
-          <p className="text-destructive">No se pudo cargar el caso.</p>
-        )}
-        {selectedId && detalle.data && !detalle.data.decision && (
-          <AnalyzingPanel
-            status={detalle.data.status}
-            ranNodes={progreso.ranNodes}
-            connected={progreso.connected}
-          />
-        )}
-        {selectedId && detalle.data?.decision && (
-          <GraphSection decision={detalle.data.decision} />
-        )}
+        {detalle.isLoading && <Skeleton className="h-96 w-full" />}
+        {detalle.isError && <p className="text-destructive">No se pudo cargar el caso.</p>}
+        {detalle.data?.decision && <GraphSection decision={detalle.data.decision} />}
       </section>
 
       <section className="space-y-3">
@@ -275,8 +265,12 @@ function FilaTransaccion({
 }) {
   const [detalleAbierto, setDetalleAbierto] = useState(false)
 
-  // Misma `queryKey` que ya usa el panel fijo de arriba para este mismo
-  // caso -React Query la deduplica, cero costo de red extra.
+  // Misma `queryKey` que usa `CasoEnCurso` para este mismo caso mientras
+  // está corriendo -React Query la deduplica, cero costo de red extra. El
+  // propio `refetchInterval` es necesario igual: una vez decidido el caso,
+  // `CasoEnCurso` se desmonta (se retira de `casosEnCurso`) y esta fila
+  // queda como la única observadora — sin esto, se congelaría mostrando
+  // "ANALYZING" para siempre en cuanto la tarjeta de arriba desaparece.
   const detalle = useQuery({
     queryKey: ['case', caseId],
     queryFn: async () => {
@@ -287,6 +281,7 @@ function FilaTransaccion({
       return data as CaseDetailType
     },
     enabled: !!caseId,
+    refetchInterval: (query) => (query.state.data?.decision ? false : 3_000),
   })
   const enCooldown = restante > 0
 
@@ -365,5 +360,39 @@ function FilaTransaccion({
         </TableRow>
       )}
     </>
+  )
+}
+
+/**
+ * Una tarjeta por caso en curso, con su propio grafo en vivo -no un panel
+ * único compartido, que sólo podía seguirle la pista a la última ejecución
+ * y dejaba a las anteriores sin ningún indicio visual de que seguían
+ * corriendo (o de que ya habían terminado).
+ */
+function CasoEnCurso({ caseId, onDone }: { caseId: string; onDone: () => void }) {
+  const detalle = useQuery({
+    queryKey: ['case', caseId],
+    queryFn: async () => {
+      const { data, error } = await api.GET('/api/v1/cases/{case_id}', {
+        params: { path: { case_id: caseId } },
+      })
+      if (error) throw error
+      return data as CaseDetailType
+    },
+  })
+  // `onDone` viene del stream (ADR-0018/0020), no de este polling: se
+  // dispara en el instante real del evento `done`, no a la espera del
+  // próximo refetch de `detalle`.
+  const progreso = useCaseProgress(caseId, onDone)
+
+  if (!detalle.data || detalle.data.decision) return null
+
+  return (
+    <AnalyzingPanel
+      identificador={`${formatTransactionId(detalle.data.transaction.transaction_id)} · ${detalle.data.transaction.customer_id}`}
+      status={detalle.data.status}
+      ranNodes={progreso.ranNodes}
+      connected={progreso.connected}
+    />
   )
 }
