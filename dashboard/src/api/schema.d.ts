@@ -101,6 +101,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/metrics/llm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Metricas Llm
+         * @description Resumen (costo, latencia, tokens, tasa de error) + desglose por nodo
+         *     real del grafo. Cacheado en proceso (`CACHE_TTL_SEGUNDOS`) para no
+         *     golpear la API de LangSmith en cada poll del dashboard si hay varias
+         *     pestañas abiertas.
+         */
+        get: operations["metricas_llm_api_v1_metrics_llm_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/policies": {
         parameters: {
             query?: never;
@@ -440,6 +463,46 @@ export interface components {
             /** Version */
             version: string;
         };
+        /** LlmMetricsRead */
+        LlmMetricsRead: {
+            /** Available */
+            available: boolean;
+            /** Nodes */
+            nodes?: components["schemas"]["LlmNodeMetrics"][] | null;
+            /** Project */
+            project?: string | null;
+            summary?: components["schemas"]["LlmMetricsSummary"] | null;
+        };
+        /** LlmMetricsSummary */
+        LlmMetricsSummary: {
+            /** Avg Cost Per Decision */
+            avg_cost_per_decision: number;
+            /** Error Rate */
+            error_rate: number;
+            /** Latency P50 Seconds */
+            latency_p50_seconds: number;
+            /** Latency P99 Seconds */
+            latency_p99_seconds: number;
+            /** Run Count */
+            run_count: number;
+            /** Total Cost */
+            total_cost: number;
+            /** Total Tokens */
+            total_tokens: number;
+        };
+        /** LlmNodeMetrics */
+        LlmNodeMetrics: {
+            /** Avg Cost */
+            avg_cost: number;
+            /** Avg Latency Seconds */
+            avg_latency_seconds: number;
+            /** Avg Tokens */
+            avg_tokens: number;
+            /** Name */
+            name: string;
+            /** Run Count */
+            run_count: number;
+        };
         /** Page[CaseSummary] */
         Page_CaseSummary_: {
             /** Items */
@@ -777,6 +840,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    metricas_llm_api_v1_metrics_llm_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LlmMetricsRead"];
                 };
             };
         };
