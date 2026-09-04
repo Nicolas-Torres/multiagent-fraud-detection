@@ -5,7 +5,6 @@ import { Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis } from 
 import { api } from '@/api/client'
 import type { components } from '@/api/schema'
 import { Field } from '@/components/Field'
-import { GraphPanel } from '@/components/GraphPanel'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
@@ -16,7 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { type CaseProgress, useCaseProgress } from '@/hooks/useCaseProgress'
+import { useCaseProgress } from '@/hooks/useCaseProgress'
 
 type DecisionType = components['schemas']['DecisionType']
 
@@ -184,11 +183,7 @@ export function Dashboard() {
         </>
       )}
 
-      <LatenciaYCostoPorNodo
-        metricas={metricas}
-        caseIdEnCurso={caseIdEnCurso}
-        progreso={progreso}
-      />
+      <LatenciaYCostoPorNodo metricas={metricas} />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <PendingCard
@@ -208,90 +203,67 @@ function formatUsd(valor: number): string {
 
 function LatenciaYCostoPorNodo({
   metricas,
-  caseIdEnCurso,
-  progreso,
 }: {
   metricas: { isLoading: boolean; isError: boolean; data: LlmMetricsRead | undefined }
-  caseIdEnCurso: string | null
-  progreso: CaseProgress
 }) {
-  const enVivo = Boolean(caseIdEnCurso) && progreso.connected
-
   return (
     <Card>
       <CardHeader>
         <CardTitle>Costo y latencia por nodo</CardTitle>
       </CardHeader>
-      <CardContent className="flex flex-col gap-4 lg:flex-row">
-        <div className="min-w-0 flex-1">
-          {metricas.isLoading ? (
-            <Skeleton className="h-40 w-full" />
-          ) : metricas.isError || !metricas.data?.available ? (
-            <p className="text-sm text-muted-foreground">
-              Sin datos todavía. Requiere `LANGSMITH_TRACING`/`LANGSMITH_API_KEY`
-              configurados y que LangSmith responda — ver ADR-0019.
-            </p>
-          ) : (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
-                <Field label="Costo total" value={formatUsd(metricas.data.summary!.total_cost)} />
-                <Field
-                  label="Costo / decisión"
-                  value={formatUsd(metricas.data.summary!.avg_cost_per_decision)}
-                />
-                <Field
-                  label="Latencia p50"
-                  value={`${metricas.data.summary!.latency_p50_seconds.toFixed(1)}s`}
-                />
-                <Field
-                  label="Tasa de error"
-                  value={`${(metricas.data.summary!.error_rate * 100).toFixed(1)}%`}
-                />
-              </div>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nodo</TableHead>
-                    <TableHead>Corridas</TableHead>
-                    <TableHead>Latencia prom.</TableHead>
-                    <TableHead>Tokens prom.</TableHead>
-                    <TableHead>Costo prom.</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {metricas.data.nodes!.map((n) => (
-                    <TableRow key={n.name}>
-                      <TableCell className="font-mono text-xs">{n.name}</TableCell>
-                      <TableCell className="text-muted-foreground">{n.run_count}</TableCell>
-                      <TableCell>{n.avg_latency_seconds.toFixed(2)}s</TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {n.avg_tokens > 0 ? Math.round(n.avg_tokens) : '—'}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {n.avg_cost > 0 ? formatUsd(n.avg_cost) : '—'}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+      <CardContent>
+        {metricas.isLoading ? (
+          <Skeleton className="h-40 w-full" />
+        ) : metricas.isError || !metricas.data?.available ? (
+          <p className="text-sm text-muted-foreground">
+            Sin datos todavía. Requiere `LANGSMITH_TRACING`/`LANGSMITH_API_KEY`
+            configurados y que LangSmith responda — ver ADR-0019.
+          </p>
+        ) : (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
+              <Field label="Costo total" value={formatUsd(metricas.data.summary!.total_cost)} />
+              <Field
+                label="Costo / decisión"
+                value={formatUsd(metricas.data.summary!.avg_cost_per_decision)}
+              />
+              <Field
+                label="Latencia p50"
+                value={`${metricas.data.summary!.latency_p50_seconds.toFixed(1)}s`}
+              />
+              <Field
+                label="Tasa de error"
+                value={`${(metricas.data.summary!.error_rate * 100).toFixed(1)}%`}
+              />
             </div>
-          )}
-        </div>
-
-        {/* Independiente de si hay datos de LangSmith: el progreso en vivo
-            sale del mismo SSE que ya usa Transactions (ADR-0018), no de
-            LangSmith. En reposo (nadie corriendo) se queda igual visible,
-            apagado -no se oculta (pedido explícito). */}
-        <div className="shrink-0 lg:w-80">
-          <GraphPanel
-            agentRoute={enVivo ? progreso.ranNodes : []}
-            degradedAgents={[]}
-            caseDecided={false}
-            idle={!enVivo}
-            direction="vertical"
-            className="h-[560px] w-full rounded-md border"
-          />
-        </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nodo</TableHead>
+                  <TableHead>Corridas</TableHead>
+                  <TableHead>Latencia prom.</TableHead>
+                  <TableHead>Tokens prom.</TableHead>
+                  <TableHead>Costo prom.</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {metricas.data.nodes!.map((n) => (
+                  <TableRow key={n.name}>
+                    <TableCell className="font-mono text-xs">{n.name}</TableCell>
+                    <TableCell className="text-muted-foreground">{n.run_count}</TableCell>
+                    <TableCell>{n.avg_latency_seconds.toFixed(2)}s</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {n.avg_tokens > 0 ? Math.round(n.avg_tokens) : '—'}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {n.avg_cost > 0 ? formatUsd(n.avg_cost) : '—'}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
       </CardContent>
     </Card>
   )

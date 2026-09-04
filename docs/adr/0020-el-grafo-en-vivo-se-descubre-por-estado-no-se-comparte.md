@@ -1,4 +1,4 @@
-# ADR-0020: el grafo en vivo de Dashboard se descubre por estado, no se comparte entre rutas
+# ADR-0020: Dashboard descubre ejecuciones en curso por estado, no por estado compartido
 
 - **Estado**: aceptado
 - **Fecha**: 2026-09-04
@@ -6,17 +6,24 @@
 ## Contexto
 
 ADR-0019 sirve costo/latencia al dashboard, pero es un número que se
-actualiza solo cada 30s — no hay nada visual mientras un caso corre. El
-usuario pidió, al costado de esa tabla, la misma animación en vivo del
-grafo que ya existe en Transactions (`AnalyzingPanel` + `GraphPanel` +
-`useCaseProgress`, SSE de ADR-0018), visible **aunque la ejecución se haya
-disparado desde otra pestaña** — el caso de uso explícito es: alguien
-ejecuta un escenario en Transactions y cambia a Dashboard a mitad de la
-corrida.
+actualiza solo cada 30s — no hay nada que avise cuando un caso termina de
+correr y ese número por fin quedó al día. El usuario pidió una forma de
+enterarse de eso **aunque la ejecución se haya disparado desde otra
+pestaña** — el caso de uso explícito es: alguien ejecuta un escenario en
+Transactions y cambia a Dashboard a mitad de la corrida.
 
 `selectedId` (qué caso mirar) hoy vive como estado local de
 `Transactions.tsx` — se pierde al desmontar la ruta. La pregunta de diseño
 es cómo Dashboard se entera de que hay algo corriendo, sin ese estado.
+
+> **Nota**: la primera versión de esta etapa agregaba, al costado de la
+> tabla, la misma animación de grafo en vivo que ya existe en Transactions
+> (`GraphPanel` en modo vertical). Se probó, se evaluó contra el resultado
+> real y se descartó — no aportaba suficiente frente al costo visual de un
+> panel más. La decisión de *cómo descubrir la ejecución en curso* y
+> *cuándo refrescar la tabla* (lo que sigue en este documento) no cambió:
+> sigue siendo la forma de mantener "Costo y latencia por nodo" al día sin
+> esperar el próximo ciclo de 30s, ya sin el grafo como consumidor.
 
 ## Decisión
 
