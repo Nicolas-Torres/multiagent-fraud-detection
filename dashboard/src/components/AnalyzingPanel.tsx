@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import { GraphPanel } from '@/components/GraphPanel'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
 // Acompañan al progreso real (ADR-0018), no lo reemplazan: el stream dice
 // qué nodo terminó, pero no narra qué está haciendo mientras corre. Van en
@@ -17,12 +17,16 @@ const FRASES = [
 const INTERVALO_MS = 2_500
 
 interface AnalyzingPanelProps {
+  /** Transacción · cliente del caso que este panel sigue — con más de una
+   * ejecución en curso a la vez, cada tarjeta necesita decir cuál es la
+   * suya; sin esto, "Analizando…" es indistinguible entre casos. */
+  identificador: string
   status: string
   ranNodes: string[]
   connected: boolean
 }
 
-export function AnalyzingPanel({ status, ranNodes, connected }: AnalyzingPanelProps) {
+export function AnalyzingPanel({ identificador, status, ranNodes, connected }: AnalyzingPanelProps) {
   const [frase, setFrase] = useState(0)
 
   useEffect(() => {
@@ -34,6 +38,7 @@ export function AnalyzingPanel({ status, ranNodes, connected }: AnalyzingPanelPr
     <Card>
       <CardHeader>
         <CardTitle>Analizando…</CardTitle>
+        <CardDescription>{identificador}</CardDescription>
       </CardHeader>
       <CardContent>
         <p className="mb-2 text-sm text-muted-foreground">

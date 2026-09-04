@@ -21,6 +21,42 @@ Sin enmiendas acumuladas. Las próximas se anotan en
 
 ---
 
+## [0.13] — El grafo en vivo llega a Dashboard
+
+Una enmienda, sobre el mismo endpoint de la versión anterior.
+
+| # | Enmienda | Toca | Por qué |
+|---|---|---|---|
+| 1 | 🆕 **`?force=true` en `GET /api/v1/metrics/llm`** | §2.3 | Deja refrescar el costo en el mismo instante en que un caso termina (vía el progreso en vivo por SSE, ADR-0018), sin esperar el caché de 30s (ADR-0020) |
+
+No agrega endpoints nuevos: Dashboard descubre el caso en curso con
+`GET /api/v1/cases?status=ANALYZING` (ya existente, §2.3) y reusa
+`GET /cases/{id}/stream` (ya existente) — ninguno de los dos cambia.
+
+Detrás: [ADR-0020](adr/0020-el-grafo-en-vivo-se-descubre-por-estado-no-se-comparte.md).
+
+---
+
+## [0.12] — El dashboard sirve costo y latencia desde LangSmith
+
+Una enmienda, salida de verificar en vivo que el wiring de LangSmith
+(conectado desde antes, nunca expuesto al dashboard) funciona de punta a
+punta y da todo lo que hace falta para mostrarlo.
+
+| # | Enmienda | Toca | Por qué |
+|---|---|---|---|
+| 1 | 🆕 **`GET /api/v1/metrics/llm`** — costo, latencia y tokens del grafo, agregados y por nodo | §2.3, §2.5 | LangSmith ya es la capa de observabilidad declarada (ADR-0013); esto la sirve al dashboard en vez de dejarla sólo en la consola de LangSmith |
+
+**Deliberadamente afuera de esta versión**: costo/latencia de un caso
+puntual (exigiría guardar el `trace_id` de LangSmith en `decisions`, una
+columna y una migración nuevas) y el benchmark de modelos con DeepEval
+(es otra cosa — una corrida manual sobre un golden set curado, no un dato
+que crezca con cada transacción en vivo).
+
+Detrás: [ADR-0019](adr/0019-el-dashboard-sirve-costo-y-latencia-desde-langsmith.md).
+
+---
+
 ## [0.11] — El progreso en vivo se transmite por SSE
 
 Una enmienda, salida de construir el dashboard del analista y notar que el

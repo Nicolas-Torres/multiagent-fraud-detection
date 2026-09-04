@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronDownIcon } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { api } from '@/api/client'
 import type { components } from '@/api/schema'
@@ -90,7 +90,6 @@ function formatoRestante(ms: number): string {
 }
 
 export function Transactions() {
-  const [selectedId, setSelectedId] = useState<string | null>(CASO_INICIAL)
   const [errorEjecucion, setErrorEjecucion] = useState<string | null>(null)
   const [ultimasCorridas, setUltimasCorridas] = useState<Record<string, number>>(leerUltimasCorridas)
   // Sólo para las filas en vivo/diversas: no tienen `case_id` hasta el
@@ -98,6 +97,13 @@ export function Transactions() {
   // mostrar su propia "Decisión del LLM" igual que una de vitrina.
   const [caseIdPorEscenario, setCaseIdPorEscenario] =
     useState<Record<string, string>>(leerCaseIdsPorEscenario)
+  // Casos que este tab disparó y todavía ocupan un chip en la tira -no
+  // sólo "corriendo": un chip ya decidido se queda un rato ahí (ver
+  // `ChipEnCurso`) hasta que se lo mira o se cierra solo.
+  const [casosEnCurso, setCasosEnCurso] = useState<string[]>([])
+  // Cuál de esos chips maneja el panel destacado ahora mismo -`null` es el
+  // caso de vitrina (`CASO_INICIAL`), nunca un chip vacío.
+  const [chipSeleccionado, setChipSeleccionado] = useState<string | null>(null)
   const [ahora, setAhora] = useState(() => Date.now())
   const queryClient = useQueryClient()
 
@@ -106,26 +112,43 @@ export function Transactions() {
     return () => clearInterval(id)
   }, [])
 
-  // Panel fijo de arriba — sin cambios de comportamiento: reacciona a la
-  // fila de vitrina elegida o a la que se acaba de disparar en vivo.
-  const detalle = useQuery({
-    queryKey: ['case', selectedId],
+  // Selecciona `caseId` para el panel destacado. Si el chip que se abandona
+  // ya tiene veredicto, se cierra en el mismo gesto -ya cumplió su función
+  // (mostrar el resultado) y no hace falta mantenerlo ocupando la tira. Si
+  // todavía está corriendo, sigue en segundo plano sin seleccionar, y
+  // `ChipEnCurso` se encarga de cerrarlo solo cuando le toque.
+  function seleccionar(caseId: string) {
+    if (chipSeleccionado && chipSeleccionado !== caseId) {
+      const anterior = queryClient.getQueryData<CaseDetailType>(['case', chipSeleccionado])
+      if (anterior?.decision) {
+        setCasosEnCurso((previos) => previos.filter((id) => id !== chipSeleccionado))
+      }
+    }
+    setChipSeleccionado(caseId)
+  }
+
+  function quitarChip(caseId: string) {
+    setCasosEnCurso((previos) => previos.filter((id) => id !== caseId))
+  }
+
+  // Panel destacado: el chip elegido, o -por default, nada seleccionado- el
+  // caso curado de vitrina, ya decidido. Es la primera prueba real que ve
+  // alguien que entra sin ejecutar nada.
+  const panelCaseId = chipSeleccionado ?? CASO_INICIAL
+  const panelDetalle = useQuery({
+    queryKey: ['case', panelCaseId],
     queryFn: async () => {
       const { data, error } = await api.GET('/api/v1/cases/{case_id}', {
-        params: { path: { case_id: selectedId! } },
+        params: { path: { case_id: panelCaseId! } },
       })
       if (error) throw error
       return data
     },
-    enabled: !!selectedId,
-    // Mientras no haya decisión el caso puede seguir avanzando — se deja de
-    // sondear apenas hay veredicto. El polling sigue siendo la fuente de
-    // verdad (§4.2); el stream de abajo sólo adelanta el progreso visual.
+    enabled: !!panelCaseId,
     refetchInterval: (query) => (query.state.data?.decision ? false : 3_000),
   })
-
   const progreso = useCaseProgress(
-    selectedId && !detalle.data?.decision ? selectedId : null,
+    chipSeleccionado && !panelDetalle.data?.decision ? chipSeleccionado : null,
   )
 
   const ejecutar = useMutation({
@@ -143,7 +166,8 @@ export function Transactions() {
     },
     onSuccess: (data, escenario) => {
       setErrorEjecucion(null)
-      setSelectedId(data.case_id)
+      setCasosEnCurso((previos) => [...previos, data.case_id])
+      seleccionar(data.case_id)
       setCaseIdPorEscenario((previos) => {
         const actualizados = { ...previos, [escenario.id]: data.case_id }
         localStorage.setItem(CASE_IDS_STORAGE_KEY, JSON.stringify(actualizados))
@@ -167,32 +191,33 @@ export function Transactions() {
 
   return (
     <div className="space-y-6">
-      <p className="text-muted-foreground">
-        Cada fila es una transacción real, evaluada por el grafo de agentes real.
-        Elegí una ya resuelta para ver su análisis, o ejecutá cualquiera en vivo y
-        mirá correr los nueve agentes.
-      </p>
+      {casosEnCurso.length > 0 && (
+        <section className="flex flex-wrap gap-2">
+          {casosEnCurso.map((caseId) => (
+            <ChipEnCurso
+              key={caseId}
+              caseId={caseId}
+              seleccionado={chipSeleccionado === caseId}
+              onSeleccionar={() => seleccionar(caseId)}
+              onQuitar={() => quitarChip(caseId)}
+            />
+          ))}
+        </section>
+      )}
 
-      {/* Panel fijo: reacciona a la fila elegida o a la que está corriendo
-          — mismo mecanismo de siempre, sin cambios. */}
+      {/* Panel destacado: ver comentario junto a `panelCaseId` arriba. */}
       <section>
-        {!selectedId && (
-          <p className="text-muted-foreground">Elegí una fila de la tabla para verla acá.</p>
-        )}
-        {selectedId && detalle.isLoading && <Skeleton className="h-96 w-full" />}
-        {selectedId && detalle.isError && (
-          <p className="text-destructive">No se pudo cargar el caso.</p>
-        )}
-        {selectedId && detalle.data && !detalle.data.decision && (
+        {panelDetalle.isLoading && <Skeleton className="h-96 w-full" />}
+        {panelDetalle.isError && <p className="text-destructive">No se pudo cargar el caso.</p>}
+        {panelDetalle.data && !panelDetalle.data.decision && (
           <AnalyzingPanel
-            status={detalle.data.status}
+            identificador={`${formatTransactionId(panelDetalle.data.transaction.transaction_id)} · ${panelDetalle.data.transaction.customer_id}`}
+            status={panelDetalle.data.status}
             ranNodes={progreso.ranNodes}
             connected={progreso.connected}
           />
         )}
-        {selectedId && detalle.data?.decision && (
-          <GraphSection decision={detalle.data.decision} />
-        )}
+        {panelDetalle.data?.decision && <GraphSection decision={panelDetalle.data.decision} />}
       </section>
 
       <section className="space-y-3">
@@ -275,8 +300,12 @@ function FilaTransaccion({
 }) {
   const [detalleAbierto, setDetalleAbierto] = useState(false)
 
-  // Misma `queryKey` que ya usa el panel fijo de arriba para este mismo
-  // caso -React Query la deduplica, cero costo de red extra.
+  // Misma `queryKey` que usan `ChipEnCurso` y el panel destacado para este
+  // mismo caso mientras está en la tira -React Query la deduplica, cero
+  // costo de red extra. El propio `refetchInterval` es necesario igual: en
+  // cuanto el chip se cierra (`casosEnCurso`), esta fila queda como la
+  // única observadora — sin esto, se congelaría mostrando "ANALYZING" para
+  // siempre.
   const detalle = useQuery({
     queryKey: ['case', caseId],
     queryFn: async () => {
@@ -287,6 +316,7 @@ function FilaTransaccion({
       return data as CaseDetailType
     },
     enabled: !!caseId,
+    refetchInterval: (query) => (query.state.data?.decision ? false : 3_000),
   })
   const enCooldown = restante > 0
 
@@ -365,5 +395,85 @@ function FilaTransaccion({
         </TableRow>
       )}
     </>
+  )
+}
+
+// Cuánto se queda un chip ya decidido, sin seleccionar, antes de cerrarse
+// solo -deja libre la tira sin que el usuario tenga que hacer nada, pero da
+// un momento para notarlo si justo estaba mirando la tabla.
+const COOLDOWN_CHIP_MS = 5_000
+
+/**
+ * Un chip por caso en curso -el grafo en vivo lo muestra el panel destacado
+ * de arriba sólo para el que está seleccionado (una sola conexión SSE a la
+ * vez, no una por chip); este componente sólo necesita saber si ya terminó,
+ * para su propio ciclo de vida.
+ */
+function ChipEnCurso({
+  caseId,
+  seleccionado,
+  onSeleccionar,
+  onQuitar,
+}: {
+  caseId: string
+  seleccionado: boolean
+  onSeleccionar: () => void
+  onQuitar: () => void
+}) {
+  // Misma `queryKey` que ya pollean el panel destacado (si este chip está
+  // seleccionado) y la fila de abajo -React Query la deduplica.
+  const detalle = useQuery({
+    queryKey: ['case', caseId],
+    queryFn: async () => {
+      const { data, error } = await api.GET('/api/v1/cases/{case_id}', {
+        params: { path: { case_id: caseId } },
+      })
+      if (error) throw error
+      return data as CaseDetailType
+    },
+    refetchInterval: (query) => (query.state.data?.decision ? false : 3_000),
+  })
+  const decidido = !!detalle.data?.decision
+
+  // `Transactions` re-renderiza cada 1s (cuenta regresiva del cooldown de
+  // las filas) y le pasa a este componente una función `onQuitar` nueva en
+  // cada una -si fuera dependencia directa del efecto, el timeout se
+  // reiniciaría cada segundo y nunca llegaría a los 5000ms. La última
+  // versión se lee desde el ref, sin integrar el efecto.
+  const onQuitarRef = useRef(onQuitar)
+  onQuitarRef.current = onQuitar
+
+  // Sólo corre para un chip decidido y sin seleccionar: el seleccionado se
+  // cierra por el gesto de elegir otro (`seleccionar`, en `Transactions`),
+  // nunca por este cooldown -si el usuario lo está mirando, no debería
+  // desaparecer solo bajo su cursor.
+  useEffect(() => {
+    if (!decidido || seleccionado) return
+    const id = setTimeout(() => onQuitarRef.current(), COOLDOWN_CHIP_MS)
+    return () => clearTimeout(id)
+  }, [decidido, seleccionado])
+
+  return (
+    <Button
+      className="cursor-pointer"
+      size="sm"
+      variant={seleccionado ? 'default' : 'outline'}
+      onClick={onSeleccionar}
+    >
+      <span className="relative flex size-2">
+        {!decidido && (
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75" />
+        )}
+        <span
+          className={cn(
+            'relative inline-flex size-2 rounded-full',
+            decidido ? 'bg-muted-foreground/50' : 'bg-emerald-500',
+          )}
+        />
+      </span>
+      {detalle.data
+        ? `${formatTransactionId(detalle.data.transaction.transaction_id)} · ${detalle.data.transaction.customer_id}`
+        : '…'}
+    </Button>
   )
 }
