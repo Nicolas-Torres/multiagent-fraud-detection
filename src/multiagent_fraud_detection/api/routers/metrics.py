@@ -39,14 +39,17 @@ from multiagent_fraud_detection.schemas.llm_metrics import (
 
 router = APIRouter(tags=["metrics"])
 
-# Los diez nodos reales del grafo -el único filtro entre las corridas hijas
-# que LangSmith trae y "nodo del agente": descarta las llamadas LLM internas
-# (`ChatAnthropic`, `AnthropicJudge.judge`) que ya viajan acumuladas dentro
-# del nodo padre -sumarlas aparte duplicaría el costo, no lo completaría.
-NODOS_DEL_GRAFO = frozenset({
+# Los diez nodos reales del grafo, en el mismo orden que corren
+# (`graph/builder.py`) -no alfabético-: el filtro entre las corridas hijas
+# que LangSmith trae y "nodo del agente" (descarta las llamadas LLM internas,
+# `ChatAnthropic`/`AnthropicJudge.judge`, que ya viajan acumuladas dentro del
+# nodo padre -sumarlas aparte duplicaría el costo-) y el orden de la tabla a
+# la vez, en vez de mantener dos listas.
+ORDEN_NODOS = (
     CONTEXT, BEHAVIORAL, THREAT_INTEL, POLICY_RAG, AGGREGATE,
     PRO_FRAUD, PRO_CUSTOMER, ARBITER, EXPLAIN, PERSIST,
-})
+)
+NODOS_DEL_GRAFO = frozenset(ORDEN_NODOS)
 
 CACHE_TTL_SEGUNDOS = 30.0
 _cache: dict[str, Any] = {"data": None, "fetched_at": 0.0}
@@ -105,8 +108,8 @@ def _consultar_langsmith_sync() -> LlmMetricsRead:
             avg_tokens=d["tokens"] / d["count"],
             avg_cost=d["cost"] / d["count"],
         )
-        for nombre, d in sorted(agregados.items())
-        if d["count"] > 0
+        for nombre in ORDEN_NODOS
+        if (d := agregados.get(nombre)) and d["count"] > 0
     ]
 
     return LlmMetricsRead(available=True, project=project, summary=resumen, nodes=nodos)
