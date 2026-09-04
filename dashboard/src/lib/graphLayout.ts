@@ -21,20 +21,8 @@ export interface Topology {
   edges: TopologyEdge[]
 }
 
-const NODE_WIDTH = 170
-
-// Horizontal (por defecto): el nivel avanza en X, los hermanos se apilan
-// en Y -las cajas son angostas en esa dimensión, 90 alcanza como margen.
-const H_LEVEL_GAP = 200
-const H_SIBLING_GAP = 90
-
-// Vertical: el nivel avanza en Y, los hermanos se reparten en X. Acá el
-// gap entre hermanos tiene que superar `NODE_WIDTH` (170) o las cajas se
-// solapan -por eso no es sólo "los mismos números con los ejes al revés"-;
-// el gap entre niveles puede ser más chico porque en esa dirección no hay
-// riesgo de solapar nada.
-const V_LEVEL_GAP = 110
-const V_SIBLING_GAP = 210
+const COL_GAP = 200
+const ROW_GAP = 90
 
 /**
  * Posiciona por nivel topológico (distancia más larga desde `__start__`), no
@@ -42,15 +30,8 @@ const V_SIBLING_GAP = 210
  * **aplanada** sin precedencia causal dentro de un grupo (contrato §2.5) —
  * ramas del mismo nivel se dibujan una al lado de la otra, nunca en cadena,
  * para no sugerir un orden que el sistema no garantiza.
- *
- * `direction='vertical'` es el mismo cálculo de niveles (BFS más abajo) con
- * los ejes invertidos -pensado para un panel angosto y alto, en vez de
- * ancho y bajo-, no un algoritmo aparte.
  */
-export function layoutTopology(
-  topology: Topology,
-  direction: 'horizontal' | 'vertical' = 'horizontal',
-): { nodes: Node[]; edges: Edge[] } {
+export function layoutTopology(topology: Topology): { nodes: Node[]; edges: Edge[] } {
   const children = new Map<string, string[]>()
   for (const e of topology.edges) {
     children.set(e.source, [...(children.get(e.source) ?? []), e.target])
@@ -88,22 +69,14 @@ export function layoutTopology(
     porNivel.set(lvl, [...(porNivel.get(lvl) ?? []), n.id])
   }
 
-  const levelGap = direction === 'vertical' ? V_LEVEL_GAP : H_LEVEL_GAP
-  const siblingGap = direction === 'vertical' ? V_SIBLING_GAP : H_SIBLING_GAP
-
   const nodes: Node[] = topology.nodes.map((n) => {
     const lvl = level.get(n.id) ?? 0
     const fila = porNivel.get(lvl) ?? []
     const idx = fila.indexOf(n.id)
     const offset = (fila.length - 1) / 2
-    const enElNivel = lvl * levelGap
-    const entreHermanos = (idx - offset) * siblingGap
     return {
       id: n.id,
-      position:
-        direction === 'vertical'
-          ? { x: entreHermanos, y: enElNivel }
-          : { x: enElNivel, y: entreHermanos },
+      position: { x: lvl * COL_GAP, y: (idx - offset) * ROW_GAP },
       // `level` viaja en `data` para que `GraphPanel` pueda escalonar la
       // animación de "analizando" en el mismo orden topológico que ya
       // gobierna el layout — un nodo no puede "pulsar antes" que sus
@@ -111,7 +84,7 @@ export function layoutTopology(
       data: { label: n.label, level: lvl },
       // Estilo real (color por estado de ejecución) lo aplica GraphPanel;
       // acá sólo la geometría.
-      style: { width: NODE_WIDTH },
+      style: { width: 170 },
     }
   })
 
