@@ -1,5 +1,5 @@
 # Contrato de Interfaz — Sistema Multi-Agente de Detección de Fraude
-**Versión 0.12 — El dashboard sirve costo y latencia desde LangSmith**
+**Versión 0.13 — El grafo en vivo llega a Dashboard**
 
 > Define las **fronteras** entre el motor de agentes (yo), la infraestructura (mi
 > compañero) y el dashboard del analista.
@@ -319,7 +319,11 @@ la va a haber: sería una segunda fuente de verdad para algo que LangSmith ya
 mide mejor. `available: false` (con `summary`/`nodes` en `null`) si
 `LANGSMITH_TRACING`/`LANGSMITH_API_KEY` no están configurados o LangSmith no
 responde — **nunca** un `4xx`/`5xx` por esto. Cacheado en proceso (30s):
-no es un dato que necesite ser instantáneo.
+no es un dato que necesite ser instantáneo. `?force=true` 🆕 (ADR-0020)
+salta ese caché para una llamada puntual y lo actualiza con el resultado
+fresco — lo usa el dashboard cuando el progreso en vivo de un caso
+(`/cases/{id}/stream`) avisa que terminó, para no esperar hasta 30s; no es
+un endpoint distinto, es el mismo con una bandera opcional.
 
 ### 2.4 Idempotencia en `POST /cases`
 

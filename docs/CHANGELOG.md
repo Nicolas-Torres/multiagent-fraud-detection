@@ -21,6 +21,22 @@ Sin enmiendas acumuladas. Las próximas se anotan en
 
 ---
 
+## [0.13] — El grafo en vivo llega a Dashboard
+
+Una enmienda, sobre el mismo endpoint de la versión anterior.
+
+| # | Enmienda | Toca | Por qué |
+|---|---|---|---|
+| 1 | 🆕 **`?force=true` en `GET /api/v1/metrics/llm`** | §2.3 | Deja refrescar el costo en el mismo instante en que un caso termina (vía el progreso en vivo por SSE, ADR-0018), sin esperar el caché de 30s (ADR-0020) |
+
+No agrega endpoints nuevos: Dashboard descubre el caso en curso con
+`GET /api/v1/cases?status=ANALYZING` (ya existente, §2.3) y reusa
+`GET /cases/{id}/stream` (ya existente) — ninguno de los dos cambia.
+
+Detrás: [ADR-0020](adr/0020-el-grafo-en-vivo-se-descubre-por-estado-no-se-comparte.md).
+
+---
+
 ## [0.12] — El dashboard sirve costo y latencia desde LangSmith
 
 Una enmienda, salida de verificar en vivo que el wiring de LangSmith

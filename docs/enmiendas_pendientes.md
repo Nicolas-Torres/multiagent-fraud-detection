@@ -1,6 +1,6 @@
 # Enmiendas pendientes — Contrato de Interfaz
 
-**Estado**: sin enmiendas acumuladas. Vigente: v0.12.
+**Estado**: sin enmiendas acumuladas. Vigente: v0.13.
 
 > Documento de trabajo: se **vacía** al publicar una versión, no se archiva.
 > Nunca hay dos.
