@@ -94,11 +94,33 @@ class AnthropicJudge:
         # de migrar a la rama beta sólo por observabilidad. Importado acá
         # adentro, no arriba del módulo: mismo criterio de import perezoso
         # que `anthropic`.
+        #
+        # `process_outputs=_message_to_outputs` reusa el mismo serializador
+        # que ya usa `wrap_anthropic` para las llamadas que sí intercepta:
+        # sin esto, LangSmith intenta volcar el `ParsedMessage` crudo -dispara
+        # el warning de Pydantic (`content` trae `ParsedTextBlock`, que no
+        # calza con la unión de bloques que declara el SDK) y, más grave,
+        # nunca extrae `usage` -el costo del Arbiter queda en $0 en LangSmith
+        # pese a generar tokens reales, verificado en vivo. Es una función
+        # privada del wrapper oficial (`_anthropic.py`), no pública: revisar
+        # si una futura versión de `langsmith` la reubica.
+        #
+        # `metadata={"ls_provider": ..., "ls_model_name": ...}` es lo que
+        # `wrap_anthropic` infiere solo del `model=` de cada llamada
+        # (`_infer_ls_params`) -acá se declara a mano porque `traceable` no
+        # ve los kwargs de la llamada real hasta que corre-. Sin esto,
+        # `usage_metadata` ya cuenta tokens bien pero LangSmith no sabe con
+        # qué tarifa convertirlos a costo: verificado en vivo, sin esta
+        # metadata el costo queda en $0 aunque los tokens ya sean correctos.
         from langsmith import traceable
+        from langsmith.wrappers._anthropic import _message_to_outputs
 
-        parse = traceable(run_type="llm", name="AnthropicJudge.judge")(
-            self._cliente().messages.parse
-        )
+        parse = traceable(
+            run_type="llm",
+            name="AnthropicJudge.judge",
+            process_outputs=_message_to_outputs,
+            metadata={"ls_provider": "anthropic", "ls_model_name": self.model},
+        )(self._cliente().messages.parse)
         respuesta = parse(
             model=self.model,
             max_tokens=self.max_tokens,
