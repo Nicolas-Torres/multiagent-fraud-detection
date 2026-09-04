@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect } from 'react'
+import { useState } from 'react'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis } from 'recharts'
 
 import { api } from '@/api/client'
@@ -16,6 +16,12 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { useCaseProgress } from '@/hooks/useCaseProgress'
+import { cn } from '@/lib/utils'
+
+// Cuánto dura el destello de "esto acaba de cambiar" en la tabla de costo
+// tras un refresco forzado (ver más abajo) — sólo lo justo para que el ojo
+// lo note, no una animación que se quede pegada.
+const DURACION_DESTELLO_MS = 1_200
 
 type DecisionType = components['schemas']['DecisionType']
 
@@ -76,26 +82,33 @@ export function Dashboard() {
     refetchInterval: 8_000,
   })
   const caseIdEnCurso = enCurso.data?.items[0]?.case_id ?? null
-  const progreso = useCaseProgress(caseIdEnCurso)
+
+  // Sólo para el destello de "esto acaba de cambiar" (§ más abajo) — no
+  // gobierna nada de la lógica de refresco en sí.
+  const [justoActualizado, setJustoActualizado] = useState(false)
 
   // Al terminar, refresca la tabla de costo en el mismo instante en vez de
   // esperar el próximo ciclo de 30s — pide el dato fresco con `force=true`
-  // (ADR-0020) y lo escribe directo en la caché de la query.
-  useEffect(() => {
-    if (!progreso.done) return
-    let cancelado = false
+  // (ADR-0020) y lo escribe directo en la caché de la query. Va como
+  // callback de `useCaseProgress`, no como efecto que mire `progreso.done`
+  // después: el sondeo de "hay algo en ANALYZING" (arriba) puede dejar de
+  // encontrar este caso justo cuando termina, resetear `caseIdEnCurso` a
+  // `null`, y con él `done` -un efecto dependiente de `done` se cancelaría
+  // a mitad de camino por esa razón ajena, sin llegar a refrescar nada.
+  // El valor de retorno no se usa acá -sólo el callback-, pero el hook
+  // igual hay que llamarlo para que abra la conexión SSE.
+  useCaseProgress(caseIdEnCurso, () => {
     void (async () => {
       const { data, error } = await api.GET('/api/v1/metrics/llm', {
         params: { query: { force: true } },
       })
-      if (!cancelado && !error) {
+      if (!error) {
         queryClient.setQueryData(['metrics', 'llm'], data)
+        setJustoActualizado(true)
+        setTimeout(() => setJustoActualizado(false), DURACION_DESTELLO_MS)
       }
     })()
-    return () => {
-      cancelado = true
-    }
-  }, [progreso.done, queryClient])
+  })
 
   const cargando = casos.isLoading || politicas.isLoading
   const conError = casos.isError || politicas.isError
@@ -183,7 +196,11 @@ export function Dashboard() {
         </>
       )}
 
-      <LatenciaYCostoPorNodo metricas={metricas} />
+      <LatenciaYCostoPorNodo
+        metricas={metricas}
+        enVivo={Boolean(caseIdEnCurso)}
+        justoActualizado={justoActualizado}
+      />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <PendingCard
@@ -203,13 +220,33 @@ function formatUsd(valor: number): string {
 
 function LatenciaYCostoPorNodo({
   metricas,
+  enVivo,
+  justoActualizado,
 }: {
   metricas: { isLoading: boolean; isError: boolean; data: LlmMetricsRead | undefined }
+  /** Hay un caso en `ANALYZING` ahora mismo -de cualquier origen, no sólo
+   * de esta pestaña (ADR-0020). Sólo enciende el badge; no cambia nada de
+   * lo que se muestra en la tabla. */
+  enVivo: boolean
+  /** El refresco forzado por `done` (ADR-0020) acaba de llegar -destello
+   * breve para marcar el momento, no un estado permanente. */
+  justoActualizado: boolean
 }) {
   return (
-    <Card>
+    <Card className={cn('transition-shadow duration-700', justoActualizado && 'ring-2 ring-emerald-500/60')}>
       <CardHeader>
-        <CardTitle>Costo y latencia por nodo</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          Costo y latencia por nodo
+          {enVivo && (
+            <span className="flex items-center gap-1.5 text-xs font-normal text-muted-foreground">
+              <span className="relative flex size-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75" />
+                <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
+              </span>
+              Analizando en vivo
+            </span>
+          )}
+        </CardTitle>
       </CardHeader>
       <CardContent>
         {metricas.isLoading ? (
