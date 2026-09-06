@@ -5,6 +5,11 @@
 
 ## Contexto
 
+> **Nota** ([ADR-0021](0021-el-orquestador-es-azure-container-apps-gestionado-con-terraform.md)):
+> el "Job" de este ADR corre como Azure Container Apps Job. La Decisión no
+> cambia — es agnóstica al orquestador, esto sólo fija dónde corre en la
+> práctica.
+
 El sistema no sirve para nada contra una base vacía. Para que el dashboard tenga
 una cola, para que el harness pueda correr y para grabar el video del entregable
 8, el ambiente desplegado necesita los 1 000 perfiles, las 7 000 transacciones y

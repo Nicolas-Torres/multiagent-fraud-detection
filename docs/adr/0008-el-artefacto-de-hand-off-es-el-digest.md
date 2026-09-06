@@ -5,6 +5,13 @@
 
 ## Contexto
 
+> **Nota** ([ADR-0021](0021-el-orquestador-es-azure-container-apps-gestionado-con-terraform.md)):
+> el reparto de dos personas que motiva este Contexto ya no existe, y el
+> orquestador real es Azure Container Apps, no Kubernetes — los ejemplos de
+> `kubectl`/labels de pod en Consecuencias quedan como ilustración de la
+> época en que se escribió esto, no como la decisión en sí. **La Decisión de
+> este ADR no cambia**: el hand-off por digest es agnóstico al orquestador.
+
 El reparto con infraestructura está fijado desde v0.2 del contrato: yo construyo
 y publico la imagen en GHCR (CI), mi compañero la despliega (CD). *"La costura no
 es el código ni los schemas: es la imagen versionada en GHCR."*
