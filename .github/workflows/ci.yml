@@ -46,7 +46,7 @@ jobs:
       - name: Instalar Python 3.12
         run: uv python install 3.12
 
-      - name: Instalar dependencias (--frozen: el lockfile manda, nunca se resuelve de nuevo)
+      - name: "Instalar dependencias (--frozen: el lockfile manda, nunca se resuelve de nuevo)"
         run: uv sync --frozen
 
       - name: Lint (ruff)
