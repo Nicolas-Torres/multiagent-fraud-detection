@@ -8,7 +8,12 @@ on:
   push:
     branches: [main]
     tags: ["v*.*.*"]
+    paths-ignore: &docs_only
+      - "**.md"
+      - "docs/**"
+      - ".gitignore"
   pull_request:
+    paths-ignore: *docs_only
 
 jobs:
   test:
@@ -115,6 +120,8 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: ${{ steps.tags.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Resumen — el digest es la referencia real, los tags son legibles (ADR-0008)
         run: |
