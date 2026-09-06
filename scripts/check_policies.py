@@ -45,7 +45,15 @@ import argparse
 import sys
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
+
+from _dataset import (
+    BLACKLIST,
+    DATA_DIR,
+    leer_ground_truth,
+    leer_perfiles,
+    leer_transacciones,
+)
 
 from multiagent_fraud_detection.domain.catalog import (
     CatalogSource,
@@ -56,14 +64,6 @@ from multiagent_fraud_detection.domain.catalog import (
 from multiagent_fraud_detection.domain.engine import evaluate, prescribed_action
 from multiagent_fraud_detection.domain.predicates import EvalContext
 from multiagent_fraud_detection.enums import IndicatorType
-
-from _dataset import (
-    BLACKLIST,
-    DATA_DIR,
-    leer_ground_truth,
-    leer_perfiles,
-    leer_transacciones,
-)
 
 # La misma ventana que usa el repositorio de historial: acá se replica en memoria
 # para que el gate mida lo mismo que va a correr contra Postgres.
@@ -121,7 +121,7 @@ def corpus_saturado(transacciones) -> dict:
     desfase de fechas no es una invariante. Si algún día el dataset se regenerara
     con fechas actuales, este gate se pondría rojo el mismo día.
     """
-    hoy = datetime.now(timezone.utc)
+    hoy = datetime.now(UTC)
     ahora = (_IndicadorSintetico(observed_at=hoy, retrieved_at=hoy),)
     return {
         (IndicatorType.ISSUER, t.issuer_bank): ahora

@@ -31,13 +31,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from multiagent_fraud_detection.arbiter.judge import AnthropicJudge, Judge
 from multiagent_fraud_detection.db.repositories.merchant_blacklist import BlacklistCache
+from multiagent_fraud_detection.db.repositories.threat_indicator import IndicatorCache
 from multiagent_fraud_detection.domain.catalog import PolicyCatalog, load_catalog
 from multiagent_fraud_detection.explain.narrator import AnthropicNarrator, Narrator
 from multiagent_fraud_detection.retrieval.embeddings import Embedder, GeminiEmbedder
 from multiagent_fraud_detection.retrieval.query import QueryCache, code_vocabulary
-from multiagent_fraud_detection.db.repositories.threat_indicator import IndicatorCache
-
-
 
 # Fase 2 de ADR-0007: el catalogo se lee de archivos versionados. La fase 3 lo
 # mueve a las tablas `fraud_policies` / `policy_bindings`, y entonces esto pasa a

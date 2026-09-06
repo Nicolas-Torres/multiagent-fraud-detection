@@ -7,6 +7,8 @@ y por eso se prueba con la misma dureza que un invariante.
 
 import re
 
+from conftest import utc
+
 from multiagent_fraud_detection.enums import DecisionType, Severity
 from multiagent_fraud_detection.explain.audit import build_audit_explanation
 from multiagent_fraud_detection.explain.customer import (
@@ -19,9 +21,10 @@ from multiagent_fraud_detection.explain.customer import (
 )
 from multiagent_fraud_detection.explain.narrator import FakeNarrator
 from multiagent_fraud_detection.graph.state import AgentError, WorkingSignal
-from multiagent_fraud_detection.schemas.decision import ExternalCitation, InternalCitation
-
-from conftest import utc
+from multiagent_fraud_detection.schemas.decision import (
+    ExternalCitation,
+    InternalCitation,
+)
 
 TODOS = list(SAFE_THEMES)
 
@@ -75,7 +78,7 @@ def test_ningun_tema_seguro_menciona_un_numero():
 
 def test_ningun_tema_seguro_menciona_un_policy_id():
     for codigo, tema in SAFE_THEMES.items():
-        assert not re.search(r"FP-\d", tema, re.I), f"{codigo} nombra una política"
+        assert not re.search(r"FP-\d", tema, re.IGNORECASE), f"{codigo} nombra una política"
 
 
 def test_el_prompt_solo_ve_temas_traducidos():

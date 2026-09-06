@@ -33,7 +33,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy import Engine, create_engine, select
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
 from multiagent_fraud_detection.config.settings import settings

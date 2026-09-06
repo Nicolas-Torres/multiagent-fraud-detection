@@ -61,11 +61,20 @@ if sys.platform == "win32":
 
 from sqlalchemy import delete, select
 
-from multiagent_fraud_detection.db.models import Case, Decision, ThreatIndicator, Transaction
+from multiagent_fraud_detection.db.models import (
+    Case,
+    Decision,
+    ThreatIndicator,
+    Transaction,
+)
 from multiagent_fraud_detection.db.session import AsyncSessionLocal
-from multiagent_fraud_detection.domain.engine import prescribed_action
 from multiagent_fraud_detection.domain.params import precedencia
-from multiagent_fraud_detection.enums import CaseStatus, Channel, DecisionType, IndicatorType
+from multiagent_fraud_detection.enums import (
+    CaseStatus,
+    Channel,
+    DecisionType,
+    IndicatorType,
+)
 from multiagent_fraud_detection.graph.builder import build_graph
 from multiagent_fraud_detection.graph.context import GraphContext
 from multiagent_fraud_detection.graph.nodes import POLICY_RAG, THREAT_INTEL

@@ -1,7 +1,8 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import DateTime, Enum as SQLEnum, Index, Numeric, String
+from sqlalchemy import DateTime, Index, Numeric, String
+from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.orm import Mapped, mapped_column
 
 from multiagent_fraud_detection.db.base import Base

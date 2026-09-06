@@ -25,7 +25,7 @@ quede mal etiquetado.
 """
 
 import random
-from datetime import datetime, timedelta, timezone as dt_timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -352,7 +352,7 @@ def _make_tx(t_id, c_id, amt, currency, country, channel, dev, local_dt, tz,
     sobrevive porque `country` sigue variando.
     """
     aware = local_dt.replace(tzinfo=ZoneInfo(tz))
-    utc = aware.astimezone(dt_timezone.utc)
+    utc = aware.astimezone(UTC)
     return {
         "transaction_id": f"T-{t_id}",
         "customer_id": c_id,
@@ -466,7 +466,12 @@ def generate_transactions(customers_df):
         hours_in = [h for h in range(24) if _in_window(h, start_h, end_h)]
         hours_out = [h for h in range(24) if not _in_window(h, start_h, end_h)]
 
-        def tx(t_id, amt, country, channel, dev, local_dt, merch=None):
+        # `c_id`/`u_currency`/`u_tz`/`u_bank` como default: `tx` se llama siempre
+        # dentro de esta misma iteración, así que hoy no cambian entre la
+        # definición y el uso — pero un closure sobre la variable de loop es
+        # frágil ante cualquier refactor que difiera esa llamada.
+        def tx(t_id, amt, country, channel, dev, local_dt, merch=None,
+                c_id=c_id, u_currency=u_currency, u_tz=u_tz, u_bank=u_bank):
             return _make_tx(
                 t_id, c_id, amt, u_currency, country, channel, dev, local_dt,
                 u_tz, merch or str(np.random.choice(MERCHANTS)), u_bank,

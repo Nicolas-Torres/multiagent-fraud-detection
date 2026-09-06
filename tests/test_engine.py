@@ -10,6 +10,8 @@ Dos comportamientos que no son obvios y que un refactor puede romper sin que
 
 from decimal import Decimal
 
+from conftest import utc
+
 from multiagent_fraud_detection.domain.catalog import Owner
 from multiagent_fraud_detection.domain.engine import (
     evaluate,
@@ -18,8 +20,6 @@ from multiagent_fraud_detection.domain.engine import (
 )
 from multiagent_fraud_detection.domain.predicates import EvalContext
 from multiagent_fraud_detection.enums import DecisionType
-
-from conftest import utc
 
 
 def ctx(tx, perfil=None, **kw):

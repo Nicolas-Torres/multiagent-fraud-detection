@@ -4,13 +4,14 @@ from sqlalchemy import (
     BigInteger,
     Boolean,
     DateTime,
-    Enum as SQLEnum,
-    Index,
     String,
     Text,
     UniqueConstraint,
     func,
     text,
+)
+from sqlalchemy import (
+    Enum as SQLEnum,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 

@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from pydantic import AwareDatetime, BaseModel, Field, HttpUrl, ConfigDict
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, HttpUrl
 
 from multiagent_fraud_detection.enums import DecisionType, Severity
 from multiagent_fraud_detection.schemas.types import Confidence

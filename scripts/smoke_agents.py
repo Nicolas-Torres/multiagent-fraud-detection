@@ -38,6 +38,7 @@ from collections import defaultdict
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
+from _dataset import leer_ground_truth, leer_transacciones
 from langgraph.runtime import Runtime
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
@@ -48,8 +49,6 @@ from multiagent_fraud_detection.graph.nodes import (
     evidence_aggregation,
     transaction_context,
 )
-
-from _dataset import leer_ground_truth, leer_transacciones
 
 SIN_PERFIL = "__sin_perfil__"
 LIMPIAS = "__limpias__"

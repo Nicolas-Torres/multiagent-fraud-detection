@@ -12,14 +12,26 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Response, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    HTTPException,
+    Query,
+    Response,
+    status,
+)
 from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from multiagent_fraud_detection.api import case_progress
-from multiagent_fraud_detection.api.deps import get_graph, get_graph_context, get_session
+from multiagent_fraud_detection.api.deps import (
+    get_graph,
+    get_graph_context,
+    get_session,
+)
 from multiagent_fraud_detection.db.models import Case, HumanResolution, Transaction
 from multiagent_fraud_detection.enums import CaseStatus
 from multiagent_fraud_detection.graph.context import GraphContext
@@ -105,7 +117,7 @@ async def _correr_grafo(
         ):
             for nodo in actualizacion:
                 case_progress.publicar(case_id, nodo)
-    except Exception:  # noqa: BLE001 - es exactamente lo que W1 existe para atrapar
+    except Exception:
         logger.exception("caso %s no llegó a un veredicto", case_id)
         await _marcar(contexto, case_id, CaseStatus.FAILED)
     finally:

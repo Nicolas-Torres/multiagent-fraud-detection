@@ -17,15 +17,29 @@ from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from multiagent_fraud_detection.db.models import (
-    Case, Decision, HumanResolution, Signal, Transaction,
+    Case,
+    Decision,
+    HumanResolution,
+    Signal,
+    Transaction,
 )
-from multiagent_fraud_detection.db.session import engine  # <- ajusta si se llama distinto
+from multiagent_fraud_detection.db.session import (
+    engine,  # <- ajusta si se llama distinto
+)
 from multiagent_fraud_detection.enums import (
-    CaseStatus, Channel, DecisionType, HumanAction, Segment, Severity,
+    CaseStatus,
+    Channel,
+    DecisionType,
+    HumanAction,
+    Segment,
+    Severity,
 )
 from multiagent_fraud_detection.schemas.case import CaseDetail, CaseSummary
 from multiagent_fraud_detection.schemas.customer_behavior import CustomerBehaviorIn
-from multiagent_fraud_detection.schemas.decision import ExternalCitation, InternalCitation
+from multiagent_fraud_detection.schemas.decision import (
+    ExternalCitation,
+    InternalCitation,
+)
 
 CASE_A = UUID("00000000-0000-0000-0000-00000000000a")
 CASE_B = UUID("00000000-0000-0000-0000-00000000000b")

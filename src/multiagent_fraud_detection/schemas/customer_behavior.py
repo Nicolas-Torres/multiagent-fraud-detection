@@ -3,7 +3,12 @@ from datetime import date
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
 from multiagent_fraud_detection.enums import Channel, Segment
-from multiagent_fraud_detection.schemas.types import CountryCode, CurrencyCode, Money, TimeZone
+from multiagent_fraud_detection.schemas.types import (
+    CountryCode,
+    CurrencyCode,
+    Money,
+    TimeZone,
+)
 
 
 class CustomerBehaviorIn(BaseModel):

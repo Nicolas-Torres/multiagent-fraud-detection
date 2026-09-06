@@ -13,6 +13,7 @@ import copy
 import json
 
 import pytest
+from conftest import POLICIES
 
 from multiagent_fraud_detection.domain.catalog import (
     CatalogError,
@@ -23,8 +24,6 @@ from multiagent_fraud_detection.domain.catalog import (
     owner_of,
     predicate_library_spec,
 )
-
-from conftest import POLICIES
 
 
 @pytest.fixture

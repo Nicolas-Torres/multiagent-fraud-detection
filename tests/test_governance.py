@@ -15,7 +15,7 @@ LISTA = normalize_allowlist(["asbanc.com.pe", "SBS.gob.pe", "krebsonsecurity.com
 
 
 def test_normaliza_a_minuscula_y_sin_punto_final():
-    assert LISTA == {"asbanc.com.pe", "sbs.gob.pe", "krebsonsecurity.com"}
+    assert {"asbanc.com.pe", "sbs.gob.pe", "krebsonsecurity.com"} == LISTA
 
 
 @pytest.mark.parametrize(

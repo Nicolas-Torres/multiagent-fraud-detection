@@ -15,7 +15,6 @@ import pytest
 from multiagent_fraud_detection.db.repositories.merchant_blacklist import BlacklistCache
 from multiagent_fraud_detection.graph.nodes import CONTEXT, transaction_context
 
-
 # --------------------------------------------------------------------------- #
 # Dobles
 # --------------------------------------------------------------------------- #

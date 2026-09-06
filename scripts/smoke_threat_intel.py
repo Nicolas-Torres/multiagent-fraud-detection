@@ -25,7 +25,7 @@ después del paso 1, y se confirma que el lookup sólo ve la suya.
 import asyncio
 import subprocess
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 if sys.platform == "win32":
@@ -101,8 +101,8 @@ async def correr() -> int:
         )
 
     # --- 2. active_indicators no mezcla generaciones --------------------- #
-    print(f"\n2. una fila sintética bajo la generación real, junto a las --fake")
-    ahora = datetime.now(timezone.utc)
+    print("\n2. una fila sintética bajo la generación real, junto a las --fake")
+    ahora = datetime.now(UTC)
     async with Session() as session:
         async with session.begin():
             await _limpiar_sonda(session)

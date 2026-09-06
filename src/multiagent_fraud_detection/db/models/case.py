@@ -2,7 +2,8 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, Enum as SQLEnum, ForeignKey, Index, Uuid, func
+from sqlalchemy import DateTime, ForeignKey, Index, Uuid, func
+from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 

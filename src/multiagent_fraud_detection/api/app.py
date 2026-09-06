@@ -73,7 +73,12 @@ def create_app() -> FastAPI:
         await session.execute(text("SELECT 1"))
         return {"status": "ok"}
 
-    from multiagent_fraud_detection.api.routers import cases, metrics, policies, predicates
+    from multiagent_fraud_detection.api.routers import (
+        cases,
+        metrics,
+        policies,
+        predicates,
+    )
 
     app.include_router(cases.router, prefix="/api/v1")
     app.include_router(metrics.router, prefix="/api/v1")

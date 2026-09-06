@@ -29,11 +29,11 @@ cuánto* se pasó el umbral —donde el drift se ve antes de que cambien los con
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Any, Callable, Literal
+from typing import Any, Literal
 from zoneinfo import ZoneInfo
 
 from multiagent_fraud_detection.domain.params import (
@@ -259,7 +259,7 @@ def predicate(*, name, requires, signal, severity, params=None, description="",
     return wrap
 
 
-def _d(value: float | int) -> Decimal:
+def _d(value: float) -> Decimal:
     """Parámetro numérico a `Decimal`, vía `str` para no arrastrar binario."""
     return Decimal(str(value))
 

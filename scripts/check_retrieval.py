@@ -51,28 +51,27 @@ import argparse
 import sys
 from collections import defaultdict
 
+from _dataset import BLACKLIST, leer_ground_truth, leer_perfiles, leer_transacciones
+from check_policies import evaluar_todo
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
 from multiagent_fraud_detection.config.settings import settings
-from multiagent_fraud_detection.db.repositories.policy_catalog import DbCatalogSource
 from multiagent_fraud_detection.db.models import PolicyChunk
+from multiagent_fraud_detection.db.repositories.policy_catalog import DbCatalogSource
 from multiagent_fraud_detection.domain.catalog import build_catalog
 from multiagent_fraud_detection.enums import DecisionType
+from multiagent_fraud_detection.graph.nodes import RAG_TOP_K
 from multiagent_fraud_detection.retrieval.embeddings import (
     INDEX_VERSION,
     GeminiEmbedder,
     format_query,
 )
-from multiagent_fraud_detection.graph.nodes import RAG_TOP_K
 from multiagent_fraud_detection.retrieval.query import (
     QueryCache,
     build_query,
     query_codes,
 )
-
-from _dataset import BLACKLIST, leer_ground_truth, leer_perfiles, leer_transacciones
-from check_policies import evaluar_todo
 
 KS_POR_DEFECTO = (1, 3, 5, 10)
 

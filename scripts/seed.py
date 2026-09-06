@@ -76,11 +76,13 @@ from collections.abc import Sequence
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
+from _dataset import ALLOWLIST, BLACKLIST, DATA_DIR, leer_perfiles, leer_transacciones
 from sqlalchemy import create_engine, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.orm import Session as SyncSession
 
+from multiagent_fraud_detection.config.settings import settings
 from multiagent_fraud_detection.db.models import (
     BindingSet,
     CustomerBehavior,
@@ -90,13 +92,13 @@ from multiagent_fraud_detection.db.models import (
     Transaction,
     WebSearchAllowlist,
 )
-from multiagent_fraud_detection.config.settings import settings
 from multiagent_fraud_detection.db.session import engine
 from multiagent_fraud_detection.domain.catalog import FileCatalogSource
-from multiagent_fraud_detection.retrieval.embeddings import INDEX_VERSION, GeminiEmbedder
+from multiagent_fraud_detection.retrieval.embeddings import (
+    INDEX_VERSION,
+    GeminiEmbedder,
+)
 from multiagent_fraud_detection.retrieval.indexing import index_catalog, index_size
-
-from _dataset import ALLOWLIST, BLACKLIST, DATA_DIR, leer_perfiles, leer_transacciones
 
 # 7 000 transacciones x 9 columnas son 63 000 parámetros, y psycopg corta en
 # 65 535. Un solo INSERT pasaría raspando hoy y reventaría al agregar una

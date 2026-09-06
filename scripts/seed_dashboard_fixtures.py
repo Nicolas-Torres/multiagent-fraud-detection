@@ -27,14 +27,14 @@ reemplaza por completo en cada corrida, igual que W2 con el caso real
 
 import asyncio
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from decimal import Decimal
 from uuid import uuid4
 
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
+from _dataset import leer_perfiles, leer_transacciones
 from sqlalchemy import delete
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
@@ -48,11 +48,14 @@ from multiagent_fraud_detection.db.models import (
     Transaction,
 )
 from multiagent_fraud_detection.db.session import AsyncSessionLocal
-from multiagent_fraud_detection.enums import CaseStatus, DecisionType, HumanAction, Severity
-from multiagent_fraud_detection.schemas.transaction import TransactionIn
+from multiagent_fraud_detection.enums import (
+    CaseStatus,
+    DecisionType,
+    HumanAction,
+    Severity,
+)
 from multiagent_fraud_detection.schemas.customer_behavior import CustomerBehaviorIn
-
-from _dataset import leer_perfiles, leer_transacciones
+from multiagent_fraud_detection.schemas.transaction import TransactionIn
 
 FIX = "[dato de desarrollo]"
 

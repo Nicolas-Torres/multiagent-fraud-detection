@@ -19,7 +19,7 @@ os.environ.setdefault(
     "DATABASE_URL", "postgresql+psycopg://test:test@localhost:5432/test"
 )
 
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 
@@ -32,13 +32,14 @@ from multiagent_fraud_detection.schemas.transaction import TransactionIn
 POLICIES = Path(__file__).resolve().parents[1] / "data" / "policies"
 
 #: Instante de referencia: 2026-03-10 15:00 UTC = 10:00 en Lima.
-T0 = datetime(2026, 3, 10, 15, 0, tzinfo=None).replace(tzinfo=datetime.now().astimezone().tzinfo)
+T0 = datetime(2026, 3, 10, 15, 0, tzinfo=None).replace(  # noqa: DTZ001 -- el .replace() siguiente ya la hace consciente de zona
+    tzinfo=datetime.now().astimezone().tzinfo
+)
 
 
 def utc(*args) -> datetime:
-    from datetime import timezone
 
-    return datetime(*args, tzinfo=timezone.utc)
+    return datetime(*args, tzinfo=UTC)
 
 
 @pytest.fixture
@@ -90,4 +91,4 @@ def catalogo():
     )
 
 
-__all__ = ["perfil", "tx", "catalogo", "utc", "timedelta"]
+__all__ = ["catalogo", "perfil", "timedelta", "tx", "utc"]

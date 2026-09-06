@@ -11,14 +11,12 @@ from dataclasses import dataclass
 from datetime import timedelta
 from types import SimpleNamespace
 
-import pytest
+from conftest import utc
 
 from multiagent_fraud_detection.db.repositories.threat_indicator import IndicatorCache
 from multiagent_fraud_detection.enums import IndicatorType
 from multiagent_fraud_detection.graph.nodes import THREAT_INTEL, external_threat_intel
 from multiagent_fraud_detection.intel.snapshot import SNAPSHOT_VERSION
-
-from conftest import utc
 
 T0 = utc(2026, 3, 10, 15, 0)  # el default de la fábrica `tx`
 
