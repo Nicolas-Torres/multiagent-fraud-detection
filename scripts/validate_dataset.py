@@ -143,9 +143,12 @@ def check_transactions(tx: pd.DataFrame, cb: pd.DataFrame) -> list[str]:
 
     # La ventana se evalúa en hora LOCAL. Si esto se hiciera en UTC, la
     # columna `timezone` sería decorativa.
-    hora_local = [t.tz_convert(ZoneInfo(z)).hour for t, z in zip(utc_m, m.timezone)]
+    hora_local = [
+        t.tz_convert(ZoneInfo(z)).hour for t, z in zip(utc_m, m.timezone, strict=True)
+    ]
     fuera = pd.Series(
-        [not _en_ventana(h, i, f) for h, i, f in zip(hora_local, horas[0], horas[1])]
+        [not _en_ventana(h, i, f)
+         for h, i, f in zip(hora_local, horas[0], horas[1], strict=True)]
     )
 
     def pais_ajeno(fila):

@@ -339,9 +339,7 @@ def build_catalog(raw: RawCatalog) -> PolicyCatalog:
                 )
 
         # --- estado --------------------------------------------------------
-        if cruda is None:
-            estado = PolicyState.EXCLUDED
-        elif not v.get("active", True):
+        if cruda is None or not v.get("active", True):
             estado = PolicyState.EXCLUDED
         elif v.get("source_fingerprint") != fingerprint(texto, algorithm=algoritmo):
             estado = PolicyState.STALE

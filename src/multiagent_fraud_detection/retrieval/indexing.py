@@ -37,7 +37,11 @@ from sqlalchemy.orm import Session
 from multiagent_fraud_detection.db.models import PolicyChunk
 from multiagent_fraud_detection.db.repositories.policy_catalog import DbCatalogSource
 from multiagent_fraud_detection.domain.catalog import build_catalog
-from multiagent_fraud_detection.retrieval.chunking import Splitter, chunk_all, whole_document
+from multiagent_fraud_detection.retrieval.chunking import (
+    Splitter,
+    chunk_all,
+    whole_document,
+)
 from multiagent_fraud_detection.retrieval.embeddings import Embedder, format_document
 
 
@@ -48,7 +52,7 @@ def indexed_contents(session: Session, index_version: str) -> dict[str, str]:
             PolicyChunk.index_version == index_version
         )
     ).all()
-    return {chunk_id: content for chunk_id, content in filas}
+    return dict(filas)
 
 
 def index_catalog(

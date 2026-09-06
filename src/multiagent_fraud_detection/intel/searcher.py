@@ -169,7 +169,7 @@ def parse_page_age(page_age: str | None) -> date | None:
         return None
 
     try:
-        return datetime.strptime(page_age.strip(), _PAGE_AGE_FORMAT).date()
+        return datetime.strptime(page_age.strip(), _PAGE_AGE_FORMAT).date()  # noqa: DTZ007 -- se descarta la hora, .date() no tiene zona
     except ValueError:
         return None
 

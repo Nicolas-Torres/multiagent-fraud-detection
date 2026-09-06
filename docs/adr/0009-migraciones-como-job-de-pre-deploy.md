@@ -5,6 +5,14 @@
 
 ## Contexto
 
+> **Nota** ([ADR-0021](0021-el-orquestador-es-azure-container-apps-gestionado-con-terraform.md)):
+> el orquestador real es Azure Container Apps Jobs, no Kubernetes —
+> `activeDeadlineSeconds`/`backoffLimit` en Consecuencias son el vocabulario
+> de Kubernetes que se asumía al escribir esto; Container Apps Jobs resuelve
+> lo mismo con `replicaTimeout`/`replicaRetryLimit`. **La Decisión no
+> cambia**: Job de pre-deploy, mismo digest, una sola instancia, aborta si
+> falla, expand/contract — todo eso es agnóstico al orquestador.
+
 La imagen soporta dos modos de arranque: servir (`uvicorn`) y migrar (`alembic
 upgrade head`). El contrato §1.2 propone desde v0.2 que el CD invoque el segundo
 como Job de pre-deploy y **no** lo meta en el entrypoint —con N réplicas serían N

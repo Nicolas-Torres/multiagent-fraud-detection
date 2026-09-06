@@ -25,14 +25,14 @@ subiera su versión — la deuda declarada de la etapa.
 
 import sys
 
+from _dataset import DATA_DIR
+
 from multiagent_fraud_detection.db.repositories.policy_catalog import DbCatalogSource
 from multiagent_fraud_detection.domain.catalog import (
     FileCatalogSource,
     PolicyCatalog,
     build_catalog,
 )
-
-from _dataset import DATA_DIR
 
 POLICIES = DATA_DIR / "policies"
 

@@ -2,8 +2,8 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
-from sqlalchemy import DateTime, Enum as SQLEnum, Float, ForeignKey, String, Text, func
-
+from sqlalchemy import DateTime, Float, ForeignKey, String, Text, func
+from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -11,9 +11,9 @@ from multiagent_fraud_detection.db.base import Base
 from multiagent_fraud_detection.enums import DecisionType
 
 if TYPE_CHECKING:
+    from multiagent_fraud_detection.db.models.agent_error import AgentError
     from multiagent_fraud_detection.db.models.case import Case
     from multiagent_fraud_detection.db.models.signal import Signal
-    from multiagent_fraud_detection.db.models.agent_error import AgentError
 
 
 class Decision(Base):

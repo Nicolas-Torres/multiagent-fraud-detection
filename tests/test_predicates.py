@@ -10,12 +10,12 @@ silencio.
 from datetime import timedelta
 from decimal import Decimal
 
-import pytest
+from conftest import utc
 
 from multiagent_fraud_detection.domain.predicates import (
-    LIBRARY,
     CONTEXT_INPUTS,
     INTEL_INPUTS,
+    LIBRARY,
     EvalContext,
     account_age_below,
     amount_over_absolute,
@@ -34,8 +34,6 @@ from multiagent_fraud_detection.domain.predicates import (
     profile_changed_within,
 )
 from multiagent_fraud_detection.enums import IndicatorType
-
-from conftest import utc
 
 
 def ctx(tx, perfil=None, *, hist=(), dev=(), blacklist=frozenset(), indicators=None):

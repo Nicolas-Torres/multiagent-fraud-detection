@@ -15,10 +15,10 @@ from uuid import UUID
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
+from _fixtures import CONTEXTO, limpiar, sembrar
 from langgraph.runtime import Runtime
 from sqlalchemy import func, select
 
-from _fixtures import CONTEXTO, limpiar, sembrar
 from multiagent_fraud_detection.db.models import AgentError as AgentErrorRow
 from multiagent_fraud_detection.db.models import Case, Decision, Signal
 from multiagent_fraud_detection.db.session import AsyncSessionLocal

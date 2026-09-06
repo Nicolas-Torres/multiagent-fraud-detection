@@ -1,5 +1,12 @@
 from collections.abc import AsyncGenerator
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
+
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
+
 from multiagent_fraud_detection.config.settings import settings
 
 engine: AsyncEngine = create_async_engine(

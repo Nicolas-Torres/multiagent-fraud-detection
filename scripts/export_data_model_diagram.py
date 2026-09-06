@@ -43,11 +43,10 @@ from pathlib import Path
 
 from sqlalchemy import UniqueConstraint
 
-from multiagent_fraud_detection.db.base import Base
-
 # El import registra las doce tablas en la metadata. Sin él, el diagrama sale
 # vacío y el guard diría "sin cambios" con toda seguridad.
 import multiagent_fraud_detection.db.models  # noqa: F401
+from multiagent_fraud_detection.db.base import Base
 
 DIAGRAMS = Path(__file__).resolve().parents[1] / "docs" / "diagrams"
 MMD_PATH = DIAGRAMS / "data_model.mmd"

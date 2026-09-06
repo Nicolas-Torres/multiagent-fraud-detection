@@ -50,9 +50,8 @@ from uuid import NAMESPACE_DNS, UUID, uuid5
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
-from sqlalchemy import delete, select
-
 from _dataset import leer_transacciones
+from sqlalchemy import delete, select
 
 from multiagent_fraud_detection.db.models import Case, Decision, ThreatIndicator
 from multiagent_fraud_detection.db.session import AsyncSessionLocal

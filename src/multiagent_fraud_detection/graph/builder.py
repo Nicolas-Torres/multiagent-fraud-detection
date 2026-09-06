@@ -12,6 +12,7 @@ que escribe el nodo de persistencia, no una bifurcacion del grafo.
 
 from langgraph.graph import END, START, StateGraph
 
+from multiagent_fraud_detection.graph.context import GraphContext
 from multiagent_fraud_detection.graph.nodes import (
     AGGREGATE,
     ARBITER,
@@ -34,7 +35,6 @@ from multiagent_fraud_detection.graph.nodes import (
     persist_decision,
     transaction_context,
 )
-from multiagent_fraud_detection.graph.context import GraphContext
 from multiagent_fraud_detection.graph.state import GraphInput, GraphState
 
 

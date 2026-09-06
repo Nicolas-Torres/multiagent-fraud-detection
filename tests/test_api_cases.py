@@ -15,7 +15,11 @@ import pytest
 from fastapi.testclient import TestClient
 
 from multiagent_fraud_detection.api.app import app
-from multiagent_fraud_detection.api.deps import get_graph, get_graph_context, get_session
+from multiagent_fraud_detection.api.deps import (
+    get_graph,
+    get_graph_context,
+    get_session,
+)
 from multiagent_fraud_detection.api.routers import cases as cases_router
 from multiagent_fraud_detection.db.models import Case
 from multiagent_fraud_detection.enums import CaseStatus

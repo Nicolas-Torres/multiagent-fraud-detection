@@ -35,16 +35,20 @@ from uuid import UUID, uuid4
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
+from _dataset import leer_perfiles, leer_transacciones
 from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from multiagent_fraud_detection.db.models import Case, CustomerBehavior, HumanResolution, Transaction
+from multiagent_fraud_detection.db.models import (
+    Case,
+    CustomerBehavior,
+    HumanResolution,
+    Transaction,
+)
 from multiagent_fraud_detection.db.session import AsyncSessionLocal
-from multiagent_fraud_detection.enums import CaseStatus, DecisionType, HumanAction
+from multiagent_fraud_detection.enums import CaseStatus, HumanAction
 from multiagent_fraud_detection.graph.builder import build_graph
 from multiagent_fraud_detection.graph.context import GraphContext
-
-from _dataset import leer_perfiles, leer_transacciones
 
 JSON_PATH = (
     Path(__file__).resolve().parents[1] / "dashboard" / "src" / "data" / "showcase_cases.json"
@@ -140,7 +144,7 @@ async def sembrar(reset: bool) -> list[dict]:
 
     async with AsyncSessionLocal() as session:
         async with session.begin():
-            for tid, txn in transacciones.items():
+            for _tid, txn in transacciones.items():
                 await _upsert_uno(session, Transaction, txn.model_dump(), "transaction_id")
                 if txn.customer_id in perfiles:
                     await _upsert_uno(

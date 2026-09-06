@@ -14,7 +14,7 @@ que ya usan las cuatro pruebas de `BlacklistCache`.
 
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 from multiagent_fraud_detection.db.repositories.threat_indicator import (
@@ -25,7 +25,7 @@ from multiagent_fraud_detection.db.repositories.threat_indicator import (
 from multiagent_fraud_detection.enums import IndicatorType
 from multiagent_fraud_detection.graph.context import GraphContext
 
-AHORA = datetime(2026, 1, 1, tzinfo=timezone.utc)
+AHORA = datetime(2026, 1, 1, tzinfo=UTC)
 
 
 # --------------------------------------------------------------------------- #

@@ -14,15 +14,14 @@ de con una base real: acá interesa qué se consultó, no qué devolvió el moto
 
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
+from conftest import utc
 
 from multiagent_fraud_detection.db.repositories.merchant_blacklist import BlacklistCache
 from multiagent_fraud_detection.graph.nodes import BEHAVIORAL, behavioral_pattern
-
-from conftest import utc
 
 
 @dataclass
@@ -99,7 +98,7 @@ async def test_el_as_of_es_el_timestamp_de_la_transaccion_no_now(tx, perfil, esp
 
     assert espia.llamadas["history_customer"]["as_of"] == momento
     assert espia.llamadas["history_device"]["as_of"] == momento
-    assert momento < datetime.now(timezone.utc)  # no es `now()`, es el pasado
+    assert momento < datetime.now(UTC)  # no es `now()`, es el pasado
 
 
 async def test_la_transaccion_bajo_analisis_se_excluye_del_historial(

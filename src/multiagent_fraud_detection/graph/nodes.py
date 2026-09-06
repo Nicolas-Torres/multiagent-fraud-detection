@@ -15,6 +15,8 @@ from functools import wraps
 from langgraph.runtime import Runtime
 from sqlalchemy import delete, update
 
+from multiagent_fraud_detection.arbiter import prompt as arbiter_prompt
+from multiagent_fraud_detection.arbiter.judge import ArbiterVerdict
 from multiagent_fraud_detection.db.models import AgentError as AgentErrorRow
 from multiagent_fraud_detection.db.models import Case, Decision, Signal
 from multiagent_fraud_detection.db.repositories.customer_behavior import profile_for
@@ -23,10 +25,7 @@ from multiagent_fraud_detection.db.repositories.transaction_history import (
     history_for_customer,
     history_for_device,
 )
-from multiagent_fraud_detection.arbiter import prompt as arbiter_prompt
-from multiagent_fraud_detection.arbiter.judge import ArbiterVerdict
 from multiagent_fraud_detection.debate import pro_customer, pro_fraud
-from multiagent_fraud_detection.enums import CaseStatus, DecisionType, Severity
 from multiagent_fraud_detection.domain.catalog import Owner, PolicyCatalog
 from multiagent_fraud_detection.domain.engine import evaluate, prescribed_action
 from multiagent_fraud_detection.domain.params import precedencia
@@ -38,6 +37,7 @@ from multiagent_fraud_detection.domain.scoring import (
     risk_score,
     signal_sort_key,
 )
+from multiagent_fraud_detection.enums import CaseStatus, DecisionType, Severity
 from multiagent_fraud_detection.explain.audit import build_audit_explanation
 from multiagent_fraud_detection.explain.customer import (
     PROMPT_VERSION,
@@ -53,12 +53,12 @@ from multiagent_fraud_detection.graph.state import (
     RetrievedChunk,
     WorkingSignal,
 )
+from multiagent_fraud_detection.intel.snapshot import SNAPSHOT_VERSION
 from multiagent_fraud_detection.retrieval.citations import (
     authorization_citations,
     merge_citations,
     missing_authorization,
 )
-from multiagent_fraud_detection.intel.snapshot import SNAPSHOT_VERSION
 from multiagent_fraud_detection.retrieval.embeddings import INDEX_VERSION, format_query
 from multiagent_fraud_detection.retrieval.query import build_query, query_codes
 from multiagent_fraud_detection.schemas.decision import ExternalCitation
@@ -107,7 +107,7 @@ def degrades(agent: str) -> Callable[[NodeFn], NodeFn]:
             # pasar; el wrapper solo tiene que reenviarlo.
             try:
                 return await fn(*args, **kwargs)
-            except Exception as exc:  # noqa: BLE001 - el punto es no propagar
+            except Exception as exc:
                 logger.exception("nodo %s degradado", agent)
                 return {
                     "agent_route": [agent],
@@ -379,7 +379,7 @@ async def internal_policy_rag(
 
     try:
         chunks = await _descubrir(state, runtime)
-    except Exception as exc:  # noqa: BLE001 - degradar el bloque, no el nodo
+    except Exception as exc:
         logger.exception("descubrimiento degradado; la autorizacion sobrevive")
         errores.append(
             AgentError(
@@ -508,7 +508,7 @@ async def debate_pro_fraud(
             pro_fraud.SYSTEM_PROMPT,
             pro_fraud.build_prompt(evidencia, politicas, riesgo),
         )
-    except Exception as exc:  # noqa: BLE001 - degradar el argumento, no el caso
+    except Exception as exc:
         logger.exception("argumento pro-fraude degradado; se usa el respaldo")
         salida["pro_fraud_argument"] = pro_fraud.fallback_argument()
         salida["agent_errors"] = [
@@ -540,7 +540,7 @@ async def debate_pro_customer(
             pro_customer.SYSTEM_PROMPT,
             pro_customer.build_prompt(evidencia, politicas, riesgo),
         )
-    except Exception as exc:  # noqa: BLE001 - degradar el argumento, no el caso
+    except Exception as exc:
         logger.exception("argumento pro-cliente degradado; se usa el respaldo")
         salida["pro_customer_argument"] = pro_customer.fallback_argument()
         salida["agent_errors"] = [
@@ -633,7 +633,7 @@ async def decision_arbiter(
                 base_confidence=base,
             ),
         )
-    except Exception as exc:  # noqa: BLE001 - degradar el veredicto, no el caso
+    except Exception as exc:
         logger.exception("juicio del Arbiter degradado; se escala con el piso")
         return {
             "agent_route": [ARBITER],
@@ -702,7 +702,7 @@ async def explainability(
             build_prompt(decision, temas),
         )
         salida["explanation_prompt_version"] = PROMPT_VERSION
-    except Exception as exc:  # noqa: BLE001 - degradar el texto, no el caso
+    except Exception as exc:
         logger.exception("narracion degradada; se usa la plantilla")
         salida["explanation_customer"] = fallback_explanation(decision)
         salida["agent_errors"] = [

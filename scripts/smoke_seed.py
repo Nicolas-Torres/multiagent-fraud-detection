@@ -24,6 +24,7 @@ from zoneinfo import ZoneInfo
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
+from seed import sembrar  # scripts/ está en sys.path al ejecutar este archivo
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
@@ -38,8 +39,6 @@ from multiagent_fraud_detection.db.repositories.transaction_history import (
 from multiagent_fraud_detection.db.session import engine
 from multiagent_fraud_detection.schemas.customer_behavior import CustomerBehaviorRead
 from multiagent_fraud_detection.schemas.transaction import TransactionRead
-
-from seed import sembrar  # scripts/ está en sys.path al ejecutar este archivo
 
 Session = async_sessionmaker(engine, expire_on_commit=False)
 
@@ -116,7 +115,7 @@ async def check_normalizacion(session) -> None:
     for z in zonas:
         try:
             ZoneInfo(z)
-        except Exception:
+        except Exception:  # noqa: BLE001 -- validar zona arbitraria, cualquier excepción == inválida
             invalidas.append(z)
     _check(not invalidas, f"{len(zonas)} zonas IANA válidas", str(invalidas))
 

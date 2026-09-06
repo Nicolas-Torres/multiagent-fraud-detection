@@ -8,7 +8,6 @@ este test nada verificaba que llegara a la fila. Sin base real: se captura
 el `Update` compilado, no se ejecuta contra Postgres.
 """
 
-from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from decimal import Decimal
@@ -17,8 +16,6 @@ from uuid import uuid4
 from multiagent_fraud_detection.enums import Channel, DecisionType, Segment
 from multiagent_fraud_detection.graph.nodes import persist_decision
 from multiagent_fraud_detection.schemas.customer_behavior import CustomerBehaviorRead
-
-from conftest import catalogo  # noqa: F401 -- fixture
 
 
 class _CtxManager:

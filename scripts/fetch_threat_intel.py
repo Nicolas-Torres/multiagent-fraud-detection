@@ -31,7 +31,7 @@ corpus deja el mismo número de filas.
 import argparse
 import asyncio
 import sys
-from datetime import datetime, time, timezone
+from datetime import UTC, datetime, time
 
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
@@ -51,8 +51,8 @@ from multiagent_fraud_detection.intel.governance import enforce
 from multiagent_fraud_detection.intel.searcher import (
     AnthropicSearcher,
     FakeSearcher,
-    SearchResult,
     Searcher,
+    SearchResult,
     parse_page_age,
 )
 from multiagent_fraud_detection.intel.snapshot import (
@@ -110,7 +110,7 @@ def _fila(
     return {
         "indicator_type": IndicatorType.ISSUER,
         "value": emisor,
-        "observed_at": datetime.combine(fecha, time.min, tzinfo=timezone.utc),
+        "observed_at": datetime.combine(fecha, time.min, tzinfo=UTC),
         "retrieved_at": ahora,
         "source_url": resultado.url,
         "summary": resultado.title,
@@ -132,7 +132,7 @@ def _recoger(
     —`(url, motivo)`— y las URLs que pasaron el allowlist pero traían una
     fecha de publicación no reconocible.
     """
-    ahora = datetime.now(timezone.utc)
+    ahora = datetime.now(UTC)
     filas: list[dict] = []
     rechazadas: list[tuple[str, str]] = []
     sin_fecha: list[str] = []

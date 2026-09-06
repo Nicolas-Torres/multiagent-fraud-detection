@@ -1,0 +1,68 @@
+name: CI
+
+# Orden fijado en el contrato (§1.6): lint -> pytest -> check_policies ->
+# export_data_model_diagram --check -> alembic upgrade head -> alembic check.
+# Build y push a GHCR van en un workflow aparte (Fase 2) — este sólo son los
+# gates, y ninguno de los cuatro primeros necesita red ni base real.
+on:
+  push:
+    branches: [main]
+    tags: ["v*.*.*"]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    # Sólo lo usan los dos últimos pasos (alembic). Es un Postgres efímero
+    # del propio job, nunca la base real — así el gate de PR no depende de
+    # si Azure/Neon son alcanzables desde el runner.
+    services:
+      postgres:
+        image: pgvector/pgvector:pg18
+        env:
+          POSTGRES_USER: fraud
+          POSTGRES_PASSWORD: fraud
+          POSTGRES_DB: fraud
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U fraud -d fraud"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql+psycopg://fraud:fraud@localhost:5432/fraud
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Instalar Python 3.12
+        run: uv python install 3.12
+
+      - name: "Instalar dependencias (--frozen: el lockfile manda, nunca se resuelve de nuevo)"
+        run: uv sync --frozen
+
+      - name: Lint (ruff)
+        run: uv run ruff check .
+
+      - name: pytest
+        run: uv run pytest
+
+      - name: check_policies (7000/7000 contra el ground truth)
+        run: uv run python scripts/check_policies.py
+
+      - name: export_data_model_diagram --check (modelo sin diagrama)
+        run: uv run python scripts/export_data_model_diagram.py --check
+
+      - name: alembic upgrade head
+        run: uv run alembic upgrade head
+
+      - name: alembic check (modelo sin migración)
+        run: uv run alembic check

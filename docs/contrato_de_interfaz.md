@@ -1,8 +1,11 @@
 # Contrato de Interfaz — Sistema Multi-Agente de Detección de Fraude
 **Versión 0.13 — El grafo en vivo llega a Dashboard**
 
-> Define las **fronteras** entre el motor de agentes (yo), la infraestructura (mi
-> compañero) y el dashboard del analista.
+> Define las **fronteras** entre el motor de agentes, la infraestructura y el
+> dashboard del analista — hoy las tres las cubro yo
+> ([ADR-0021](adr/0021-el-orquestador-es-azure-container-apps-gestionado-con-terraform.md)),
+> pero la separación de conceptos se mantiene: son contratos distintos aunque
+> los valide la misma persona.
 >
 > Qué cambió respecto de versiones anteriores: [`CHANGELOG.md`](CHANGELOG.md).
 
@@ -12,10 +15,10 @@
 
 | | Contrato Operativo | Contrato de API |
 |---|---|---|
-| **Frontera con** | Infraestructura (compañero) | Dashboard |
+| **Frontera con** | Infraestructura | Dashboard |
 | **Qué define** | Cómo se empaqueta, ejecuta y configura | Endpoints y schemas |
 | **Punto de hand-off** | **La imagen en GHCR**, por **digest** | El API HTTP |
-| **Quién valida** | Compañero | Yo |
+| **Quién valida** | Yo | Yo |
 
 ---
 
@@ -23,10 +26,17 @@
 
 ### 1.1 Reparto CI / CD
 
+> Hasta v0.13 este reparto asumía dos personas (CI mío, CD de un
+> compañero). Ese reparto ya no existe — ver
+> [ADR-0021](adr/0021-el-orquestador-es-azure-container-apps-gestionado-con-terraform.md).
+> Ambas etapas las cubro yo; la tabla se mantiene porque la separación de
+> responsabilidades sigue siendo real y útil, aunque la persona sea la
+> misma.
+
 | Etapa | Responsable | Contenido |
 |---|---|---|
 | **CI** — build | **Yo** | Dockerfile, GitHub Actions, lint + tests, publicar imagen en **GHCR** |
-| **CD** — deploy | **Compañero** | Terraform, orquestador, invocar migraciones, rollout, ConfigMaps/Secrets |
+| **CD** — deploy | **Yo** | Terraform, Azure Container Apps, invocar migraciones, rollout, secrets |
 
 La costura no es el código ni los schemas: **es la imagen versionada en GHCR**.
 
@@ -1079,5 +1089,5 @@ tienen ahora cada uno su endpoint o su wrapper. Sin `POST /api/v1/policies`
 todavía (ADR-0017); sin autenticación, declarada como deuda explícita, no
 como omisión silenciosa.
 
-**§1 validado por el compañero.** ADR-0008 a ADR-0010 siguen **aceptados**.
-**Valido yo**: §2–§4, §7.
+**§1 lo valido yo** (ver ADR-0021: el reparto de dos personas ya no aplica).
+ADR-0008 a ADR-0010 siguen **aceptados**. **Valido yo**: §2–§4, §7.
