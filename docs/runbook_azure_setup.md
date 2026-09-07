@@ -396,6 +396,115 @@ gasto («una decena de dólares») para evaluar el portafolio en vivo, y
 después revisar una opción más barata si conviene — no es una decisión
 cerrada para siempre.
 
+## 8. Primer bug real en producción — vitrina con `case_id` inexistentes
+
+Al visitar la URL pública, la consola del navegador mostraba varios
+`GET /api/v1/cases/{id} 404` en la pestaña Transacción.
+
+### Diagnóstico
+
+El panel de vitrina que carga por defecto usa `CASO_INICIAL` en
+`dashboard/src/routes/Transactions.tsx:53`, que sale de
+`dashboard/src/data/showcase_cases.json` — un archivo **horneado en el
+build del frontend**, no leído en runtime. Ese JSON lo escribe
+`scripts/seed_showcase.py`, corriendo el grafo real contra 5
+transacciones curadas y guardando los `case_id` resultantes. La imagen
+`sha-b642e85` (la que Fase 3 desplegó) tenía ese JSON generado contra
+Postgres **local**, nunca contra Neon — los IDs no existían en
+producción.
+
+`caj-fraud-detection-seed` (`scripts/seed.py`) no alcanza para esto: el
+propio script documenta que sólo carga historial (transacciones,
+perfiles, catálogo de políticas, índice vectorial) y **deliberadamente
+no crea casos** — crear un caso es correr el pipeline, y eso lo hace
+`POST /cases` o un script aparte.
+
+### Corrección, paso a paso
+
+**1. Job base en Azure** (`scripts/seed.py`, sin costo de LLM salvo el
+índice):
+
+```bash
+az containerapp job start --name caj-fraud-detection-seed --resource-group rg-fraud-detection
+```
+
+Primer intento: `Failed`. El log (`az containerapp job logs show
+--name caj-fraud-detection-seed ... --tail 100`, requiere `az extension
+add --name containerapp --upgrade --yes` primero) mostró que los datos
+tabulares cargaron bien (1000 perfiles, 7000 transacciones, 11
+políticas) pero la indexación vectorial murió con `429
+RESOURCE_EXHAUSTED` de la API de embeddings de Gemini
+(`gemini-embedding-2`). Verificado en Google Cloud Console
+(`console.cloud.google.com` → API del proyecto → Generative Language
+API → Quotas): la cuota diaria daba `unlimited` con `current usage: 8`
+— no era un tope agotado, sino un límite de ráfaga (RPM) momentáneo por
+indexar muchos chunks seguidos. `seed.py` es idempotente (upsert), así
+que un reintento no duplica nada:
+
+```bash
+az containerapp job start --name caj-fraud-detection-seed --resource-group rg-fraud-detection
+# reintento, unos minutos después: Succeeded
+```
+
+**2. `seed_showcase.py` contra Neon, corrido en local** (gasta llamadas
+reales a Anthropic y Gemini — 5 corridas del grafo completo):
+
+```bash
+DATABASE_URL="<connection string de Neon>" uv run python scripts/seed_showcase.py
+# escribe dashboard/src/data/showcase_cases.json con 5 case_id nuevos
+```
+
+**3. Commit + PR + merge** del JSON regenerado — rama aparte
+(`fix/showcase-cases-azure`), no la de Terraform: es un cambio de datos
+del dashboard, no de infraestructura. Verificado por API que el PR #23
+quedó `merged`, no sólo cerrado.
+
+**4. Rebuild + push + redeploy manual** (Fase 4 real, el workflow de CD
+automático, todavía no existe):
+
+```bash
+git checkout main && git pull   # trae el merge, main queda en 231fd93
+docker login ghcr.io -u Nicolas-Torres --password-stdin   # PAT temporal, write:packages
+docker build -t ghcr.io/nicolas-torres/multiagent-fraud-detection:sha-231fd93 .
+docker push ghcr.io/nicolas-torres/multiagent-fraud-detection:sha-231fd93
+docker logout ghcr.io
+az containerapp update --name ca-fraud-detection-api --resource-group rg-fraud-detection \
+  --image ghcr.io/nicolas-torres/multiagent-fraud-detection:sha-231fd93
+```
+
+El tag `sha-231fd93` se calculó **después** del merge, no del commit en
+la rama — el repo usa *squash merge* (CLAUDE.md), así que el hash del
+commit en la rama (`d2b85dd`) no es el que terminó existiendo en
+`main`. Usar el hash de la rama habría producido un tag que, según
+ADR-0008 (`sha-<7>` = commit real en `main`), apunta a un commit que
+nunca estuvo ahí.
+
+El PAT usado para el `docker push` (scope `write:packages`) es
+**temporal y distinto** del que vive como secret en la Container App
+(`ghcr_token`, scope `read:packages` únicamente, ADR de mínimo
+privilegio) — se generó sólo para este push manual y se revoca después
+de usarlo, no queda guardado en ningún lado.
+
+`az containerapp update` quedó bloqueado por el clasificador de modo
+automático de Claude Code (acción de producción) — lo corrió el
+usuario directamente.
+
+### Verificación
+
+```bash
+curl .../api/v1/cases/a0cfbbae-...   # 200 — el nuevo case_id de vitrina
+curl .../api/v1/cases/c9065a38-...   # 404 — el id viejo, correctamente ya no existe en el frontend desplegado
+```
+
+**Lección para Fase 4**: el workflow de CD automático va a necesitar
+resolver este mismo problema de origen (el JSON de vitrina depende de
+qué base recibió el seed) — probablemente corriendo
+`seed_showcase.py` como paso del propio pipeline de build, no a mano,
+para que la imagen publicada siempre traiga IDs que existen en la base
+a la que apunta.
+
 <!-- Sigue con Fase 4: el workflow de CD (build → push a GHCR → az
 containerapp update --image → correr el Job de migrar antes, abortando
-el deploy si falla, por ADR-0009). -->
+el deploy si falla, por ADR-0009). Considerar ahí mismo cómo evitar el
+problema de §8: el JSON de vitrina no puede depender de un paso manual
+posterior al build. -->
