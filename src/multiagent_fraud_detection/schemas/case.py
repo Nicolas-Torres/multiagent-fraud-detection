@@ -39,6 +39,17 @@ class CaseDetail(BaseModel):
     updated_at: AwareDatetime
 
 
+class CaseShowcaseItem(BaseModel):
+    """Un ítem del GET /cases/showcase: el `case_id` real de un caso curado
+    de la vitrina, resuelto en vivo contra este entorno — nunca horneado en
+    el build del frontend (docs/reviews/11-ci-cd-azure.md §2.2/§6.1)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    case_id: UUID
+    transaction_id: str
+
+
 class CaseSummary(BaseModel):
     """Proyección plana para la cola HITL (GET /cases)."""
 

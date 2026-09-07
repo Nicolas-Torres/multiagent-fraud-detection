@@ -32,10 +32,16 @@ from multiagent_fraud_detection.api.deps import (
     get_graph_context,
     get_session,
 )
+from multiagent_fraud_detection.api.showcase import CASOS_VITRINA
 from multiagent_fraud_detection.db.models import Case, HumanResolution, Transaction
 from multiagent_fraud_detection.enums import CaseStatus
 from multiagent_fraud_detection.graph.context import GraphContext
-from multiagent_fraud_detection.schemas.case import CaseCreated, CaseDetail, CaseSummary
+from multiagent_fraud_detection.schemas.case import (
+    CaseCreated,
+    CaseDetail,
+    CaseShowcaseItem,
+    CaseSummary,
+)
 from multiagent_fraud_detection.schemas.human_resolution import HumanResolutionIn
 from multiagent_fraud_detection.schemas.pagination import Page
 from multiagent_fraud_detection.schemas.transaction import TransactionIn
@@ -221,6 +227,28 @@ async def listar_casos(
         limit=limit,
         offset=offset,
     )
+
+
+@router.get("/cases/showcase", response_model=list[CaseShowcaseItem])
+async def vitrina(session: AsyncSession = Depends(get_session)) -> list[CaseShowcaseItem]:
+    """Los `case_id` reales de los 5 casos curados de la vitrina
+    (`scripts/seed_showcase.py`), resueltos en vivo contra la base de este
+    entorno — nunca horneados en el build del frontend. Un entorno que
+    todavía no corrió ese seed simplemente devuelve menos de 5 ítems, no un
+    404 (docs/reviews/11-ci-cd-azure.md §2.2/§6.1).
+
+    Ruta registrada **antes** de `/cases/{case_id}`: si fuera al revés,
+    `showcase` intentaría convertirse a `UUID` como si fuera un `case_id` y
+    nunca llegaría acá.
+    """
+    casos = (
+        await session.scalars(
+            select(Case).where(Case.transaction_id.in_(CASOS_VITRINA))
+        )
+    ).all()
+    orden = {tid: i for i, tid in enumerate(CASOS_VITRINA)}
+    casos_ordenados = sorted(casos, key=lambda c: orden[c.transaction_id])
+    return [CaseShowcaseItem.model_validate(c) for c in casos_ordenados]
 
 
 @router.get("/cases/{case_id}", response_model=CaseDetail)

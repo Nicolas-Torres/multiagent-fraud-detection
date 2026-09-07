@@ -38,6 +38,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/cases/showcase": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Vitrina
+         * @description Los `case_id` reales de los 5 casos curados de la vitrina
+         *     (`scripts/seed_showcase.py`), resueltos en vivo contra la base de este
+         *     entorno — nunca horneados en el build del frontend. Un entorno que
+         *     todavía no corrió ese seed simplemente devuelve menos de 5 ítems, no un
+         *     404 (docs/reviews/11-ci-cd-azure.md §2.2/§6.1).
+         *
+         *     Ruta registrada **antes** de `/cases/{case_id}`: si fuera al revés,
+         *     `showcase` intentaría convertirse a `UUID` como si fuera un `case_id` y
+         *     nunca llegaría acá.
+         */
+        get: operations["vitrina_api_v1_cases_showcase_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/cases/{case_id}": {
         parameters: {
             query?: never;
@@ -284,6 +312,21 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /**
+         * CaseShowcaseItem
+         * @description Un ítem del GET /cases/showcase: el `case_id` real de un caso curado
+         *     de la vitrina, resuelto en vivo contra este entorno — nunca horneado en
+         *     el build del frontend (docs/reviews/11-ci-cd-azure.md §2.2/§6.1).
+         */
+        CaseShowcaseItem: {
+            /**
+             * Case Id
+             * Format: uuid
+             */
+            case_id: string;
+            /** Transaction Id */
+            transaction_id: string;
         };
         /**
          * CaseStatus
@@ -749,6 +792,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    vitrina_api_v1_cases_showcase_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseShowcaseItem"][];
                 };
             };
         };
