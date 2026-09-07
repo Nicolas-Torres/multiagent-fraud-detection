@@ -328,7 +328,31 @@ vaya a llegar — sólo prueba que *ese* puerto, con *esa* ruta, responde
 cuando Cloud Run mismo lo pregunta. El puerto que de verdad importa
 para el tráfico de un visitante es una configuración aparte.
 
-<!-- Sigue con: 1) `deploy-gcp.yml` (mismo patrón que deploy-azure.yml),
-2) los 3 secrets de GitHub para Workload Identity Federation,
-3) primera corrida real disparada por un push a main,
-4) acta de cierre de Fase 6. -->
+---
+
+## 8. Fase 6 — workflow de CD (`deploy-gcp.yml`)
+
+Mismo patrón que `deploy-azure.yml`: `workflow_run` tras `CI`, mismo
+`sha-<7>` calculado del commit, migrar (aborta si falla) → servir →
+sembrar (no bloqueante) → mantener fetch-intel al día. Diferencia real
+frente a Azure: `gcloud run jobs execute --wait` bloquea hasta que la
+ejecución termina y devuelve el código de salida real — no hizo falta
+el loop de sondeo manual (`until ... az containerapp job execution
+show ...`) que sí hizo falta en `deploy-azure.yml`.
+
+Login con `google-github-actions/auth@v2` (Workload Identity
+Federation) — dos secrets nuevos en GitHub, cargados vía API con el
+mismo método que los de Azure (`pynacl.SealedBox` contra la public key
+del repo):
+
+```bash
+GCP_WORKLOAD_IDENTITY_PROVIDER = projects/432475042270/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider
+GCP_SERVICE_ACCOUNT            = github-actions-deployer@fraud-detection-portafolio.iam.gserviceaccount.com
+```
+
+**Nota**: el `workload_identity_provider` necesita el **número** de
+proyecto (`432475042270`), no el `project_id` — a diferencia de casi
+todo lo demás en `gcloud`, que acepta el id.
+
+<!-- Sigue con: 1) primera corrida real disparada por un push a main,
+2) acta de cierre de Fase 6. -->
