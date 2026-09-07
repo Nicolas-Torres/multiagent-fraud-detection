@@ -15,7 +15,9 @@ que no alcanzan confianza suficiente pasan a una cola de revisión humana.
 
 **Demo en vivo**: https://ca-fraud-detection-api.graywave-cc1ab2d2.eastus2.azurecontainerapps.io
 — Azure Container Apps, desplegado automáticamente desde `main` (ver
-[docs/runbook_azure_setup.md](docs/runbook_azure_setup.md)).
+[docs/runbook_azure_setup.md](docs/runbook_azure_setup.md)). También
+desplegado en GCP Cloud Run como segunda prueba de multi-nube, a modo
+de aprendizaje ([ADR-0022](docs/adr/0022-gcp-cloud-run-como-segundo-target-de-aprendizaje.md)).
 
 ---
 
