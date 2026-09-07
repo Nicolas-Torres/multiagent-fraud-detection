@@ -1,0 +1,114 @@
+name: Deploy a Azure
+
+# Se dispara cuando el workflow CI (test -> build -> push a GHCR) termina
+# bien contra `main` — nunca deploya un commit que no pasó los gates.
+# `workflow_run`, no un segundo trigger de `push:` en este mismo archivo:
+# evita reconstruir la imagen acá y deployar algo que el propio CI no
+# validó.
+#
+# `branches: [main]` alcanza incluso para el caso de un tag de versión: un
+# `git tag vX.Y.Z` normal se aplica sobre un commit que ya está en `main`,
+# así que ese commit ya disparó su propio deploy cuando se pusheó. El tag
+# le agrega etiquetas legibles a la misma imagen (ADR-0008), no dispara un
+# segundo deploy de código que no cambió.
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  id-token: write # OIDC (azure/login) - sin secreto estático de larga vida
+  contents: read
+
+env:
+  RESOURCE_GROUP: rg-fraud-detection
+  IMAGE_BASE: ghcr.io/nicolas-torres/multiagent-fraud-detection
+
+jobs:
+  deploy:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Calcular el tag (mismo sha-<7> que CI acaba de publicar, ADR-0008)"
+        id: image
+        run: |
+          set -euo pipefail
+          sha="${{ github.event.workflow_run.head_sha }}"
+          echo "tag=sha-${sha:0:7}" >> "$GITHUB_OUTPUT"
+
+      - name: Login a Azure (OIDC, federated credential de github-oidc-fraud-detection)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Instalar la extensión containerapp
+        run: az extension add --name containerapp --upgrade --yes
+
+      - name: "Migrar (ADR-0009: si falla, aborta el deploy sin tocar la app que sirve)"
+        id: migrate
+        run: |
+          set -euo pipefail
+          image="${{ env.IMAGE_BASE }}:${{ steps.image.outputs.tag }}"
+
+          az containerapp job update \
+            --name caj-fraud-detection-migrate \
+            --resource-group "${{ env.RESOURCE_GROUP }}" \
+            --image "$image"
+
+          execution=$(az containerapp job start \
+            --name caj-fraud-detection-migrate \
+            --resource-group "${{ env.RESOURCE_GROUP }}" \
+            --query "name" -o tsv)
+          echo "Ejecución: $execution"
+
+          until status=$(az containerapp job execution show \
+              --name caj-fraud-detection-migrate \
+              --resource-group "${{ env.RESOURCE_GROUP }}" \
+              --job-execution-name "$execution" \
+              --query "properties.status" -o tsv) \
+            && [ "$status" != "Running" ] && [ "$status" != "Processing" ]; do
+            sleep 5
+          done
+
+          echo "Estado final: $status"
+          if [ "$status" != "Succeeded" ]; then
+            echo "::error::La migración falló ($status) — deploy abortado, la Container App sigue en la imagen anterior."
+            exit 1
+          fi
+
+      - name: "Actualizar la Container App al nuevo digest (recién si migrar salió bien)"
+        run: |
+          az containerapp update \
+            --name ca-fraud-detection-api \
+            --resource-group "${{ env.RESOURCE_GROUP }}" \
+            --image "${{ env.IMAGE_BASE }}:${{ steps.image.outputs.tag }}"
+
+      - name: "Sembrar (no bloqueante, ADR-0010: idempotente, un fallo acá no revierte el deploy)"
+        continue-on-error: true
+        run: |
+          az containerapp job update \
+            --name caj-fraud-detection-seed \
+            --resource-group "${{ env.RESOURCE_GROUP }}" \
+            --image "${{ env.IMAGE_BASE }}:${{ steps.image.outputs.tag }}"
+          az containerapp job start \
+            --name caj-fraud-detection-seed \
+            --resource-group "${{ env.RESOURCE_GROUP }}"
+
+      - name: Mantener fetch-intel en la misma imagen
+        run: |
+          az containerapp job update \
+            --name caj-fraud-detection-fetch-intel \
+            --resource-group "${{ env.RESOURCE_GROUP }}" \
+            --image "${{ env.IMAGE_BASE }}:${{ steps.image.outputs.tag }}"
+
+      - name: Resumen
+        run: |
+          {
+            echo "### Deploy a Azure"
+            echo ""
+            echo "Imagen: \`${{ env.IMAGE_BASE }}:${{ steps.image.outputs.tag }}\`"
+            echo "Commit: \`${{ github.event.workflow_run.head_sha }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

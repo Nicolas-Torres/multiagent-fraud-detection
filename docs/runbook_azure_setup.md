@@ -165,7 +165,7 @@ necesidad, no antes).
 
 ---
 
-## 5. Rol de acceso — bloqueado, propagación de RBAC
+## 5. Rol de acceso — resuelto (el diagnóstico inicial estaba mal)
 
 Plan: `Contributor`, pero **acotado sólo al resource group**
 `rg-fraud-detection` (no a nivel de toda la suscripción) — mínimo
@@ -179,16 +179,47 @@ az role assignment create \
   --scope "/subscriptions/6bf9c7de-db5d-4857-8851-e5c1903d3833/resourceGroups/rg-fraud-detection"
 ```
 
-**Bloqueado por ahora**: falla con `MissingSubscription`, y el mismo
-error aparece incluso en una simple *lectura* de asignaciones de rol
-(`az role assignment list`), a nivel de resource group **y** de
-suscripción entera. Se descartó que sea un problema del comando puntual
-— es el subsistema de RBAC (`Microsoft.Authorization`) de una suscripción
-Pay-As-You-Go recién activada, que en la práctica tarda en inicializarse
-más que el resto de los providers (Storage y Resources ya respondían
-bien al momento de este bloqueo). No es algo que un reintento inmediato
-resuelva — se retoma más adelante en esta misma bitácora, en la sección
-correspondiente, una vez que se destrabe solo.
+**Bloqueado durante gran parte de la Fase 3**: fallaba con
+`MissingSubscription`, y el mismo error aparecía incluso en una simple
+*lectura* (`az role assignment list --assignee ...`), a nivel de
+resource group y de suscripción entera. El diagnóstico de en ese
+momento —demora de propagación del subsistema de RBAC
+(`Microsoft.Authorization`) en una suscripción Pay-As-You-Go recién
+activada— **resultó incorrecto**, aunque parecía razonable con la
+evidencia de ese momento.
+
+### Diagnóstico real
+
+Se resolvió por el Portal (Resource Group → *Access control (IAM)* →
+*Add role assignment*, buscando la identidad por nombre) sin ningún
+problema — lo cual ya era una pista de que no era un tema de
+propagación a nivel de suscripción. La confirmación llegó al aislar la
+variable correcta:
+
+```bash
+# Con --assignee: sigue fallando incluso con una sesión de az login recién refrescada
+az role assignment list --assignee 47529fc8-... --scope ".../rg-fraud-detection"
+# ERROR: (MissingSubscription) ...
+
+# Sin --assignee, mismo scope: funciona y muestra la asignación real
+az role assignment list --resource-group rg-fraud-detection -o table
+# Principal: 47529fc8-...  Role: Contributor  Scope: .../rg-fraud-detection
+```
+
+El problema nunca fue el subsistema de RBAC ni la suscripción — fue
+específicamente el flag `--assignee` de `az role assignment
+list`/`create`, que internamente resuelve la identidad contra
+Microsoft Graph antes de operar. Esa resolución puntual fallaba en
+esta sesión del CLI (probablemente algo de la cuenta/consentimiento de
+Graph para Azure CLI en este tenant), mientras que el Portal resuelve
+identidades por otro camino y por eso siempre funcionó. Un `az logout`
++ `az login` fresco tampoco lo arregló — confirma que no era un token
+viejo, era el propio comando.
+
+**Lección**: cuando un comando con varios flags falla con un error
+genérico, aislar variable por variable (acá: sacar `--assignee` y
+listar todo el scope) encuentra la causa real más rápido que asumir la
+explicación más "razonable" a primera vista.
 
 ---
 
@@ -503,8 +534,101 @@ qué base recibió el seed) — probablemente corriendo
 para que la imagen publicada siempre traiga IDs que existen en la base
 a la que apunta.
 
-<!-- Sigue con Fase 4: el workflow de CD (build → push a GHCR → az
-containerapp update --image → correr el Job de migrar antes, abortando
-el deploy si falla, por ADR-0009). Considerar ahí mismo cómo evitar el
-problema de §8: el JSON de vitrina no puede depender de un paso manual
-posterior al build. -->
+## 9. Segundo incidente — `internal_policy_rag` degradado en una corrida real
+
+Ejecutando T-3349 desde la web pública, el nodo `internal_policy_rag`
+terminó con "Evidencia incompleta... no completó su análisis" — el
+mensaje de `@degrades` (regla del proyecto en `CLAUDE.md`), no un
+crash del grafo.
+
+### Diagnóstico
+
+Los logs de la Container App (no del Job — la app misma) confirmaron
+la causa exacta:
+
+```bash
+az extension add --name log-analytics --upgrade --yes
+WORKSPACE_ID=$(az monitor log-analytics workspace show \
+  --resource-group rg-fraud-detection --workspace-name log-fraud-detection \
+  --query customerId -o tsv)
+az monitor log-analytics query --workspace "$WORKSPACE_ID" \
+  --analytics-query "ContainerAppConsoleLogs_CL | where ContainerAppName_s == 'ca-fraud-detection-api' | where Log_s has 'Traceback' | order by TimeGenerated desc | take 50 | project TimeGenerated, Log_s"
+```
+
+```
+File "/app/src/multiagent_fraud_detection/graph/nodes.py", line 381, in internal_policy_rag
+google.genai.errors.ClientError: 429 RESOURCE_EXHAUSTED
+```
+
+Se verificó primero que el índice vectorial estuviera completo en Neon
+(no era eso):
+
+```bash
+DATABASE_URL="<neon>" uv run python -c "... SELECT count(*) FROM policy_chunks ..."
+# policy_chunks: 11, sin embedding: 0 — el índice está completo
+```
+
+Y se descartó cuota agotada mirando el panel real de Google Cloud
+Console (Generative Language API → Quotas, filtrado por
+`gemini-embedding-2`): RPM 3000 (uso: 12), TPM 1M (uso: 368), RPD
+ilimitado (uso: 29) — muy lejos de cualquier tope. `nodes.py` sólo
+llama al embedder en un único punto (línea 340, dentro de
+`internal_policy_rag`, una vez por caso) — no hay ráfaga propia de
+llamadas concurrentes que lo explique tampoco.
+
+**Conclusión**: un límite de ráfaga por segundo, no documentado en el
+panel de cuota agregada, contra el que el retry interno del SDK
+`google-genai` (basado en `tenacity`, fuera de nuestro control) no
+alcanzó a protegernos en este caso puntual. `@degrades` hizo exactamente
+lo que tiene que hacer — degradar con un mensaje honesto en vez de
+inventar una señal — así que esto no bloquea nada, queda como mejora
+pendiente: envolver la llamada de `embeddings.py`/`nodes.py:340` con un
+retry propio (backoff de varios segundos, no el de milisegundos del
+SDK) para absorber esta clase de ráfaga transitoria antes de llegar a
+degradar. No implementado todavía — el usuario prefirió anotarlo y
+seguir.
+
+---
+
+## 10. Fase 4 — workflow de CD (`deploy-azure.yml`)
+
+`.github/workflows/deploy-azure.yml`, disparado por `workflow_run`
+cuando `CI` termina bien contra `main` (nunca reconstruye la imagen —
+usa el mismo `sha-<7>` que el job `build` de `ci.yml` ya publicó,
+calculado de `github.event.workflow_run.head_sha`).
+
+Orden de los pasos, seguido a ADR-0009/0010:
+
+1. `az containerapp job update --image` + `job start` sobre
+   `caj-fraud-detection-migrate`, sondeado hasta que termine. Si no
+   sale `Succeeded`, el step falla (`exit 1`) y el workflow se corta
+   ahí — la Container App **no** se toca, sigue sirviendo la imagen
+   anterior.
+2. Sólo si migrar salió bien: `az containerapp update --image` sobre
+   `ca-fraud-detection-api` — este es el momento real de "ir a
+   producción".
+3. `caj-fraud-detection-seed`, actualizado y disparado con
+   `continue-on-error: true` — no bloqueante, igual que en local.
+4. `caj-fraud-detection-fetch-intel`, sólo actualizado (no disparado —
+   corre solo, por su propio cron).
+
+Login vía `azure/login@v2` con OIDC (`id-token: write` en
+`permissions:`) contra la misma identidad `github-oidc-fraud-detection`
+de §4 — sin ningún secreto estático.
+
+**Actualización**: el role assignment de §5 ya está confirmado — la
+identidad `github-oidc-fraud-detection` tiene `Contributor` real sobre
+`rg-fraud-detection`. El archivo está escrito y validado
+sintácticamente (`yaml.safe_load`); la primera corrida real sólo
+queda pendiente de cargar los secrets (siguiente punto).
+
+**Pendiente antes de la primera corrida real**: cargar los tres
+secrets del repo (`AZURE_CLIENT_ID`, `AZURE_TENANT_ID`,
+`AZURE_SUBSCRIPTION_ID`) en GitHub — Settings → Secrets and variables →
+Actions. Todavía no se hizo.
+
+<!-- Sigue con: 1) cargar los 3 secrets de GitHub, 2) mergear PR #25,
+3) primera corrida real de deploy-azure.yml (push a main dispara CI,
+que a su vez dispara este workflow), 4) resolver la lección de §8
+(seed_showcase.py como parte del pipeline de build, no manual),
+5) Fase 5 — verificación end-to-end + cierre de README/acta. -->
