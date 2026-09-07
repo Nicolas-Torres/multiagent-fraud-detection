@@ -16,13 +16,16 @@ estos 5 casos, no toda la tabla).
     uv run python scripts/seed_showcase.py
     uv run python scripts/seed_showcase.py --reset
 
-Escribe `dashboard/src/data/showcase_cases.json` con los `case_id`
-resultantes — el frontend los pide por `GET /cases/{id}`, sin necesitar un
-endpoint nuevo ni tocar el contrato. Cada entrada suma también `id` (slug
-corto para el cooldown de "volver a ejecutar") y `payload` (la transacción
-original, mismo shape que ya usa `LiveScenario` en `liveScenarios.ts`) — así
-el frontend puede reejecutar cualquiera de los 5 sin pedirle el detalle al
-backend primero.
+Escribe `dashboard/src/data/showcase_cases.json` con `transaction_id`,
+`label`, `id` (slug corto para el cooldown de "volver a ejecutar") y
+`payload` (la transacción original, mismo shape que ya usa `LiveScenario`
+en `liveScenarios.ts`) — **sin `case_id`**: ese archivo se hornea en el
+build del frontend, y un `case_id` horneado ahí apuntaría a la base contra
+la que se corrió este script (normalmente, la del desarrollador en local),
+no contra la del entorno donde termine desplegada la imagen
+(docs/reviews/11-ci-cd-azure.md §2.2). El frontend resuelve el `case_id`
+real en vivo con `GET /cases/showcase` (§2.3 del contrato), cruzándolo con
+este archivo por `transaction_id`.
 """
 
 import argparse
@@ -39,6 +42,7 @@ from _dataset import leer_perfiles, leer_transacciones
 from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
+from multiagent_fraud_detection.api.showcase import CASOS_VITRINA as CASOS
 from multiagent_fraud_detection.db.models import (
     Case,
     CustomerBehavior,
@@ -54,15 +58,10 @@ JSON_PATH = (
     Path(__file__).resolve().parents[1] / "dashboard" / "src" / "data" / "showcase_cases.json"
 )
 
-# transaction_id -> etiqueta corta para la vitrina. El cuarto se resuelve
-# como un analista lo haría, para mostrar también el flujo HITL.
-CASOS = {
-    "T-2579": "Aprobación limpia",
-    "T-1809": "Monto y horario inusual (FP-01)",
-    "T-4445": "Perfil modificado antes de operar (FP-09)",
-    "T-1313": "Cuenta nueva, monto grande (FP-08)",
-    "T-5816": "Escalado y resuelto por un analista",
-}
+# El cuarto (RESOLVER) se resuelve como un analista lo haría, para mostrar
+# también el flujo HITL. Qué transacciones son "la vitrina" vive en
+# `api.showcase.CASOS_VITRINA` — única fuente, compartida con
+# `GET /cases/showcase`.
 RESOLVER = "T-5816"
 
 ANALISTA_VITRINA = "vitrina-portafolio"
@@ -161,7 +160,6 @@ async def sembrar(reset: bool) -> list[dict]:
         if existente is not None:
             print(f"  {tid}: ya existe ({existente}), no se vuelve a correr")
             resultado.append({
-                "case_id": str(existente),
                 "transaction_id": tid,
                 "label": etiqueta,
                 "id": _id_corto(tid),
@@ -196,7 +194,6 @@ async def sembrar(reset: bool) -> list[dict]:
             )
 
         resultado.append({
-            "case_id": str(case_id),
             "transaction_id": tid,
             "label": etiqueta,
             "id": _id_corto(tid),

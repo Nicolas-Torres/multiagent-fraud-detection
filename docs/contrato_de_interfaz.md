@@ -304,6 +304,7 @@ mediría la discrepancia de reglas en vez de la calidad del sistema.
 | `POST` | `/api/v1/cases` | Ingresar transacción | `Transaction` | `CaseCreated` | `202` nuevo / `200` reintento |
 | `GET` | `/api/v1/cases` | Listar/filtrar cola (HITL) | query: `status`, `limit`, `offset` | `Page[CaseSummary]` | `200` |
 | `GET` | `/api/v1/cases/{case_id}` | Detalle completo | — | `CaseDetail` | `200` |
+| `GET` | `/api/v1/cases/showcase` | 🆕 `case_id` reales de los 5 casos curados de la vitrina, resueltos en vivo | — | `list[CaseShowcaseItem]` | `200` |
 | `POST` | `/api/v1/cases/{case_id}/resolution` | Acción del analista | `HumanResolutionIn` | `CaseDetail` | `200` |
 | `GET` | `/api/v1/policies` | 🆕 Catálogo con estado de cada política | — | `list[PolicyRead]` | `200` |
 | `POST` | `/api/v1/policies` | 🆕 Alta de política (norma + vinculación opcional) | `PolicyIn` | `PolicyRead` | `201` |
@@ -322,6 +323,18 @@ veredicto, que sigue siendo exclusivamente `GET /cases/{case_id}` (§2.3);
 esto no cambia en absoluto, sólo lo complementa con progreso visual. Sin
 autenticación, misma deuda declarada que el resto de los endpoints HITL
 (acta 09 §6.1).
+
+`GET /api/v1/cases/showcase` existe porque `dashboard/src/data/showcase_cases.json`
+—el archivo que `scripts/seed_showcase.py` escribe, horneado en el build del
+frontend— nunca lleva un `case_id`: ese id depende de contra qué base se
+corrió el seed, y un valor horneado apuntaría a la base del desarrollador
+que armó la imagen, no a la del entorno donde termine desplegada (encontrado
+en producción, acta 11 §2.2/§6.1). El endpoint devuelve, en el mismo orden
+que `api.showcase.CASOS_VITRINA`, sólo los `case_id` que de verdad existen
+en este entorno — **menos de 5 ítems, nunca un `404`**, es la respuesta
+correcta para un entorno que todavía no corrió el seed. El frontend cruza
+esta respuesta con el JSON estático por `transaction_id` para armar label,
+descripción y payload.
 
 `GET /api/v1/metrics/llm` lee costo, latencia y tokens directo de la API de
 lectura de LangSmith (ADR-0019) — no hay una tabla propia con este dato, ni
@@ -577,6 +590,13 @@ y aplanados; se construye con un factory explícito que tolera casos sin decisi�
 
 > `decision` y `confidence` son `null` cuando el caso está en `RECEIVED`/`ANALYZING`
 > —listable en la cola antes de tener veredicto—.
+
+#### `CaseShowcaseItem` — un ítem del `GET /cases/showcase`
+
+| Campo | Tipo |
+|---|---|
+| `case_id` | `UUID` |
+| `transaction_id` | `str` |
 
 #### `CaseCreated` — respuesta del `POST /cases`
 

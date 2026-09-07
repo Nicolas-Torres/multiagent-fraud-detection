@@ -28,8 +28,10 @@ import { cn } from '@/lib/utils'
 type TransactionIn = components['schemas']['TransactionIn']
 type CaseDetailType = components['schemas']['CaseDetail']
 
+// Sin `case_id`: ese campo se resuelve en vivo con GET /cases/showcase
+// (contrato §2.3), nunca horneado en el build — ver el docstring de
+// scripts/seed_showcase.py y docs/reviews/11-ci-cd-azure.md §2.2/§6.1.
 interface ShowcaseCase {
-  case_id: string
   transaction_id: string
   label: string
   id: string
@@ -46,11 +48,6 @@ const diverseScenarios = diverseScenariosRaw as LiveScenario[]
 // igual — separarlos en dos encabezados no comunicaba ninguna diferencia
 // visible.
 const escenariosEnVivo: LiveScenario[] = [...LIVE_SCENARIOS, ...diverseScenarios]
-
-// El desafiado (CHALLENGE) es el más representativo para el primer vistazo:
-// tiene señal, cita, debate y confianza intermedia — el resto queda a un
-// click en la tabla de abajo.
-const CASO_INICIAL = showcaseCases[1]?.case_id ?? showcaseCases[0]?.case_id ?? null
 
 // Espejo, sólo para la UI, del cooldown real del backend (`LIVE_COOLDOWN` en
 // `api/routers/cases.py`) — ese es el que manda, esto sólo evita el
@@ -102,10 +99,27 @@ export function Transactions() {
   // `ChipEnCurso`) hasta que se lo mira o se cierra solo.
   const [casosEnCurso, setCasosEnCurso] = useState<string[]>([])
   // Cuál de esos chips maneja el panel destacado ahora mismo -`null` es el
-  // caso de vitrina (`CASO_INICIAL`), nunca un chip vacío.
+  // caso de vitrina (`casoInicial`), nunca un chip vacío.
   const [chipSeleccionado, setChipSeleccionado] = useState<string | null>(null)
   const [ahora, setAhora] = useState(() => Date.now())
   const queryClient = useQueryClient()
+
+  // Los `case_id` reales de la vitrina, resueltos en vivo (contrato §2.3) —
+  // nunca los del JSON horneado en el build. Un entorno recién desplegado
+  // que todavía no corrió el seed de vitrina devuelve menos de 5 ítems: esas
+  // filas simplemente muestran "—" (ver `FilaTransaccion`), no rompen nada.
+  const vitrinaQuery = useQuery({
+    queryKey: ['cases-showcase'],
+    queryFn: async () => {
+      const { data, error } = await api.GET('/api/v1/cases/showcase')
+      if (error) throw error
+      return data
+    },
+  })
+  const vitrinaCaseIds: Record<string, string> = {}
+  for (const item of vitrinaQuery.data ?? []) {
+    vitrinaCaseIds[item.transaction_id] = item.case_id
+  }
 
   useEffect(() => {
     const id = setInterval(() => setAhora(Date.now()), 1_000)
@@ -131,10 +145,19 @@ export function Transactions() {
     setCasosEnCurso((previos) => previos.filter((id) => id !== caseId))
   }
 
+  // El desafiado (CHALLENGE) es el más representativo para el primer
+  // vistazo: tiene señal, cita, debate y confianza intermedia — el resto
+  // queda a un click en la tabla de abajo. `null` hasta que `vitrinaQuery`
+  // resuelva (o si este entorno todavía no sembró ese caso en particular).
+  const casoInicial =
+    vitrinaCaseIds[showcaseCases[1]?.transaction_id ?? ''] ??
+    vitrinaCaseIds[showcaseCases[0]?.transaction_id ?? ''] ??
+    null
+
   // Panel destacado: el chip elegido, o -por default, nada seleccionado- el
   // caso curado de vitrina, ya decidido. Es la primera prueba real que ve
   // alguien que entra sin ejecutar nada.
-  const panelCaseId = chipSeleccionado ?? CASO_INICIAL
+  const panelCaseId = chipSeleccionado ?? casoInicial
   const panelDetalle = useQuery({
     queryKey: ['case', panelCaseId],
     queryFn: async () => {
@@ -239,11 +262,11 @@ export function Transactions() {
           <TableBody>
             {showcaseCases.map((item) => (
               <FilaTransaccion
-                key={item.case_id}
+                key={item.id}
                 claveEscenario={item.id}
                 transactionId={item.transaction_id}
                 payload={item.payload}
-                caseId={item.case_id}
+                caseId={vitrinaCaseIds[item.transaction_id] ?? null}
                 restante={restanteMs(item.id)}
                 accionLabel="Ejecutar"
                 onEjecutar={() => ejecutar.mutate(item)}
