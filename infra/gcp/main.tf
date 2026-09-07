@@ -88,6 +88,20 @@ resource "google_secret_manager_secret_iam_member" "runtime_access" {
 # hacia GHCR (ADR-0022 §Alternativas descartadas). Sigue apuntando a GHCR
 # como fuente real, no una copia manual: la imagen real la sigue publicando
 # sólo el job `build` de ci.yml (ADR-0008).
+data "google_project" "current" {}
+
+# Artifact Registry lee las credenciales del upstream con su propia
+# identidad de servicio gestionada por Google (`service-<projectNumber>
+# @gcp-sa-artifactregistry.iam.gserviceaccount.com`), no con la mía —
+# bug real encontrado en el primer `apply` (ver docs/runbook_gcp_setup.md):
+# sin este permiso, crear el repository falla con "does not have
+# permission to access the secret version".
+resource "google_secret_manager_secret_iam_member" "artifact_registry_ghcr_pull" {
+  secret_id = google_secret_manager_secret.this["ghcr-token"].secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:service-${data.google_project.current.number}@gcp-sa-artifactregistry.iam.gserviceaccount.com"
+}
+
 resource "google_artifact_registry_repository" "ghcr_mirror" {
   location      = var.region
   repository_id = "ghcr-mirror"
@@ -111,6 +125,8 @@ resource "google_artifact_registry_repository" "ghcr_mirror" {
       }
     }
   }
+
+  depends_on = [google_secret_manager_secret_iam_member.artifact_registry_ghcr_pull]
 }
 
 resource "google_artifact_registry_repository_iam_member" "runtime_pull" {
@@ -147,6 +163,15 @@ resource "google_cloud_run_v2_service" "api" {
           cpu    = "1"
           memory = "512Mi"
         }
+      }
+
+      # Bug real encontrado en el primer apply (docs/runbook_gcp_setup.md):
+      # sin esto, Cloud Run enruta el tráfico real al puerto 8080 por
+      # defecto -uvicorn escucha en 8000-, y todo pedido real da
+      # "The request timed out while connecting to the instance" aunque
+      # los probes (que sí declaran su puerto) pasen bien.
+      ports {
+        container_port = 8000
       }
 
       dynamic "env" {

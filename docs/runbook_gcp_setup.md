@@ -249,7 +249,86 @@ secrets (mismos que ya usa Azure, reusables) y un PAT de GitHub con
 patrón que el de Azure, pero un token propio — el que se usó para Azure
 en su momento no quedó guardado en ningún lado, por diseño).
 
-<!-- Sigue con: 1) `terraform apply` real (mostrado completo antes de
-confirmar), 2) `deploy-gcp.yml`, 3) primera corrida real disparada por
-un push a main, 4) verificación cruzada de GET /cases/showcase contra
-la misma Neon desde GCP. -->
+## 7. `terraform apply` real — dos bugs encontrados, ambos resueltos
+
+Con los secrets reales (mismos valores que Azure, más un PAT de GitHub
+nuevo y propio — `read:packages`, mismo criterio de no reusar
+identidades entre nubes) se corrió el `apply` real.
+
+### Bug 1: Artifact Registry usa su propia identidad para leer credenciales
+
+El primer intento creó 16 recursos y falló creando el repository:
+
+```
+Error 400: An error occurred while retrieving upstream credentials:
+Artifact Registry service account
+"service-432475042270@gcp-sa-artifactregistry.iam.gserviceaccount.com"
+does not have permission to access the secret version.
+```
+
+Causa: cuando Artifact Registry necesita leer las credenciales del
+upstream (para el espejo hacia GHCR), lo hace con **su propia
+identidad de servicio gestionada por Google** —una por proyecto,
+`service-<projectNumber>@gcp-sa-artifactregistry.iam.gserviceaccount.com`—,
+no con la identidad que corrió el `apply`. Nunca hizo falta crearla a
+mano (la provisiona Google en cuanto se usa la API), pero sí darle
+permiso explícito sobre el secret `ghcr-token`:
+
+```hcl
+resource "google_secret_manager_secret_iam_member" "artifact_registry_ghcr_pull" {
+  secret_id = google_secret_manager_secret.this["ghcr-token"].secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:service-${data.google_project.current.number}@gcp-sa-artifactregistry.iam.gserviceaccount.com"
+}
+```
+
+Con `depends_on` explícito en el repository — no hay ninguna referencia
+de atributo entre ambos recursos que le indique a Terraform el orden
+por sí solo.
+
+### Bug 2: Cloud Run enruta al puerto 8080 por defecto, no al que declara la app
+
+Con el fix anterior, el `apply` completó los 10 recursos restantes —
+pero `/health`/`/ready` daban `500` con `server: Google Frontend`
+(nunca llegaban a la app). Los logs de sistema de Cloud Run (no los de
+la app) lo dijeron directo:
+
+```bash
+gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name="fraud-detection-api" AND severity>=WARNING' \
+  --limit=20 --format="value(timestamp,severity,textPayload)"
+# ERROR  The request timed out while connecting to the instance.
+```
+
+Los `startup_probe`/`liveness_probe` sí pasaban (cada uno declara su
+propio puerto, 8000) — pero nunca declaré el puerto real del
+**contenedor**, y Cloud Run enruta el tráfico real al 8080 por defecto
+si no se le dice lo contrario. Fix de una línea:
+
+```hcl
+containers {
+  # ...
+  ports {
+    container_port = 8000
+  }
+}
+```
+
+**Verificación, después de ambos fixes**:
+
+```bash
+curl .../health     # 200
+curl .../ready      # 200
+curl .../api/v1/cases/showcase
+# los mismos 5 case_id que ya devuelve Azure — misma Neon, confirmado
+# desde una nube distinta, sin ningún cambio extra
+```
+
+**Lección**: un `startup_probe` que pasa no prueba que el tráfico real
+vaya a llegar — sólo prueba que *ese* puerto, con *esa* ruta, responde
+cuando Cloud Run mismo lo pregunta. El puerto que de verdad importa
+para el tráfico de un visitante es una configuración aparte.
+
+<!-- Sigue con: 1) `deploy-gcp.yml` (mismo patrón que deploy-azure.yml),
+2) los 3 secrets de GitHub para Workload Identity Federation,
+3) primera corrida real disparada por un push a main,
+4) acta de cierre de Fase 6. -->
