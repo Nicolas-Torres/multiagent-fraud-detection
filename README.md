@@ -13,6 +13,10 @@ que no alcanzan confianza suficiente pasan a una cola de revisión humana.
 
 > Proyecto final del programa de especialización en IA Generativa.
 
+**Demo en vivo**: https://ca-fraud-detection-api.graywave-cc1ab2d2.eastus2.azurecontainerapps.io
+— Azure Container Apps, desplegado automáticamente desde `main` (ver
+[docs/runbook_azure_setup.md](docs/runbook_azure_setup.md)).
+
 ---
 
 ## Estado
@@ -36,7 +40,7 @@ que no alcanzan confianza suficiente pasan a una cola de revisión humana.
 | Agentes con LLM (Debate x2, Arbiter agéntico) | ✅ |
 | API FastAPI + HITL | ✅ |
 | Dashboard del analista (frontend) | ✅ |
-| CI, imagen y despliegue | ⬜ |
+| CI, imagen y despliegue | ✅ |
 
 ---
 
