@@ -175,11 +175,10 @@ done
 | `roles/cloudscheduler.admin` | El cron de fetch-intel (§6.2 del ADR — Cloud Run no tiene trigger de cron nativo) |
 | `roles/secretmanager.admin` | Los 5 secrets de runtime, mismo contenido que en Azure |
 | `roles/storage.admin` | Leer/escribir el bucket de state de Terraform (§3) |
+| `roles/artifactregistry.reader` | **Agregado después** (§9) — faltaba para que el propio deploy pudiera referenciar la imagen del espejo |
 
 **Verificación**: `gcloud projects get-iam-policy ... --filter=...`
-lista los 5 roles para el Service Account.
-
----
+lista los 6 roles para el Service Account.
 
 ---
 
@@ -354,5 +353,65 @@ GCP_SERVICE_ACCOUNT            = github-actions-deployer@fraud-detection-portafo
 proyecto (`432475042270`), no el `project_id` — a diferencia de casi
 todo lo demás en `gcloud`, que acepta el id.
 
-<!-- Sigue con: 1) primera corrida real disparada por un push a main,
-2) acta de cierre de Fase 6. -->
+## 9. Primera corrida real — un tercer bug, a la identidad equivocada
+
+Merge a `main` disparó `CI` (éxito) → `Deploy a GCP` por
+`workflow_run` — el mismo mecanismo que ya probó Azure. Falló en el
+paso de migrar:
+
+```
+ERROR: (gcloud.run.jobs.update) PERMISSION_DENIED: Permission
+'artifactregistry.repositories.downloadArtifacts' denied on resource
+'.../repositories/ghcr-mirror'
+```
+
+Causa: el Terraform le dio `roles/artifactregistry.reader` a la
+identidad de **runtime** (`fraud-detection-runtime`, la que Cloud Run
+usa para efectivamente bajar la imagen al arrancar un contenedor) —
+pero nunca a la identidad de **GitHub Actions**
+(`github-actions-deployer`, la que corre `gcloud run jobs
+update --image=...`). Ese comando también necesita poder leer el
+repositorio, para resolver/validar la referencia de imagen antes de
+actualizar el recurso — son dos necesidades de lectura distintas, dos
+identidades distintas, y el bootstrap manual de §5 sólo cubrió la
+segunda.
+
+```bash
+gcloud projects add-iam-policy-binding fraud-detection-portafolio \
+  --member="serviceAccount:github-actions-deployer@fraud-detection-portafolio.iam.gserviceaccount.com" \
+  --role="roles/artifactregistry.reader" \
+  --condition=None
+```
+
+Re-disparado el mismo run fallido (no un nuevo push — el commit no
+cambió):
+
+```bash
+curl -X POST -H "Authorization: token $TOKEN" \
+  https://api.github.com/repos/Nicolas-Torres/multiagent-fraud-detection/actions/runs/34098328255/rerun-failed-jobs
+```
+
+**Verificación**:
+
+```bash
+gcloud run services describe fraud-detection-api --region=us-central1 \
+  --format="value(spec.template.spec.containers[0].image)"
+# us-central1-docker.pkg.dev/fraud-detection-portafolio/ghcr-mirror/nicolas-torres/multiagent-fraud-detection:sha-64dac1a
+
+curl .../health   # 200
+curl .../ready    # 200
+```
+
+`sha-64dac1a` es exactamente el commit del merge que disparó todo esto
+— el mismo criterio de siempre (ADR-0008): la imagen que corre es la
+que ese commit publicó, nunca otra.
+
+**Patrón que se repite en esta fase**: cada bug real encontrado
+—el secret vacío en Azure, el service agent de Artifact Registry, el
+puerto 8080 por defecto, y ahora este— es una variación del mismo
+tema: **una identidad o una configuración que sólo se manifiesta
+cuando algo *realmente* intenta usarla**, nunca en `validate` ni en
+`plan`. Ninguno se podría haber previsto sin intentarlo de verdad.
+
+<!-- Sigue con: acta de cierre de Fase 6, una vez que el re-run
+confirme el deploy completo. -->
