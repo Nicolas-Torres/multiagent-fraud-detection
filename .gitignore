@@ -8,3 +8,7 @@ dashboard/node_modules/
 dashboard/dist/
 docs/mejoras.md
 docs/temp/*
+
+infra/**/.terraform/
+infra/**/*.tfvars
+infra/**/*.tfplan
