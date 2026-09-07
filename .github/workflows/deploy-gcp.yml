@@ -1,0 +1,79 @@
+name: Deploy a GCP
+
+# Mismo patrón que deploy-azure.yml: se dispara cuando CI termina bien
+# contra `main`, nunca reconstruye la imagen — usa el mismo `sha-<7>`
+# que el job `build` de ci.yml ya publicó en GHCR. Corre en paralelo al
+# deploy de Azure, del mismo build, sin reconstruir nada dos veces.
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  id-token: write # Workload Identity Federation - sin clave de Service Account
+  contents: read
+
+env:
+  REGION: us-central1
+  # El espejo de Artifact Registry (ADR-0022) — no ghcr.io directo, Cloud
+  # Run no puede pull-ear un registro externo.
+  IMAGE_BASE: us-central1-docker.pkg.dev/fraud-detection-portafolio/ghcr-mirror/nicolas-torres/multiagent-fraud-detection
+
+jobs:
+  deploy:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Calcular el tag (mismo sha-<7> que CI acaba de publicar, ADR-0008)"
+        id: image
+        run: |
+          set -euo pipefail
+          sha="${{ github.event.workflow_run.head_sha }}"
+          echo "tag=sha-${sha:0:7}" >> "$GITHUB_OUTPUT"
+
+      - name: Login a GCP (Workload Identity Federation, sin clave estática)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Instalar gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: "Migrar (ADR-0009: si falla, aborta el deploy sin tocar la app que sirve)"
+        run: |
+          set -euo pipefail
+          image="${{ env.IMAGE_BASE }}:${{ steps.image.outputs.tag }}"
+          gcloud run jobs update fraud-detection-migrate --region "${{ env.REGION }}" --image "$image"
+          # --wait bloquea hasta que termine la ejecución y devuelve el
+          # código de salida real — a diferencia de Azure, acá no hace
+          # falta un loop de sondeo manual.
+          gcloud run jobs execute fraud-detection-migrate --region "${{ env.REGION }}" --wait
+
+      - name: "Actualizar el Cloud Run service al nuevo digest (recién si migrar salió bien)"
+        run: |
+          gcloud run services update fraud-detection-api \
+            --region "${{ env.REGION }}" \
+            --image "${{ env.IMAGE_BASE }}:${{ steps.image.outputs.tag }}"
+
+      - name: "Sembrar (no bloqueante, ADR-0010: idempotente, un fallo acá no revierte el deploy)"
+        continue-on-error: true
+        run: |
+          gcloud run jobs update fraud-detection-seed --region "${{ env.REGION }}" --image "${{ env.IMAGE_BASE }}:${{ steps.image.outputs.tag }}"
+          gcloud run jobs execute fraud-detection-seed --region "${{ env.REGION }}" --wait
+
+      - name: Mantener fetch-intel en la misma imagen
+        run: |
+          gcloud run jobs update fraud-detection-fetch-intel \
+            --region "${{ env.REGION }}" \
+            --image "${{ env.IMAGE_BASE }}:${{ steps.image.outputs.tag }}"
+
+      - name: Resumen
+        run: |
+          {
+            echo "### Deploy a GCP"
+            echo ""
+            echo "Imagen: \`${{ env.IMAGE_BASE }}:${{ steps.image.outputs.tag }}\`"
+            echo "Commit: \`${{ github.event.workflow_run.head_sha }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
