@@ -20,24 +20,38 @@ resource "azurerm_container_app_environment" "main" {
   log_analytics_workspace_id = azurerm_log_analytics_workspace.main.id
 }
 
-# Los cinco secrets y el registro de GHCR se repiten igual en la Container
-# App y en los tres Jobs -misma imagen, mismos insumos-, así que se arman
-# una sola vez acá y se referencian desde cada recurso con `dynamic`.
+# Los secrets y el registro de GHCR se repiten igual en la Container App y
+# en los tres Jobs -misma imagen, mismos insumos-, así que se arman una
+# sola vez acá y se referencian desde cada recurso con `dynamic`.
+#
+# LangSmith es opcional (ADR-0013: sin clave, o con LANGSMITH_TRACING=false,
+# el sistema funciona igual sin trazar). Azure Container Apps rechaza un
+# secret con `value = ""` ("value or keyVaultUrl and identity should be
+# provided"), así que ese par secret/env sólo se arma cuando hay una clave
+# real — de lo contrario ni siquiera se declara.
 locals {
-  container_secrets = [
-    { name = "ghcr-token", value = var.ghcr_token },
-    { name = "database-url", value = var.database_url },
-    { name = "anthropic-api-key", value = var.anthropic_api_key },
-    { name = "gemini-api-key", value = var.gemini_api_key },
-    { name = "langsmith-api-key", value = var.langsmith_api_key },
-  ]
+  container_secrets = concat(
+    [
+      { name = "ghcr-token", value = var.ghcr_token },
+      { name = "database-url", value = var.database_url },
+      { name = "anthropic-api-key", value = var.anthropic_api_key },
+      { name = "gemini-api-key", value = var.gemini_api_key },
+    ],
+    var.langsmith_api_key == "" ? [] : [
+      { name = "langsmith-api-key", value = var.langsmith_api_key },
+    ],
+  )
 
-  container_env = [
-    { name = "DATABASE_URL", secret_name = "database-url" },
-    { name = "ANTHROPIC_API_KEY", secret_name = "anthropic-api-key" },
-    { name = "GEMINI_API_KEY", secret_name = "gemini-api-key" },
-    { name = "LANGSMITH_API_KEY", secret_name = "langsmith-api-key" },
-  ]
+  container_env = concat(
+    [
+      { name = "DATABASE_URL", secret_name = "database-url" },
+      { name = "ANTHROPIC_API_KEY", secret_name = "anthropic-api-key" },
+      { name = "GEMINI_API_KEY", secret_name = "gemini-api-key" },
+    ],
+    var.langsmith_api_key == "" ? [] : [
+      { name = "LANGSMITH_API_KEY", secret_name = "langsmith-api-key" },
+    ],
+  )
 
   container_env_plain = [
     { name = "LANGSMITH_TRACING", value = tostring(var.langsmith_tracing) },

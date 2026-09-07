@@ -315,7 +315,87 @@ Lo que sigue faltando para un `apply` real (no de prueba) es tener
 valores *genuinos* en esas cinco variables: un PAT de GitHub con
 `read:packages`, y un proyecto de Neon con su connection string.
 
-<!-- Sigue con `terraform apply` real una vez que existan los valores
-genuinos de los secretos (Neon + PAT de GHCR). El role assignment de
-§5 se puede seguir reintentando en paralelo — hace falta para Fase 4,
-no para este apply. -->
+## 7. `terraform apply` real — infraestructura ya arriba
+
+Con Neon (free tier, región `us-east-2`, extensión `vector` habilitada a
+mano vía `CREATE EXTENSION IF NOT EXISTS vector;` en su SQL Editor) y un
+PAT de GitHub (`read:packages`, acotado sólo a este repo) ya generados,
+se corrió el `apply` real.
+
+### Bug encontrado en el primer intento
+
+El primer `apply` creó 2 de los 6 recursos (`azurerm_log_analytics_workspace`,
+`azurerm_container_app_environment`) y falló en los otros 4 con:
+
+```
+ContainerAppSecretInvalid: Invalid Request: Container app secret(s)
+with name(s) 'langsmith-api-key' are invalid: value or keyVaultUrl
+and identity should be provided.
+```
+
+Causa: `var.langsmith_api_key` tiene `default = ""` (es opcional, por
+diseño — ADR-0013: sin clave, el sistema funciona igual sin trazar),
+pero Azure Container Apps **rechaza declarar un secret con valor
+vacío** — exige un valor real o una referencia a Key Vault. El primer
+`-var-file` armado en esta sesión, además, se olvidó de copiar
+`LANGSMITH_API_KEY` desde el `.env` local (sólo copiaba Anthropic y
+Gemini), así que cayó en ese default vacío sin necesidad.
+
+Dos arreglos, no uno solo:
+
+1. **El olvido puntual**: agregar la clave real al archivo de variables.
+2. **El bug de fondo en el `.tf`**, que iba a repetirse con cualquier
+   entorno que no configure LangSmith (el caso legítimo que el propio
+   diseño del sistema contempla): en `main.tf`, `local.container_secrets`
+   y `local.container_env` ahora arman el par `langsmith-api-key` con
+   `concat(...)` y una lista vacía cuando `var.langsmith_api_key == ""`
+   — el secret ni se declara si no hay una clave real, en vez de
+   declararlo vacío y que Azure lo rechace.
+
+Reintentado con el fix: `terraform plan` mostró `4 to add` (los 2 ya
+creados no se tocan — Terraform es idempotente respecto al state real),
+y el `apply` los creó sin errores.
+
+### Resultado
+
+```
+Apply complete! Resources: 4 added, 0 changed, 0 destroyed.
+
+Outputs:
+api_fqdn = "https://ca-fraud-detection-api.graywave-cc1ab2d2.eastus2.azurecontainerapps.io"
+```
+
+```bash
+curl https://ca-fraud-detection-api.graywave-cc1ab2d2.eastus2.azurecontainerapps.io/health   # 200
+curl https://ca-fraud-detection-api.graywave-cc1ab2d2.eastus2.azurecontainerapps.io/ready    # 200 (¡ya!)
+```
+
+`/ready` dio 200 antes incluso de migrar — porque sólo hace `SELECT 1`
+(`src/multiagent_fraud_detection/api/app.py`): confirma que la
+Container App llega a Neon, no que el esquema exista. Se corrió la
+migración real igual, como preveía el plan:
+
+```bash
+az containerapp job start --name caj-fraud-detection-migrate --resource-group rg-fraud-detection
+# execution: caj-fraud-detection-migrate-z51xfkd
+az containerapp job execution show --name caj-fraud-detection-migrate \
+  --resource-group rg-fraud-detection \
+  --job-execution-name caj-fraud-detection-migrate-z51xfkd \
+  --query properties.status -o tsv
+# Succeeded
+```
+
+**Estado actual**: infraestructura real arriba y con esquema migrado.
+Pendiente, sin bloquear lo anterior: el role assignment de §5 (necesario
+recién para Fase 4/CD automático), y decidir si sembrar datos de vitrina
+(`caj-fraud-detection-seed`) ahora o dejarlo para cuando exista el
+workflow de deploy.
+
+Nota de costo: el usuario decidió sostener esto ~1 mes a este nivel de
+gasto («una decena de dólares») para evaluar el portafolio en vivo, y
+después revisar una opción más barata si conviene — no es una decisión
+cerrada para siempre.
+
+<!-- Sigue con Fase 4: el workflow de CD (build → push a GHCR → az
+containerapp update --image → correr el Job de migrar antes, abortando
+el deploy si falla, por ADR-0009). -->
