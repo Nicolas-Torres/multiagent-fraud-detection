@@ -625,10 +625,40 @@ queda pendiente de cargar los secrets (siguiente punto).
 **Pendiente antes de la primera corrida real**: cargar los tres
 secrets del repo (`AZURE_CLIENT_ID`, `AZURE_TENANT_ID`,
 `AZURE_SUBSCRIPTION_ID`) en GitHub — Settings → Secrets and variables →
-Actions. Todavía no se hizo.
+Actions. Cargados vía API (`PUT /repos/.../actions/secrets/{name}`,
+cifrados con la public key del repo usando `pynacl.SealedBox` — el
+mismo cifrado que usa `gh secret set` por debajo, sin tener `gh`
+instalado).
 
-<!-- Sigue con: 1) cargar los 3 secrets de GitHub, 2) mergear PR #25,
-3) primera corrida real de deploy-azure.yml (push a main dispara CI,
-que a su vez dispara este workflow), 4) resolver la lección de §8
-(seed_showcase.py como parte del pipeline de build, no manual),
-5) Fase 5 — verificación end-to-end + cierre de README/acta. -->
+### Primera corrida real — 2026-09-07
+
+Merge de PR #25 a `main` (commit `94d91d0`) disparó `CI` normalmente,
+que terminó en `success`, que a su vez disparó `Deploy a Azure` por
+`workflow_run` — sin ningún paso manual.
+
+```bash
+curl "https://api.github.com/repos/.../actions/runs?head_sha=94d91d0..."
+# CI: completed / success
+# Deploy a Azure: in_progress -> (poco después) completed / success
+```
+
+Verificado que la Container App terminó sirviendo exactamente esa
+imagen, no una vieja:
+
+```bash
+az containerapp show --name ca-fraud-detection-api --resource-group rg-fraud-detection \
+  --query "properties.template.containers[0].image" -o tsv
+# ghcr.io/nicolas-torres/multiagent-fraud-detection:sha-94d91d0
+
+curl .../health   # 200
+curl .../ready    # 200
+```
+
+**Fase 4 cerrada**: push a `main` → CI → build/push a GHCR → migrar
+(con abort-on-failure) → actualizar la Container App, de punta a
+punta, sin intervención manual, primera vez.
+
+<!-- Sigue con: 1) resolver la lección de §8 (seed_showcase.py como
+parte del pipeline de build, no manual — el próximo deploy real va a
+volver a romper la vitrina si no se resuelve antes), 2) Fase 5 —
+verificación end-to-end + cierre de README/acta. -->
