@@ -225,7 +225,7 @@ cuatro explícitas, ninguna es un olvido.
 
 ## 9. Documentación asociada
 
-- [ADR-0018](adr/0018-el-progreso-en-vivo-se-transmite-por-sse.md)
+- [ADR-0018](../adr/0018-el-progreso-en-vivo-se-transmite-por-sse.md)
 - `enmiendas_pendientes.md` — vacío tras publicar; una enmienda hacia v0.11, en `CHANGELOG.md`
 - `09-api-hitl.md` — etapa anterior
 - `docs/temp/dashboard_mejoras.md` — notas del usuario para la etapa siguiente (gitignored, no versionado)

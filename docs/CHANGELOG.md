@@ -21,6 +21,24 @@ Sin enmiendas acumuladas. Las próximas se anotan en
 
 ---
 
+## [0.14] — La vitrina se resuelve en vivo, no en el build
+
+Un endpoint nuevo.
+
+| # | Enmienda | Toca | Por qué |
+|---|---|---|---|
+| 1 | 🆕 **`GET /api/v1/cases/showcase`** | §2.3, §2.5 | Resuelve en vivo los `case_id` de los 5 casos curados de la vitrina — nunca hornea un id en el build del frontend, que rompía cada vez que la imagen se desplegaba contra una base distinta de la que corrió el seed |
+
+Devuelve, en el mismo orden que `api.showcase.CASOS_VITRINA`, sólo los
+`case_id` que de verdad existen en el entorno que responde — un entorno
+que todavía no corrió el seed de vitrina simplemente recibe menos de 5
+ítems, nunca un `404`. `dashboard/src/data/showcase_cases.json` deja de
+llevar `case_id`: el frontend cruza ambas fuentes por `transaction_id`.
+
+Detrás: [docs/reviews/11-ci-cd-azure.md](reviews/11-ci-cd-azure.md) §2.2/§6.1.
+
+---
+
 ## [0.13] — El grafo en vivo llega a Dashboard
 
 Una enmienda, sobre el mismo endpoint de la versión anterior.
