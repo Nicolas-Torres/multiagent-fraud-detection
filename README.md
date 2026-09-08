@@ -227,13 +227,24 @@ uv run python scripts/check_retrieval.py              # ablación del descubrimi
 
 ```bash
 uv run python scripts/smoke_read.py             # round-trip de la capa Read
+uv run python scripts/smoke_seed.py             # verifica lo que quedó en la base tras el seed
 uv run python scripts/smoke_graph.py            # supersteps, reducers, input_schema
 uv run python scripts/smoke_degradation.py      # un agente caído no aborta el grafo
 uv run python scripts/smoke_persistence.py      # un reintento no duplica señales
 uv run python scripts/smoke_catalog_sources.py  # archivo y base dan el mismo catálogo
 uv run python scripts/smoke_retrieval.py        # la búsqueda no mezcla generaciones
 uv run python scripts/smoke_threat_intel.py     # el fetch es idempotente; el lookup no mezcla snapshots
+uv run python scripts/smoke_agents.py           # agentes determinísticos contra Postgres, comparados con el ground truth
 uv run python scripts/smoke_decision.py         # incluye el caso que pasa de APPROVE a CHALLENGE, y el Arbiter LLM decidiendo sobre el piso
+uv run python scripts/smoke_api.py              # la API de punta a punta por HTTP, TestClient sobre la app real
+```
+
+### Datos de demo para el dashboard
+
+```bash
+uv run python scripts/seed_dashboard_fixtures.py  # 25 casos, todo estado × veredicto relevante
+uv run python scripts/seed_showcase.py            # 5 casos reales, corridos de punta a punta con LLM real
+uv run python scripts/seed_diverse_scenarios.py   # candidatos "ejecutar en vivo", sin gastar LLM en elegirlos
 ```
 
 ### Evaluación no bloqueante
@@ -266,30 +277,44 @@ regenerar es una guarda válida de CI.
 
 ```
 ├── compose.yml                  # Postgres 18 + pgvector
+├── Dockerfile                   # build multi-stage: backend + dashboard, ADR-0008
 ├── migrations/versions/         # 15 revisiones · head: sello del snapshot externo
-├── scripts/                     # gates, smoke tests y generadores
+├── scripts/                     # gates, smoke tests, seed y generadores
 ├── data/
 │   ├── policies/                # documento normativo + vinculaciones
 │   ├── customer_behaviors.csv
 │   ├── ground_truth.csv
 │   ├── transactions.csv
 │   └── README.md
+├── dashboard/                    # frontend del analista (React + Vite), servido por la API
+├── infra/
+│   ├── azure/                    # Terraform — Container Apps, orquestador oficial (ADR-0021)
+│   └── gcp/                      # Terraform — Cloud Run, segundo target de aprendizaje (ADR-0022)
+├── .github/workflows/            # ci.yml, deploy-azure.yml, deploy-gcp.yml
+├── tests/
 ├── docs/
-│   ├── contrato_de_interfaz.md  # documento vivo (v0.10)
+│   ├── contrato_de_interfaz.md  # documento vivo (v0.14)
 │   ├── CHANGELOG.md
 │   ├── enmiendas_pendientes.md  # staging de la próxima versión
+│   ├── trazabilidad.md          # rúbrica ↔ evidencia, se revisa al cerrar etapa
 │   ├── runbook_base_nueva.md
+│   ├── runbook_azure_setup.md
+│   ├── runbook_gcp_setup.md
 │   ├── adr/                     # decisiones de arquitectura
 │   ├── reviews/                 # cierres de etapa
 │   └── diagrams/
 └── src/multiagent_fraud_detection/
     ├── enums.py
     ├── config/                  # settings (pydantic-settings)
-    ├── db/                      # engine async, Base, 12 modelos, repositorios
+    ├── db/                      # engine async, Base, 14 modelos, repositorios
     ├── domain/                  # predicados, catálogo, motor de reglas
     ├── retrieval/               # chunking, embeddings, índice, query, citas
+    ├── intel/                   # inteligencia externa: búsqueda web gobernada, en build
+    ├── debate/                  # las dos posturas del debate, con LLM
+    ├── arbiter/                 # veredicto final: LLM sobre el piso determinístico
     ├── explain/                 # auditoría por plantilla, cliente por LLM
     ├── schemas/                 # frontera pública (Pydantic)
+    ├── api/                     # FastAPI + HITL
     └── graph/                   # state, nodes, builder, context
 ```
 
@@ -300,6 +325,12 @@ regenerar es una guarda válida de CI.
 - **[Contrato de interfaz](docs/contrato_de_interfaz.md)** — las dos fronteras
   del sistema: la operativa (empaquetado, configuración, health) y la de API
   (endpoints y schemas). Incluye el modelo de persistencia.
+- **[Trazabilidad](docs/trazabilidad.md)** — el mapa rúbrica → evidencia, con
+  los desvíos declarados frente al enunciado.
+- **[Catálogo de políticas](docs/catalogo_de_politicas.md)** — las once
+  políticas, su estado y su vinculación ejecutable.
+- **[Briefing del dashboard](docs/briefing_dashboard.md)** — qué muestra cada
+  vista al analista y por qué.
 - **[`data/README.md`](data/README.md)** — el dataset sintético: esquema de los tres
   archivos, semántica de las etiquetas, confusores y limitaciones.
 - **[CHANGELOG](docs/CHANGELOG.md)** — qué cambió entre versiones del contrato y
@@ -311,6 +342,8 @@ regenerar es una guarda válida de CI.
   próxima versión del contrato.
 - **[Runbook de base nueva](docs/runbook_base_nueva.md)** — poner en marcha una
   base vacía: crear, verificar, migrar, sembrar y comprobar.
+- **[Runbook de Azure](docs/runbook_azure_setup.md)** · **[Runbook de GCP](docs/runbook_gcp_setup.md)**
+  — cómo se armó cada infraestructura, comando por comando.
 
 ### Diagramas
 
@@ -318,7 +351,7 @@ regenerar es una guarda válida de CI.
 |---|---|---|
 | `graph_topology.png` | generado del grafo compilado | automática |
 | `data_model.png` · `.mmd` | generado de `Base.metadata` | automática, con `--check` |
-| `citacion-interna.drawio` | a mano | se revisa al cerrar etapa |
+| `citacion-internal.drawio` | a mano | se revisa al cerrar etapa |
 | `c4-container.drawio` | a mano — **vista C4 vigente** | se revisa al cerrar etapa |
 | `ciclo-de-vida.drawio` | a mano | se revisa al cerrar etapa |
 | `capa1-infra.drawio` | a mano — **histórico de la etapa 1**, no se actualiza | congelado |

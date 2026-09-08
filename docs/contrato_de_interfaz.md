@@ -1,5 +1,5 @@
 # Contrato de Interfaz — Sistema Multi-Agente de Detección de Fraude
-**Versión 0.13 — El grafo en vivo llega a Dashboard**
+**Versión 0.14 — La vitrina se resuelve en vivo, no en el build**
 
 > Define las **fronteras** entre el motor de agentes, la infraestructura y el
 > dashboard del analista — hoy las tres las cubro yo
@@ -1100,14 +1100,15 @@ c558fd490ae6  (pgvector)
 
 ---
 
-**Estado**: v0.10 — el Contrato de API deja de ser sólo especificación:
-`POST /cases`, `GET /cases`, `GET /cases/{id}`, `POST .../resolution`,
-`GET /policies` (sólo lectura, ADR-0017) y `GET /predicates` están
-implementados y corren de punta a punta contra Postgres y el grafo real
-(`scripts/smoke_api.py`). Los cuatro puntos de escritura de §7.3 —W0 a W3—
-tienen ahora cada uno su endpoint o su wrapper. Sin `POST /api/v1/policies`
-todavía (ADR-0017); sin autenticación, declarada como deuda explícita, no
-como omisión silenciosa.
+**Estado**: v0.14 — el sistema corre de punta a punta, en producción real.
+Los cuatro puntos de escritura de §7.3 —W0 a W3— tienen cada uno su
+endpoint o su wrapper (`scripts/smoke_api.py`); el dashboard del analista
+está completo (grafo en vivo por SSE, cola HITL, costo y latencia desde
+LangSmith, vitrina resuelta en vivo — `GET /cases/showcase`); y el
+despliegue es automático en dos nubes: Azure (oficial, ADR-0021) y GCP
+(aprendizaje, ADR-0022). Sin `POST /api/v1/policies` todavía (ADR-0017);
+sin autenticación, declarada como deuda explícita, no como omisión
+silenciosa.
 
 **§1 lo valido yo** (ver ADR-0021: el reparto de dos personas ya no aplica).
 ADR-0008 a ADR-0010 siguen **aceptados**. **Valido yo**: §2–§4, §7.
