@@ -263,7 +263,10 @@ resource "azurerm_container_app_job" "fetch_intel" {
   container_app_environment_id = azurerm_container_app_environment.main.id
 
   replica_timeout_in_seconds = 900
-  replica_retry_limit        = 1
+  # ADR-0009 / incidente 0001: un reintento automático no arregla un bug de
+  # código, sólo paga de nuevo el loop completo de búsquedas (~10 min de
+  # claude-sonnet-4-6 + web_search) contra el mismo fallo determinista.
+  replica_retry_limit = 0
 
   schedule_trigger_config {
     cron_expression          = var.fetch_intel_cron
