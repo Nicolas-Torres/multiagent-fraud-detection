@@ -191,28 +191,33 @@ async def _correr(dry_run: bool, fake: bool) -> int:
         emisores = await _emisores(session)
         allowlist = await active_domains(session)
 
-        if not allowlist:
-            print(
-                "el allowlist está vacío: sin fuentes autorizadas, cada búsqueda "
-                'se pagaría y no guardaría ninguna fila — lo mismo que se lee como '
-                '"sin alertas". Sembrá `web_search_allowlist` antes de correr esto '
-                "(`uv run python scripts/seed.py`).",
-                file=sys.stderr,
-            )
-            return 2
-
-        print(f"  {len(emisores)} emisores · allowlist: {', '.join(sorted(allowlist))}")
-
-        if dry_run:
-            print("\n--dry-run: queries que se ejecutarían, sin gastar búsquedas")
-            for emisor in emisores:
-                print(f"  {emisor}: {build_query(emisor)}")
-            return 0
-
-        filas, rechazadas, sin_fecha = _recoger(
-            searcher, emisores, allowlist, snapshot_version
+    if not allowlist:
+        print(
+            "el allowlist está vacío: sin fuentes autorizadas, cada búsqueda "
+            'se pagaría y no guardaría ninguna fila — lo mismo que se lee como '
+            '"sin alertas". Sembrá `web_search_allowlist` antes de correr esto '
+            "(`uv run python scripts/seed.py`).",
+            file=sys.stderr,
         )
+        return 2
 
+    print(f"  {len(emisores)} emisores · allowlist: {', '.join(sorted(allowlist))}")
+
+    if dry_run:
+        print("\n--dry-run: queries que se ejecutarían, sin gastar búsquedas")
+        for emisor in emisores:
+            print(f"  {emisor}: {build_query(emisor)}")
+        return 0
+
+    # La sesión de arriba ya se cerró: el loop de búsquedas tarda varios
+    # minutos y no toca la base, así que no debe haber ninguna transacción
+    # abierta mientras corre — Neon mata la conexión por
+    # `idle-in-transaction timeout` antes de que llegue al upsert.
+    filas, rechazadas, sin_fecha = _recoger(
+        searcher, emisores, allowlist, snapshot_version
+    )
+
+    async with Session() as session:
         # Un solo commit: o queda todo o no queda nada. Mismo criterio que
         # `seed.py` y `index_policies.py`.
         await _upsert(session, filas)

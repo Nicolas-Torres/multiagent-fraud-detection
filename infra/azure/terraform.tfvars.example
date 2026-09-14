@@ -1,0 +1,21 @@
+# Copiá este archivo a `terraform.tfvars` (ya está en .gitignore, nunca se
+# commitea) y completá los valores reales con un editor de texto normal —
+# NO lo tipees en el chat ni en un comando `!`: cualquier texto que pase por
+# ahí queda en la transcripción de la conversación.
+#
+# Con este archivo en su lugar, `terraform plan`/`apply` lo cargan solos —
+# no hace falta pasar `-var` a mano, y ningún secreto vuelve a aparecer en
+# el output de Claude Code.
+
+# No sensibles — confirmalos contra el estado real antes de tocarlos
+# (`az containerapp show --name ca-fraud-detection-api --resource-group
+# rg-fraud-detection --query "properties.template.containers[0].image"`):
+image         = "ghcr.io/nicolas-torres/multiagent-fraud-detection:sha-64dac1a"
+ghcr_username = "Nicolas-Torres"
+
+# Sensibles — completar a mano, nunca pegarlos en el chat:
+ghcr_token         = ""
+database_url       = ""
+anthropic_api_key  = ""
+gemini_api_key     = ""
+langsmith_api_key  = ""
