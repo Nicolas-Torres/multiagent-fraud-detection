@@ -6,6 +6,14 @@
 # Con este archivo en su lugar, `terraform plan`/`apply` lo cargan solos —
 # no hace falta pasar `-var` a mano, y ningún secreto vuelve a aparecer en
 # el output de Claude Code.
+#
+# Para **rotar un secreto** (no un cambio de infra), usá en cambio
+# `infra/rotate-secrets.sh` + `infra/shared.secrets.tfvars` (ADR-0023):
+# aplica el mismo valor en Azure y GCP de una sola vez, así no vuelve a
+# pasar lo del incidente 0001/0002 (rotar acá y olvidarse de GCP). Este
+# archivo sigue sirviendo para un `apply` manual de infraestructura propia
+# de Azure (como `replica_retry_limit`), que sí necesita `image` y no
+# encaja en "rotar un secreto compartido".
 
 # No sensibles — confirmalos contra el estado real antes de tocarlos
 # (`az containerapp show --name ca-fraud-detection-api --resource-group
