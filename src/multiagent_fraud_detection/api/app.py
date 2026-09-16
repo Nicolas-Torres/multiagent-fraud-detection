@@ -33,6 +33,7 @@ if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 from multiagent_fraud_detection.api.deps import get_session
+from multiagent_fraud_detection.api.routers import metrics as metrics_router
 from multiagent_fraud_detection.db.session import AsyncSessionLocal
 from multiagent_fraud_detection.graph.builder import build_graph
 from multiagent_fraud_detection.graph.context import GraphContext
@@ -47,6 +48,10 @@ DASHBOARD_DIST = Path(__file__).resolve().parents[3] / "dashboard" / "dist"
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     app.state.graph = build_graph()
     app.state.graph_context = GraphContext(session_factory=AsyncSessionLocal)
+    # De fondo, sin bloquear el arranque ni `/ready`: sin esto, el primer
+    # visitante después de cada deploy paga el costo completo de la consulta
+    # a LangSmith que `precalentar` deja resuelto de antemano.
+    app.state.metrics_prewarm_task = asyncio.create_task(metrics_router.precalentar())
     yield
 
 
