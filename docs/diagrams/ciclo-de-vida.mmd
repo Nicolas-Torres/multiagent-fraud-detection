@@ -1,0 +1,35 @@
+%%{init: {"flowchart": {"htmlLabels": true, "curve": "basis"}} }%%
+flowchart TB
+    classDef status fill:#d5e8d4,stroke:#82b366,color:#1a1a1a
+    classDef terminal fill:#f8cecc,stroke:#b85450,color:#1a1a1a
+    classDef note fill:#fff2cc,stroke:#d6b656,color:#1a1a1a,text-align:left
+
+    Start(["POST /cases"]) -->|"202 + case_id<br/>INSERT transactions + cases"| RECEIVED
+    RECEIVED["RECEIVED"]:::status -->|"arranca el grafo en segundo plano"| ANALYZING["ANALYZING"]:::status
+
+    ANALYZING -->|"decision en APPROVE, CHALLENGE, BLOCK<br/>INSERT decisions + signals"| DECIDED["DECIDED"]:::terminal
+    ANALYZING -->|"decision = ESCALATE_TO_HUMAN<br/>INSERT decisions + signals"| PENDING["PENDING_HUMAN"]:::terminal
+    ANALYZING -->|"error del pipeline"| FAILED["FAILED"]:::terminal
+
+    PENDING -->|"POST /cases/{id}/resolution<br/>INSERT human_resolutions"| RESOLVED["RESOLVED"]:::status
+
+    NotaCheckpointer["Como funciona PENDING_HUMAN - corregido<br/>Es un estado TERMINAL: el grafo ya terminó de correr,<br/>no queda suspendido en ningún lado.<br/>Sin checkpointer, sin interrupt() (graph/builder.py:45).<br/>La resolución humana llega después, por un endpoint<br/>HTTP separado - POST /cases/{id}/resolution (W3) -<br/>que sólo escribe human_resolutions y pasa el caso a RESOLVED."]:::note
+    PENDING -.- NotaCheckpointer
+
+    NotaIdempotencia["Idempotencia<br/>Reintento con el mismo transaction_id: 200 con<br/>el case_id existente. No se crea caso ni se corre<br/>el grafo. Lo garantiza el UNIQUE de la BD."]:::note
+    RECEIVED -.- NotaIdempotencia
+
+    NotaAsync["El cliente no bloquea 15-30 s<br/>Async en el borde: 202 + case_id, el dashboard<br/>consulta por polling y por progreso en vivo (SSE,<br/>ADR-0018) mientras el caso está en curso -<br/>ya implementado, no es WebSocket, pero cubre<br/>la misma necesidad de tiempo real."]:::note
+    Start -.- NotaAsync
+
+    NotaLatencia["decided_at menos created_at = latencia del pipeline<br/>Métrica de producción del entregable 6."]:::note
+    DECIDED -.- NotaLatencia
+
+    NotaCola["Cola HITL: GET /cases?status=PENDING_HUMAN<br/>Sale del índice compuesto (status, created_at)."]:::note
+    PENDING -.- NotaCola
+
+    NotaNull["decision es null hasta aquí<br/>En CaseDetail y CaseSummary, decision y confidence<br/>llegan null mientras el caso está en RECEIVED / ANALYZING.<br/>El dashboard debe listarlos igual."]:::note
+    ANALYZING -.- NotaNull
+
+    NotaCustomer["customer puede ser null en cualquier estado:<br/>cliente nuevo sin perfil. No es un error - es el<br/>escenario más sospechoso. (Enmienda 1 del contrato v0.3)"]:::note
+    RECEIVED -.- NotaCustomer

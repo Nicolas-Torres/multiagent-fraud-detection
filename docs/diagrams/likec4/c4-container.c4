@@ -1,0 +1,91 @@
+specification {
+  element system
+  element container
+  element component
+  element person
+  element external
+
+  tag construido
+  tag pendiente
+}
+
+model {
+  gateway = external 'Pasarela de pagos' 'sistema origen'
+  analyst = person 'Analista de fraude' 'consume la vitrina, la cola HITL y el catálogo'
+
+  fraudSystem = system 'Sistema Multi-Agente de Detección de Fraude' 'Un solo contenedor desplegable — monolito en-proceso, sin broker' {
+    api = container 'API FastAPI' 'POST /cases · GET /cases(/{id}) · POST .../resolution · GET /policies (solo lectura) · /predicates · GET /cases/showcase (v0.14) · /health · /ready. Sin auth (deuda declarada).' {
+      #construido
+    }
+
+    dashboard = container 'Dashboard del analista' 'Grafo y debate en vivo por SSE (ADR-0018) · cola HITL · catálogo de políticas · costo/latencia desde LangSmith (ADR-0019/0020) · vitrina resuelta en vivo, no horneada en el build' {
+      #construido
+    }
+
+    graph = container 'Grafo de agentes (LangGraph)' 'Context · Behavioral · Policy RAG · Threat Intel · Aggregation · Debate x2 · Arbiter (LLM sobre piso determinístico, ADR-0016) · Explainability. Sin checkpointer: PENDING_HUMAN es terminal, la resolución es HTTP (W3).' {
+      #construido
+    }
+
+    migrate = component 'Alembic' 'sync · 15 migraciones' { #construido }
+    seed = component 'seed.py' 'Job de seed post-deploy · idempotente · dataset + catálogo + índice · no aborta el rollout' { #construido }
+
+    orm = component 'Modelos ORM' 'SQLAlchemy 2.0 async · 14 tablas · el diagrama se genera desde Base.metadata (data_model.png)' { #construido }
+    schemas = component 'Schemas Pydantic' 'frontera: TransactionIn/Read · CustomerBehaviorIn/Read · DecisionRead · SignalRead · CaseDetail · CaseSummary · CaseCreated · Page[T] · HumanResolutionIn/Read' { #construido }
+    domain = component 'Dominio' 'recuperación · explicabilidad' { #construido }
+  }
+
+  db = container 'PostgreSQL 18 + pgvector' 'transacciones · casos · decisiones · señales · errores. Gobernanza: merchant_blacklist · web_search_allowlist · catálogo de políticas. Índice vectorial policy_chunks (filtra por index_version). threat_indicators — snapshot congelado, filtra por snapshot_version.' {
+    #construido
+    style {
+      shape storage
+    }
+  }
+
+  gemini = external 'Gemini' 'embeddings — retrieval_index_version'
+  anthropic = external 'Anthropic' 'búsqueda, explicación, debate y juicio del Arbiter'
+  webSources = external 'Fuentes web externas' 'consultadas en BUILD, nunca en runtime (ADR-0014) · gobernadas por allowlist · congeladas en threat_indicators'
+  langsmith = external 'LangSmith' 'trazas · evals · costo y latencia por nodo'
+
+  ghcr = external 'GHCR' 'tags legibles (semver, sha) — el hand-off real es el digest (ADR-0008)'
+  azure = external 'Azure Container Apps' 'orquestador oficial, min-replicas=1 (ADR-0021) — el link del README'
+  gcp = external 'GCP Cloud Run' 'segundo target, aprendizaje, escala a cero (ADR-0022)'
+
+  gateway -> api 'transacciones'
+  analyst -> dashboard 'usa'
+  dashboard -> api 'consume la frontera HTTP'
+  api -> graph 'dispara en segundo plano'
+  api -> schemas 'valida y serializa'
+  graph -> domain 'usa'
+  graph -> orm 'persiste el resultado'
+  orm -> db 'async · psycopg3'
+  migrate -> db 'upgrade head (Job de pre-deploy)'
+  seed -> db 'Job de post-deploy'
+  graph -> gemini 'embeddings'
+  graph -> anthropic 'debate, juicio, explicación'
+  seed -> webSources 'sólo en build'
+  api -> langsmith 'trazas'
+  dashboard -> langsmith 'costo/latencia'
+
+  fraudSystem -> ghcr 'CI (mío): lint -> pytest -> check_policies -> diagrama --check -> alembic check -> build -> push' {
+    #construido
+  }
+  ghcr -> azure 'pull por digest, CD automático (deploy-azure.yml)' { #construido }
+  ghcr -> gcp 'pull por digest via espejo de Artifact Registry, CD automático (deploy-gcp.yml)' { #construido }
+}
+
+views {
+  view index {
+    title 'C4 — Vista Context · sistema completo y desplegado'
+    include fraudSystem, gateway, analyst, db, gemini, anthropic, webSources, langsmith, ghcr, azure, gcp
+    style * { color muted }
+    style element.tag == #construido { color green }
+  }
+
+  view containers of fraudSystem {
+    title 'C4 — Vista Container · sistema completo y desplegado (docs/reviews/12-gcp-multicloud.md)'
+    include *
+    include db, gemini, anthropic, webSources, langsmith, ghcr, azure, gcp, analyst, gateway
+    style * { color muted }
+    style element.tag == #construido { color green }
+  }
+}

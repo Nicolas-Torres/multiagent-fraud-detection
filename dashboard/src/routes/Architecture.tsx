@@ -51,7 +51,7 @@ function DiagramaC4() {
   if (falta) {
     return (
       <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
-        Diagrama C4 pendiente de exportar — ver <code>docs/diagrams/c4-container.drawio</code>.
+        Diagrama C4 pendiente de exportar — ver <code>docs/diagrams/likec4/c4-container.c4</code>.
       </div>
     )
   }

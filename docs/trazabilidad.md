@@ -20,7 +20,7 @@ evidencia que lo cubre en el repo, y declara los desvíos frente a
 | 1 | Descripción del caso de uso | `README.md`, `requisitos/reto_de_aplicacion.md` | 🟡 falta el informe |
 | 2 | Selección de modelo y datos | ADR-0003 (dataset sintético), ADR-0012 (índice versionado), `data/README.md`, tres proveedores tras puerto (`Embedder`, `Narrator`, `Searcher`) | ✅ |
 | 3 | Ingeniería de prompts y adaptación | `explain/customer.py` (`PROMPT_VERSION`), `intel/snapshot.py` (`QUERY_TEMPLATE`), `debate/pro_fraud.py`, `debate/pro_customer.py`, `arbiter/prompt.py` (ADR-0016), `retrieval/` (RAG sobre pgvector), ADR-0011, ADR-0012, ADR-0014 | 🟡 ver desvío D-04 |
-| 4 | Implementación de la aplicación | `graph/`, `domain/`, `db/`, `api/`, `dashboard/`, `diagrams/c4-container.drawio`, `contrato_de_interfaz.md` (v0.13) | ✅ |
+| 4 | Implementación de la aplicación | `graph/`, `domain/`, `db/`, `api/`, `dashboard/`, `diagrams/likec4/c4-container.c4`, `contrato_de_interfaz.md` (v0.13) | ✅ |
 | 5 | Orquestación y despliegue | ADR-0008 (digest), ADR-0009 (migraciones), ADR-0010 (seed), ADR-0021 (Azure), ADR-0022 (GCP), `infra/azure/`, `infra/gcp/`, `.github/workflows/`, contrato §1 | ✅ |
 | 6 | Monitoreo y mantenimiento | LangSmith, contrato §3.3 (cuatro métricas operativas), cinco sellos de auditoría en `decisions`, tarjeta de costo/latencia en vivo (ADR-0019/0020), cola HITL en `dashboard/` | ✅ |
 | 7 | Evaluación de la aplicación | `check_policies.py` 7000/7000, ADR-0006 + ADR-0016 (brazo de control determinístico, ya en producción — no sólo planeado), ADR-0013 (métricas duras vs LLM-as-judge), `ground_truth.csv` | 🟡 |
