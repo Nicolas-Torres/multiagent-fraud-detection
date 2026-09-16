@@ -6,7 +6,8 @@
 > bugs reales), separado de por qué se lo eligió (eso ya está en
 > ADR-0013) y de la decisión de servirlo al dashboard (ADR-0019). Se sigue
 > completando mientras el trabajo sobre LangSmith continúe — última
-> actualización: grafo en vivo en `Dashboard.tsx` (en curso).
+> actualización: por qué el desglose por nodo era lento y cómo se
+> resolvió (§5, PR #36).
 
 ---
 
@@ -122,7 +123,87 @@ perdería la atribución por nodo del grafo gratis (ver §4).
   generador pagina solo hasta agotar el proyecto; ponerle un número alto
   "para ser generoso" no lo acota, lo rompe.
 
-## 5. Cómo probarlo de punta a punta (repetible)
+## 5. Por qué el desglose por nodo era lento — servidor vs. cliente
+
+Pregunta que también vale la pena responder por escrito, porque tampoco es
+obvia: cuando `GET /api/v1/metrics/llm` tardaba casi un minuto en la
+primera visita de cada deploy, ¿ese recorrido pasaba en los servidores de
+LangSmith o en nuestro propio proceso? Las dos llamadas de
+`_consultar_langsmith_sync`
+(`src/multiagent_fraud_detection/api/routers/metrics.py`) responden
+distinto:
+
+- **`client.get_run_stats(...)` — agregación real, del lado del
+  servidor.** Un solo request; LangSmith ya tiene el conteo, el costo
+  total y los percentiles calculados en su base, y los devuelve en una
+  respuesta. Rápida sin importar cuánta historia haya — es justo el tipo
+  de trabajo para el que una base de datos está hecha.
+- **`client.list_runs(...)` — no es una agregación, es un listado
+  paginado.** Cada página trae como máximo 100 filas (tope real del
+  servidor: pedir más devuelve `"Limit exceeds maximum allowed value of
+  100"`, confirmado en vivo, §4). El generador de la SDK hace un
+  round-trip HTTP por página, por debajo, cada vez que el `for` sigue
+  pidiendo la próxima.
+- **El agrupado por nodo es código nuestro, en nuestro proceso — no algo
+  que LangSmith ofrezca.** No existe (o este proyecto no la usa) una API
+  de lectura que responda directamente "cuántas veces corrió
+  `debate_pro_fraud` y con qué latencia/costo promedio". Para saber eso
+  hace falta traer cada fila individual y sumarla a mano
+  (`agregados[corrida.name] += ...`), así que el trabajo crece con el
+  **total de corridas en el rango pedido**, no con lo que realmente
+  importa mostrar (el estado reciente del sistema).
+
+```mermaid
+sequenceDiagram
+    participant D as Dashboard
+    participant A as FastAPI
+    participant L as LangSmith
+
+    D->>A: GET /api/v1/metrics/llm
+    A->>A: caché fresco, menos de 30s?
+    alt caché frío
+        A->>L: get_run_stats -- 1 llamada
+        L-->>A: agregado ya calculado por el servidor
+        A->>L: list_runs -- página 1, hasta 100 filas
+        L-->>A: hasta 100 filas
+        A->>A: agregados por nodo += fila, en Python
+        loop hasta agotar la ventana de 3 días
+            A->>L: list_runs -- página N
+            L-->>A: hasta 100 filas
+            A->>A: agregados por nodo += fila
+        end
+        A->>A: guarda en caché
+    end
+    A-->>D: LlmMetricsRead -- resumen + por nodo
+```
+
+**Números reales, medidos contra el proyecto de este portafolio** (no son
+un benchmark de LangSmith en general, son lo que se observó acá):
+
+| Ventana | Corridas | Tiempo | Páginas aprox. |
+|---|---|---|---|
+| sin acotar (todo el historial) | 1624 | 93.00s | ~17 |
+| últimos 7 días | 308 | 6.97s | ~4 |
+| últimas 72 horas | 196 | 2.38s | ~2 |
+
+Más páginas explica parte de la diferencia, pero no toda: el tiempo por
+página también bajó acotando (~5.5s/página sin acotar vs. ~1.2–1.7s/página
+acotado, en las mismas corridas de arriba). Eso queda anotado como
+**observado, no confirmado** — a diferencia del resto de este §, no es
+código instalado que se pueda leer para verificarlo; es una hipótesis
+razonable (una consulta sin filtro de fecha probablemente escanea más del
+lado del servidor también), no un hecho comprobado contra el código
+interno de LangSmith.
+
+**El fix real** (PR #36): `VENTANA_RECIENTE = timedelta(days=3)` acota las
+dos llamadas al mismo rango —para que el resumen y el desglose por nodo
+no queden inconsistentes entre sí— y `precalentar()` dispara esa consulta
+una vez al arrancar el proceso, de fondo, sin bloquear `/ready`, para que
+ni el primer visitante después de cada deploy pague el costo (acotado a
+`environment == "production"`, para no disparar una llamada de red real
+en cada corrida de `pytest`).
+
+## 6. Cómo probarlo de punta a punta (repetible)
 
 1. API key real desde la cuenta de LangSmith.
 2. En `.env` (nunca `.env.example`):
@@ -136,9 +217,9 @@ perdería la atribución por nodo del grafo gratis (ver §4).
    por consola (`uv run python scripts/smoke_decision.py`, cinco
    escenarios reales, no necesita levantar el servidor).
 4. Confirmar las trazas en el proyecto de LangSmith, o contra
-   `GET /api/v1/metrics/llm` una vez implementado (§7).
+   `GET /api/v1/metrics/llm` (implementado — mecánica interna en §5).
 
-## 6. Números de referencia (una corrida real, para calibrar expectativas)
+## 7. Números de referencia (una corrida real, para calibrar expectativas)
 
 No son un SLA, son lo que se observó verificando en vivo — útil para no
 sorprenderse la próxima vez:
@@ -161,15 +242,22 @@ posterior, no el gate (ese es el motor de reglas determinístico). Detalle
 completo de esta lectura en la conversación que motivó este documento; se
 resume acá para no perderlo.
 
-## 7. Qué sigue (deuda / trabajo en curso)
+## 8. Qué sigue (deuda / trabajo en curso)
 
 - **`GET /api/v1/metrics/llm`** (ADR-0019, v0.12 del contrato): sirve el
-  resumen y el desglose por nodo al dashboard — implementado.
-- **Grafo en vivo al costado de la tabla, sincronizado con el fin de una
-  corrida** — en curso al momento de escribir esto: descubrir el caso en
-  `ANALYZING` vía `GET /cases?status=ANALYZING`, reusar `useCaseProgress`
-  (SSE, ADR-0018), y un `?force=true` en `/metrics/llm` para refrescar la
-  tabla en el mismo instante en que el grafo termina, sin esperar el
-  caché de 30s. ADR propio (0020) cuando se cierre.
+  resumen y el desglose por nodo al dashboard — implementado. El bug de
+  performance del primer request tras cada deploy (~1 minuto en blanco)
+  está resuelto — ver §5.
+- **Tabla sincronizada con el fin de una corrida, sin esperar los 30s de
+  caché** (ADR-0020, cerrado) — implementado. La idea original de este
+  bullet, un panel de grafo en vivo al costado de la tabla, se probó y se
+  descartó (nota de esa misma ADR: "no aportaba suficiente frente al
+  costo visual de un panel más"). Lo que quedó, más simple: Dashboard
+  sondea `GET /cases?status=ANALYZING` (mismo filtro que la Cola), se
+  suscribe con `useCaseProgress` (SSE, ADR-0018) al caso que encuentra, y
+  cuando el stream avisa `done` dispara `GET /metrics/llm?force=true` y
+  escribe el resultado directo en la caché de React Query — la tabla se
+  actualiza en el instante, con un badge "Analizando en vivo" mientras
+  tanto (`Dashboard.tsx`).
 - **Migrar de `list_runs` a `client.runs.query()`** cuando la firma de esa
   API madure en una versión más nueva del SDK — no bloquea nada hoy.
