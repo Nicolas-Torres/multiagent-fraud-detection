@@ -1,4 +1,4 @@
-import { Background, ReactFlow, type Node } from '@xyflow/react'
+import { Background, ReactFlow, type Node, type NodeProps } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { type CSSProperties, useMemo } from 'react'
 
@@ -47,6 +47,92 @@ for (const arista of topology.edges) {
   const lista = PREDECESORES.get(arista.target) ?? []
   lista.push(arista.source)
   PREDECESORES.set(arista.target, lista)
+}
+
+// Categoría por tipo de nodo -segundo eje, aparte del estado de ejecución
+// (`ESTILOS`, abajo)-, comunicada sólo por los recuadros y sus etiquetas de
+// texto: se probó primero una franja de color por nodo (`boxShadow`) y se
+// descartó -no se leía bien-, así que acá no queda ningún estilo por nodo,
+// sólo la decoración de grupo más abajo.
+type Categoria = 'deterministico' | 'rag' | 'llm'
+
+const COLOR_CATEGORIA: Record<Categoria, string> = {
+  deterministico: '#eab308',
+  rag: '#3b82f6',
+  llm: '#f97316',
+}
+
+// Los recuadros de agrupación (los "recuadros" de la anotación a mano):
+// sólo para clusters realmente contiguos en el layout -`evidence_aggregation`
+// y `persist_decision` son deterministas también, pero no son vecinos de
+// estos tres en el grafo real, así que sólo reciben una etiqueta suelta
+// (`ETIQUETAS_SUELTAS`, abajo), nunca un recuadro que sugiera una
+// adyacencia que no existe.
+// `\n` entre el texto y el paréntesis -junto con `whiteSpace: 'pre-line'`
+// en el estilo del nodo de etiqueta, más abajo- para que no compita por
+// ancho con el recuadro que describe.
+const GRUPOS: { key: string; label: string; nodeIds: string[]; color: string }[] = [
+  {
+    key: 'deterministico',
+    label: 'Determinísticos\n(no LLM)',
+    nodeIds: ['transaction_context', 'behavioral_pattern', 'external_threat_intel'],
+    color: COLOR_CATEGORIA.deterministico,
+  },
+  {
+    key: 'rag',
+    label: 'Retrieval semántico\n(gemini-embedding-2)',
+    nodeIds: ['internal_policy_rag'],
+    color: COLOR_CATEGORIA.rag,
+  },
+  {
+    key: 'llm',
+    label: 'LLM Anthropic\n(claude-sonnet-5)',
+    nodeIds: ['debate_pro_fraud', 'debate_pro_customer', 'decision_arbiter', 'explainability'],
+    color: COLOR_CATEGORIA.llm,
+  },
+]
+
+const ETIQUETAS_SUELTAS: { nodeId: string; label: string; color: string }[] = [
+  { nodeId: 'evidence_aggregation', label: 'Scoring determinístico', color: COLOR_CATEGORIA.deterministico },
+  { nodeId: 'persist_decision', label: 'Escritura en BD', color: COLOR_CATEGORIA.deterministico },
+]
+
+// Nominal, no medido: `layoutTopology` no fija una altura real (los nodos
+// normales se ajustan a su contenido), así que el recuadro se calcula con
+// una estimación generosa de ancho/alto de nodo — el padding de sobra
+// (`GROUP_PADDING_*`) absorbe la diferencia sin que el recuadro quede
+// corto. Horizontal más angosto que vertical a propósito: entre columnas
+// vecinas sólo hay 30px de por sí (`COL_GAP` 200 − `NODE_WIDTH` 170), así
+// que un padding de 20px de cada lado hacía que dos recuadros de columnas
+// contiguas (determinísticos/RAG) se superpusieran 10px.
+const NODE_WIDTH = 170
+const NODE_HEIGHT = 40
+const GROUP_PADDING_X = 10
+const GROUP_PADDING_Y = 20
+// Dos líneas (texto + paréntesis en la suya, ver `GRUPOS`), no una.
+const GROUP_LABEL_HEIGHT = 36
+
+interface BBox {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+function bboxDeGrupo(nodos: Node[], ids: string[]): BBox {
+  const miembros = nodos.filter((n) => ids.includes(n.id))
+  const xs = miembros.map((n) => n.position.x)
+  const ys = miembros.map((n) => n.position.y)
+  const minX = Math.min(...xs)
+  const maxX = Math.max(...xs) + NODE_WIDTH
+  const minY = Math.min(...ys)
+  const maxY = Math.max(...ys) + NODE_HEIGHT
+  return {
+    x: minX - GROUP_PADDING_X,
+    y: minY - GROUP_PADDING_Y - GROUP_LABEL_HEIGHT,
+    width: maxX - minX + GROUP_PADDING_X * 2,
+    height: maxY - minY + GROUP_PADDING_Y * 2 + GROUP_LABEL_HEIGHT,
+  }
 }
 
 // El propio CSS de React Flow (`.react-flow__node-default`) fija `border`,
@@ -98,6 +184,19 @@ const ESTILOS: Record<NodeStatus, EstiloNodo> = {
     fontSize: '0.75rem',
   },
 }
+
+// Tipo de nodo propio para las etiquetas de recuadro y las sueltas -ni
+// `default` (dibuja los dos `Handle`, los "puntos negros" que tapaban el
+// texto) ni `group` (el componente real de React Flow, `GroupNode`, es
+// literal `return null`: no renderiza `data.label` en absoluto, se
+// probó y el texto desaparecía por completo) sirven acá. Este no
+// renderiza ningún `Handle`, sólo el texto — la posición/tamaño los
+// sigue aplicando React Flow por fuera, igual que a cualquier nodo.
+function EtiquetaNode({ data }: NodeProps) {
+  return (data as { label?: string })?.label ?? null
+}
+
+const NODE_TYPES = { etiqueta: EtiquetaNode }
 
 function estadoDe(
   nodeId: string,
@@ -151,14 +250,125 @@ export function GraphPanel({
       }
     })
 
-    return { nodes, edges: base.edges }
+    // Recuadros de agrupación, calculados de las posiciones reales de sus
+    // miembros -no coordenadas fijas a mano-, más su etiqueta de texto.
+    // Van primero en el array (detrás, en z-order) y son puramente
+    // decorativos: sin interacción, sin afectar `estadoDe`/`acentoDe`.
+    const decoracion: Node[] = GRUPOS.flatMap((g) => {
+      const box = bboxDeGrupo(base.nodes, g.nodeIds)
+      const recuadro: Node = {
+        id: `group-box-${g.key}`,
+        type: 'group',
+        position: { x: box.x, y: box.y },
+        style: {
+          width: box.width,
+          height: box.height,
+          border: `1.5px dashed ${g.color}`,
+          backgroundColor: `color-mix(in oklch, ${g.color} 6%, transparent)`,
+          borderRadius: '10px',
+        },
+        data: {},
+        selectable: false,
+        draggable: false,
+        connectable: false,
+        focusable: false,
+        zIndex: -1,
+      }
+      const etiqueta: Node = {
+        id: `group-label-${g.key}`,
+        type: 'etiqueta',
+        position: { x: box.x, y: box.y + 2 },
+        style: {
+          width: box.width,
+          border: 'none',
+          background: 'transparent',
+          padding: 0,
+          fontSize: '0.7rem',
+          fontWeight: 600,
+          color: g.color,
+          textAlign: 'center',
+          whiteSpace: 'pre-line',
+          lineHeight: 1.3,
+        },
+        data: { label: g.label },
+        selectable: false,
+        draggable: false,
+        connectable: false,
+        focusable: false,
+        zIndex: -1,
+      }
+      return [recuadro, etiqueta]
+    })
+
+    // `evidence_aggregation`/`persist_decision`: misma categoría
+    // determinística, sin recuadro (ver comentario de `ETIQUETAS_SUELTAS`)
+    // — sólo el texto, centrado sobre el nodo, arriba de él.
+    const etiquetasSueltas: Node[] = ETIQUETAS_SUELTAS.flatMap((e) => {
+      const nodo = base.nodes.find((n) => n.id === e.nodeId)
+      if (!nodo) return []
+      const suelta: Node = {
+        id: `loose-label-${e.nodeId}`,
+        type: 'etiqueta',
+        // Una sola línea (sin paréntesis en la suya) -altura fija propia,
+        // no `GROUP_LABEL_HEIGHT` (pensada para las de dos líneas de
+        // `GRUPOS`), o quedaría con un hueco de más antes del nodo.
+        position: { x: nodo.position.x, y: nodo.position.y - 18 - 4 },
+        style: {
+          width: NODE_WIDTH,
+          border: 'none',
+          background: 'transparent',
+          padding: 0,
+          fontSize: '0.65rem',
+          fontWeight: 600,
+          color: e.color,
+          textAlign: 'center',
+        },
+        data: { label: e.label },
+        selectable: false,
+        draggable: false,
+        connectable: false,
+        focusable: false,
+        zIndex: -1,
+      }
+      return [suelta]
+    })
+
+    return { nodes: [...decoracion, ...etiquetasSueltas, ...nodes], edges: base.edges }
   }, [agentRoute, degradedAgents, animating, caseDecided])
 
   return (
-    <div className="h-80 w-full rounded-md border">
+    <div
+      className="graph-panel-sin-handles h-80 w-full rounded-md border"
+      // Fijo -no `var(--background)`- a propósito: el panel siempre está
+      // oscuro, sin importar el tema del sitio. El amarillo/azul/naranja
+      // de las etiquetas de categoría (`COLOR_CATEGORIA`) está pensado
+      // para leerse sobre un fondo oscuro; en modo claro, sobre el fondo
+      // casi blanco del sitio, perdía casi todo el contraste. Tono
+      // elegido a mano (no referencia `--background` de `.dark` en
+      // `index.css`): tiene que quedar igual aunque alguien cambie ese
+      // token ahí.
+      style={{ backgroundColor: 'oklch(0.25 0 0)' }}
+    >
+      {/* Puramente estético, a pedido: los puntos de conexión de React Flow
+          (`.react-flow__handle`) no aportan nada acá -`nodesConnectable`
+          ya está en `false` en todo el panel, nadie arrastra una arista
+          nueva- y tapaban texto en los recuadros. `opacity: 0` en vez de
+          `width`/`height: 0`: el tamaño fijo (6px, ver `style.css` de
+          `@xyflow/react`) es lo que XYFlow usa para calcular dónde ancla
+          cada arista, así que achicarlo correría el punto de anclaje;
+          la opacidad no toca esa geometría, sólo lo hace invisible.
+          Escapado bajo `.graph-panel-sin-handles` (no un selector global)
+          para no afectar otros paneles de grafo de la app si alguna vez
+          los hay. */}
+      <style>{`
+        .graph-panel-sin-handles .react-flow__handle {
+          opacity: 0;
+        }
+      `}</style>
       <ReactFlow
         nodes={nodes}
         edges={edges}
+        nodeTypes={NODE_TYPES}
         fitView
         nodesDraggable={false}
         nodesConnectable={false}
