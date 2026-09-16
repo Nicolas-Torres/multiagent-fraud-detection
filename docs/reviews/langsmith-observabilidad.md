@@ -248,11 +248,16 @@ resume acá para no perderlo.
   resumen y el desglose por nodo al dashboard — implementado. El bug de
   performance del primer request tras cada deploy (~1 minuto en blanco)
   está resuelto — ver §5.
-- **Grafo en vivo al costado de la tabla, sincronizado con el fin de una
-  corrida** — en curso al momento de escribir esto: descubrir el caso en
-  `ANALYZING` vía `GET /cases?status=ANALYZING`, reusar `useCaseProgress`
-  (SSE, ADR-0018), y un `?force=true` en `/metrics/llm` para refrescar la
-  tabla en el mismo instante en que el grafo termina, sin esperar el
-  caché de 30s. ADR propio (0020) cuando se cierre.
+- **Tabla sincronizada con el fin de una corrida, sin esperar los 30s de
+  caché** (ADR-0020, cerrado) — implementado. La idea original de este
+  bullet, un panel de grafo en vivo al costado de la tabla, se probó y se
+  descartó (nota de esa misma ADR: "no aportaba suficiente frente al
+  costo visual de un panel más"). Lo que quedó, más simple: Dashboard
+  sondea `GET /cases?status=ANALYZING` (mismo filtro que la Cola), se
+  suscribe con `useCaseProgress` (SSE, ADR-0018) al caso que encuentra, y
+  cuando el stream avisa `done` dispara `GET /metrics/llm?force=true` y
+  escribe el resultado directo en la caché de React Query — la tabla se
+  actualiza en el instante, con un badge "Analizando en vivo" mientras
+  tanto (`Dashboard.tsx`).
 - **Migrar de `list_runs` a `client.runs.query()`** cuando la firma de esa
   API madure en una versión más nueva del SDK — no bloquea nada hoy.
