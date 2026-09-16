@@ -351,9 +351,10 @@ regenerar es una guarda válida de CI.
 |---|---|---|
 | `graph_topology.png` | generado del grafo compilado | automática |
 | `data_model.png` · `.mmd` | generado de `Base.metadata` | automática, con `--check` |
+| `c4-context.png` · `c4-container.png` | generado de `likec4/c4-container.c4` — **vista C4 vigente** | se revisa al cerrar etapa |
+| `ciclo-de-vida-likec4.png` | generado de `likec4/ciclo-de-vida.c4` — vista dinámica (secuencia) | se revisa al cerrar etapa |
+| `ciclo-de-vida-mermaid.png` · `ciclo-de-vida.mmd` | curado a mano, en Mermaid — mismo contenido que la de arriba, otra notación (`scripts/export_c4_diagrams.py`) | se revisa al cerrar etapa |
 | `citacion-internal.drawio` | a mano | se revisa al cerrar etapa |
-| `c4-container.drawio` | a mano — **vista C4 vigente** | se revisa al cerrar etapa |
-| `ciclo-de-vida.drawio` | a mano | se revisa al cerrar etapa |
 | `capa1-infra.drawio` | a mano — **histórico de la etapa 1**, no se actualiza | congelado |
 | `transaction-flow.drawio` | a mano — apoyo de la etapa 1 | congelado |
 
@@ -361,6 +362,16 @@ Lo que se genera no deriva; lo que se dibuja a mano sí. `modelo-datos.drawio` s
 había atrasado dos etapas antes de que alguien lo notara, y por eso el modelo de
 datos pasó a generarse. Los que siguen a mano son los que codifican **juicio**
 —qué está construido, qué garantiza cada camino— y no estructura.
+
+`c4-container`/`c4-context`/`ciclo-de-vida-likec4` son un caso intermedio: el
+PNG se genera (`npx likec4@latest export png docs/diagrams/likec4 -o
+docs/diagrams`), pero la fuente en `docs/diagrams/likec4/*.c4` sigue siendo a
+mano — el juicio vive ahí, no en el render. `ciclo-de-vida` convive a propósito
+en dos notaciones: estructura y comportamiento en runtime son preguntas
+distintas (ver "Describing Agentic AI Systems with C4", arXiv:2603.15021), y
+acá además sirve para comparar en la práctica LikeC4 (vista dinámica nativa)
+contra Mermaid (nativo en GitHub y en Claude Code, sin instalar nada) sobre el
+mismo contenido real.
 
 La documentación sigue **C4** (Context → Container → Component → Code) como
 columna estructural, más vistas dinámicas, y se escribe incrementalmente al

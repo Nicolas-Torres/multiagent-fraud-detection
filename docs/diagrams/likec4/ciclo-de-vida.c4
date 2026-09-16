@@ -1,0 +1,30 @@
+specification {
+  element actor
+  element service
+  element store
+}
+
+model {
+  lcCliente = actor 'Pasarela de pagos' 'sistema origen'
+  lcApi = service 'API FastAPI' 'W0/W3'
+  lcGraph = service 'Grafo de agentes' 'W1 — sin checkpointer, sin interrupt()'
+  lcDb = store 'Postgres' 'transactions · cases · decisions · signals · human_resolutions'
+  lcAnalista = actor 'Analista de fraude'
+}
+
+views {
+  dynamic view lifecycle {
+    title 'Ciclo de vida del caso — vista dinámica (sin checkpointer: PENDING_HUMAN es terminal, la resolución es HTTP/W3)'
+
+    lcCliente -> lcApi 'POST /cases'
+    lcApi -> lcDb 'INSERT transactions + cases (RECEIVED). transaction_id único: un reintento con el mismo id devuelve 200 con el case_id existente, no crea caso ni corre el grafo.'
+    lcApi -> lcCliente '202 + case_id — no bloquea 15-30s. El progreso real ya se transmite en vivo por SSE (ADR-0018), no WebSocket: la necesidad estaba, WebSocket puntualmente no se implementó.'
+    lcApi -> lcGraph 'arranca en segundo plano (ANALYZING)'
+    lcGraph -> lcDb 'APPROVE/CHALLENGE/BLOCK: INSERT decisions + signals (DECIDED)'
+    lcGraph -> lcDb 'ESCALATE_TO_HUMAN: INSERT decisions + signals (PENDING_HUMAN, terminal — el grafo ya terminó de correr, no queda suspendido: no hay checkpointer, no hay interrupt())'
+    lcGraph -> lcDb 'error del pipeline (FAILED)'
+    lcAnalista -> lcApi 'GET /cases?status=PENDING_HUMAN — cola HITL, índice (status, created_at)'
+    lcAnalista -> lcApi 'POST /cases/{id}/resolution'
+    lcApi -> lcDb 'INSERT human_resolutions (RESOLVED) — W3, endpoint HTTP aparte, corrido después de que PENDING_HUMAN ya es terminal'
+  }
+}
