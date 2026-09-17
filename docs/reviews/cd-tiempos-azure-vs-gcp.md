@@ -140,7 +140,28 @@ execution" (~19-45s), no el cold-start, que es la parte grande.
 `.github/workflows/deploy-gcp.yml:64` — `--async` devuelve el control
 apenas se crea la ejecución, sin esperar ni a que arranque, igual que el
 fire-and-forget que ya hacía Azure (`az containerapp job start`, sin
-polling). Pendiente de verificar con el próximo deploy real (§4).
+polling).
+
+**Confirmado (2026-09-17)**, con otro deploy real (merge de PR #43, commit
+`1b74bbf`, Azure y GCP en paralelo): Sembrar pasó de **103s a 3s** —
+fire-and-forget de verdad, al fin igual de rápido que el de Azure (18s,
+incluye el `az containerapp job start` en sí).
+
+| Paso | Azure | GCP |
+|---|---|---|
+| Migrar | 50s | 190s |
+| Actualizar servicio | 14s | 46s |
+| Sembrar | 18s | **3s** |
+| Mantener fetch-intel | 18s | 3s |
+| **Total** | **1m58s** | **4m30s** |
+
+El total de GCP **no** bajó proporcionalmente esta corrida (4m30s, similar
+al 4m17s de la verificación anterior) — pero no es que el fix haya
+fallado: `Migrar` (que sí tiene que bloquear, ADR-0009) tardó 190s esta
+vez contra 109s la vez pasada, la misma variabilidad de cold-start de
+Cloud Run que ya documenta §2.3. El fix de Sembrar quedó objetivamente
+confirmado (103s → 3s); lo que sigue empujando el total hacia arriba es
+la pregunta abierta de §2.3, no esto.
 
 ## 4. Pendiente — resuelto (2026-09-17), con una pregunta nueva que queda abierta
 
@@ -162,18 +183,18 @@ Los cuatro puntos que este documento dejaba abiertos:
 - **Detalle de fases para Azure — resuelto.** Ver §2.2: mismo nivel de
   detalle que GCP, cruzando `az containerapp job execution list` con
   `ContainerAppConsoleLogs_CL`.
-- **Sacar el `--wait` de `Sembrar` en GCP — parcialmente resuelto, ver
+- **Sacar el bloqueo de `Sembrar` en GCP — resuelto y confirmado, ver
   §3.** El primer intento (sacar `--wait`) sólo recortó ~45s de los 148s
   originales, porque `gcloud run jobs execute` espera a que la ejecución
-  *arranque* aunque no se le pida esperar a que termine. Se agregó
-  `--async` como segundo fix — **falta confirmar con el próximo deploy
-  real** que ahora sí Sembrar es fire-and-forget de verdad (unos pocos
-  segundos, no ~100s).
+  *arranque* aunque no se le pida esperar a que termine. `--async` sí lo
+  resolvió del todo: confirmado con un deploy real, 103s → 3s.
 
-**Lo que queda genuinamente abierto**: el hallazgo de §2.3 (con el tamaño
-de imagen ya descartado como variable, Azure arranca el mismo contenedor
-8-12x más rápido que GCP) y la confirmación del fix con `--async` de
-arriba. Candidatos para cuando se retome: comparar el tiempo de pull
+**Lo único que queda genuinamente abierto** es el hallazgo de §2.3: con
+el tamaño de imagen ya descartado como variable, Azure arranca el mismo
+contenedor 8-12x más rápido que GCP — y sigue siendo la razón por la que
+el total de GCP no baja proporcionalmente aunque `Sembrar` ya esté
+resuelto (ver la corrida del 2026-09-17 en §3, donde `Migrar` solo tardó
+190s). Candidatos para cuando se retome: comparar el tiempo de pull
 directo desde GHCR (Azure) contra pull desde el espejo de Artifact
 Registry (GCP) de forma aislada, o revisar si Cloud Run Jobs tiene algún
 parámetro de cold-start/concurrencia que Container Apps Jobs no necesita.
