@@ -125,7 +125,7 @@ Los tres sin autenticación, `200` cuando OK.
 | `LOG_LEVEL` | `INFO` |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` 🆕 | `http://localhost:4317` (vacío = instrumentación OTel deshabilitada, ADR-0024) |
 | `OTEL_SERVICE_NAME` 🆕 | `fraud-detection-api` |
-| **`ENVIRONMENT`** | `local` \| `staging` \| `production` 🆕 |
+| **`ENVIRONMENT`** | `local` \| `staging` \| `production` |
 
 > `LOG_LEVEL` gobierna también el echo de SQL de SQLAlchemy: solo en `DEBUG`.
 >
