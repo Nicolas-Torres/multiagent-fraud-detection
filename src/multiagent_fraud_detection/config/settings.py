@@ -58,6 +58,14 @@ class Settings(BaseSettings):
     langsmith_tracing: bool = False
     langsmith_project: str | None = None
 
+    # ADR-0024: observabilidad de infraestructura (HTTP + DB), separada de
+    # LangSmith arriba —ese cubre LLM, esto cubre lo que LangSmith no ve—.
+    # Ausente por default a proposito: sin endpoint no hay ningun intento de
+    # conexion de red al iniciar OTel, ni en `pytest` ni en un entorno que
+    # todavia no corre el stack local de Alloy/Loki/Tempo/Prometheus.
+    otel_exporter_otlp_endpoint: str | None = None
+    otel_service_name: str = "fraud-detection-api"
+
     @property
     def permite_operaciones_destructivas(self) -> bool:
         """Lista blanca: solo `local`.

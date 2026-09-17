@@ -1,0 +1,51 @@
+// Collector único (ADR-0024): la app sólo conoce este endpoint OTLP.
+// Recibe trazas + logs de la app, reenvía trazas a Tempo y logs a Loki.
+otelcol.receiver.otlp "app" {
+	grpc {
+		endpoint = "0.0.0.0:4317"
+	}
+	http {
+		endpoint = "0.0.0.0:4318"
+	}
+
+	output {
+		traces = [otelcol.exporter.otlp.tempo.input]
+		logs   = [otelcol.exporter.loki.default.input]
+	}
+}
+
+otelcol.exporter.otlp "tempo" {
+	client {
+		endpoint = "tempo:4317"
+
+		tls {
+			insecure = true
+		}
+	}
+}
+
+otelcol.exporter.loki "default" {
+	forward_to = [loki.write.default.receiver]
+}
+
+loki.write "default" {
+	endpoint {
+		url = "http://loki:3100/loki/api/v1/push"
+	}
+}
+
+// Métricas: la app expone /metrics en el host (no corre en este compose),
+// Alloy la scrapea y reenvía a Prometheus por remote_write.
+prometheus.scrape "api" {
+	targets = [
+		{"__address__" = "host.docker.internal:8000"},
+	]
+	metrics_path = "/metrics"
+	forward_to   = [prometheus.remote_write.default.receiver]
+}
+
+prometheus.remote_write "default" {
+	endpoint {
+		url = "http://prometheus:9090/api/v1/write"
+	}
+}

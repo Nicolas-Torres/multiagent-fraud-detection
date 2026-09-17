@@ -13,6 +13,7 @@ from collections.abc import Awaitable, Callable
 from functools import wraps
 
 from langgraph.runtime import Runtime
+from opentelemetry import trace
 from sqlalchemy import delete, update
 
 from multiagent_fraud_detection.arbiter import prompt as arbiter_prompt
@@ -64,6 +65,10 @@ from multiagent_fraud_detection.retrieval.query import build_query, query_codes
 from multiagent_fraud_detection.schemas.decision import ExternalCitation
 
 logger = logging.getLogger(__name__)
+# API de OpenTelemetry, no-op segura sin un TracerProvider configurado
+# (ADR-0024): sin `OTEL_EXPORTER_OTLP_ENDPOINT` esto no crea ningun span
+# real, asi que este modulo no necesita saber nada de `settings`.
+tracer = trace.get_tracer(__name__)
 
 # Nombres de nodo como constantes: los consumen el builder y `agent_route`,
 # y un typo entre ambos produce un grafo que compila y no corre.
@@ -106,7 +111,8 @@ def degrades(agent: str) -> Callable[[NodeFn], NodeFn]:
             # que LangGraph inspecciona la firma ORIGINAL para decidir que
             # pasar; el wrapper solo tiene que reenviarlo.
             try:
-                return await fn(*args, **kwargs)
+                with tracer.start_as_current_span(agent):
+                    return await fn(*args, **kwargs)
             except Exception as exc:
                 logger.exception("nodo %s degradado", agent)
                 return {
@@ -588,6 +594,13 @@ async def decision_arbiter(
     desacuerdo del modelo, un paso mas: el peor caso tambien es escalar de
     mas, nunca aprobar de menos.
     """
+    with tracer.start_as_current_span(ARBITER):
+        return await _decision_arbiter_impl(state, runtime)
+
+
+async def _decision_arbiter_impl(
+    state: GraphState, runtime: Runtime[GraphContext]
+) -> dict:
     politicas = state.get("policies", sorted(set(state.get("matched_policies", []))))
     citas = state.get("citations_internal", [])
     base = state.get("base_confidence")
@@ -793,6 +806,13 @@ async def persist_decision(
     La clave de idempotencia es `case_id`, que ya es PK de `decisions`; el
     `ON DELETE CASCADE` barre `signals` y `agent_errors` sin nombrarlas.
     """
+    with tracer.start_as_current_span(PERSIST):
+        return await _persist_decision_impl(state, runtime)
+
+
+async def _persist_decision_impl(
+    state: GraphState, runtime: Runtime[GraphContext]
+) -> dict:
     _verificar_invariantes(state, runtime.context.catalog)
 
     case_id = state["case_id"]

@@ -1,0 +1,29 @@
+# Config mínima, single-binary, storage local en el volumen del compose.
+# El receptor OTLP de acá no se publica al host (ver compose): sólo Alloy
+# le habla, por la red interna del compose.
+server:
+  http_listen_port: 3200
+
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+
+ingester:
+  max_block_duration: 5m
+
+compactor:
+  compaction:
+    block_retention: 48h
+
+storage:
+  trace:
+    backend: local
+    local:
+      path: /var/tempo/traces
+    wal:
+      path: /var/tempo/wal

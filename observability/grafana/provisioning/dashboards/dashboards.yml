@@ -1,0 +1,15 @@
+# El "provider": le dice a Grafana dónde leer dashboards JSON del disco.
+# Mismo patrón que datasources.yml — versionado en el repo, nadie lo
+# arma a mano en la UI.
+apiVersion: 1
+
+providers:
+  - name: fraud-detection
+    orgId: 1
+    folder: ""
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards

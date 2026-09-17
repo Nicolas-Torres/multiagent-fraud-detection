@@ -17,6 +17,9 @@ uv run pytest                                        # sin red ni base
 uv run python scripts/check_policies.py --source=db  # gate: 7000/7000
 uv run alembic check                                 # gate: modelo sin migración
 uv run python scripts/export_data_model_diagram.py --check   # gate: modelo sin diagrama
+
+# Observabilidad de infra (opcional, local, ADR-0024) — Grafana en :3000
+docker compose -f compose.yml -f observability/compose.observability.yml up -d
 ```
 
 Dependencias con `uv`, nunca `pip`. Windows + Git Bash.

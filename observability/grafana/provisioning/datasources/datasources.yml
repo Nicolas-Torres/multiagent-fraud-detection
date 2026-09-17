@@ -1,0 +1,41 @@
+# Los tres datasources correlacionados por trace_id — es lo que hace que
+# el stack se sienta como un solo panel. El regex de `derivedFields` está
+# ajustado contra una línea real (verificación ADR-0024, §Fase 2): el
+# exporter Loki de Alloy serializa el log como JSON con la clave
+# `"traceid":"<hex>"` (minúscula, sin guión bajo) — no el `trace_id=xxx`
+# estilo logfmt que se asume a veces por default.
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    uid: prometheus
+    isDefault: true
+
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    uid: loki
+    jsonData:
+      derivedFields:
+        - datasourceUid: tempo
+          matcherRegex: '"traceid":"([0-9a-f]+)"'
+          name: TraceID
+          url: '$${__value.raw}'
+
+  - name: Tempo
+    type: tempo
+    access: proxy
+    url: http://tempo:3200
+    uid: tempo
+    jsonData:
+      tracesToLogsV2:
+        datasourceUid: loki
+        spanStartTimeShift: '-5m'
+        spanEndTimeShift: '5m'
+        filterByTraceID: true
+      serviceMap:
+        datasourceUid: prometheus

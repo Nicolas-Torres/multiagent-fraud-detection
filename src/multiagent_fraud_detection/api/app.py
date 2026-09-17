@@ -26,6 +26,7 @@ from pathlib import Path
 from fastapi import Depends, FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from prometheus_fastapi_instrumentator import Instrumentator
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -34,6 +35,7 @@ if sys.platform == "win32":
 
 from multiagent_fraud_detection.api.deps import get_session
 from multiagent_fraud_detection.api.routers import metrics as metrics_router
+from multiagent_fraud_detection.config.observability import instrumentar_observabilidad
 from multiagent_fraud_detection.db.session import AsyncSessionLocal
 from multiagent_fraud_detection.graph.builder import build_graph
 from multiagent_fraud_detection.graph.context import GraphContext
@@ -60,6 +62,7 @@ def create_app() -> FastAPI:
         title="Sistema Multi-Agente de Detección de Fraude",
         lifespan=lifespan,
     )
+    instrumentar_observabilidad(app)
 
     @app.get("/health")
     async def health() -> dict[str, str]:
@@ -89,6 +92,13 @@ def create_app() -> FastAPI:
     app.include_router(metrics.router, prefix="/api/v1")
     app.include_router(policies.router, prefix="/api/v1")
     app.include_router(predicates.router, prefix="/api/v1")
+
+    # `/metrics` (ADR-0024), sin gate — a diferencia de las trazas/logs de
+    # arriba, esto no abre ninguna conexión de red: sólo agrega un endpoint
+    # in-process que sirve el registro de Prometheus en memoria. Tiene que
+    # quedar registrado antes del catch-all del SPA de abajo, igual que
+    # `/health`/`/ready`.
+    Instrumentator().instrument(app).expose(app)
 
     # El dashboard, si está compilado. Va al final a propósito: un
     # catch-all registrado antes le robaría el matching a `/api/v1/*`. Sin
