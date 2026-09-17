@@ -30,7 +30,10 @@ from typing import Any, Protocol
 from multiagent_fraud_detection.config.settings import settings
 from multiagent_fraud_detection.intel.snapshot import MODEL
 
-MAX_USES = 3
+# En 3 costaba ~20x mas que el resto del sistema junto (docs/incidentes/
+# 0004-...md): la query es una busqueda puntual, no necesita las rondas
+# adicionales que el proveedor gasta tratando de refinarla.
+MAX_USES = 1
 MAX_TOKENS = 1024
 
 # El único formato que la API documenta y ejemplifica para `page_age`
