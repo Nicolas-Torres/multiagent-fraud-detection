@@ -42,8 +42,9 @@ comparable 1 a 1 con el de GCP tal cual está la tabla.
 
 **El trabajo real —correr las migraciones, insertar el seed— es rápido
 en los dos casos (9-19s).** Casi todo el tiempo de GCP se va en
-"Starting execution": Cloud Run Jobs bajando y arrancando el
-contenedor, antes de que corra una sola línea de nuestro Python.
+"Starting execution", antes de que corra una sola línea de nuestro
+Python — **no es la imagen bajando** (§2.3 lo mide y lo descarta): es el
+cold-start del sandbox `gen2` de Cloud Run Jobs.
 
 ### 2.2 Desglose fino de Azure — resuelto, mismo nivel de detalle que GCP
 
@@ -58,24 +59,63 @@ contenedor de trabajo real, igual que en GCP:
 | Migrar | `caj-fraud-detection-migrate-bo3q668` (2026-09-17) | 31s | ~23.3s | ~7.7s (Alembic) |
 | Sembrar | `caj-fraud-detection-seed-k9fe74b` (2026-09-17) | 28s | ~16.3s | ~11.7s (seed) |
 
-### 2.3 Hallazgo nuevo: Azure arranca la misma imagen 8-12x más rápido — pregunta abierta
+### 2.3 Investigado (2026-09-17): no es imagen, no es el espejo — es el cold-start del sandbox `gen2` de Cloud Run Jobs
 
 El tamaño real de la imagen ya se confirmó (§4): **152.5 MiB comprimidos**,
 mismo dígest `amd64` en las dos nubes — no hay diferencia de imagen que
 explique lo que sigue.
 
-Con el desglose de arriba, Azure tarda **~23.3s / ~16.3s** en arrancar el
-contenedor (comando → primer log real). GCP, con la **misma imagen**, tarda
-**189.3s / 123.3s** en "Starting execution" (§2.1). Es una diferencia de
-**8 a 12 veces**, no explicable por tamaño de imagen porque el tamaño es
-idéntico en los dos casos.
+Con el desglose de §2.1/§2.2, Azure tarda **~23.3s / ~16.3s** en arrancar
+el contenedor (comando → primer log real). GCP, con la **misma imagen**,
+tarda **189.3s / 123.3s** en "Starting execution". Las dos hipótesis
+originales (pull directo de GHCR vs. a través del espejo de Artifact
+Registry; cold-start "genérico" de Cloud Run Jobs) quedaron descartadas o
+confirmadas con datos, no con conjeturas:
 
-Dos hipótesis, ninguna confirmada todavía: Azure Container Apps Jobs tira
-la imagen directo de GHCR, mientras que Cloud Run Jobs tira a través del
-espejo de Artifact Registry (§4) — o es, más llanamente, que el cold-start
-de Cloud Run Jobs es estructuralmente más lento que el de Container Apps
-Jobs para este tamaño de imagen. Queda como pregunta abierta genuina, no
-se investiga más en esta pasada (ver §4, Pendiente).
+**`gcloud run jobs executions describe` expone condiciones con timestamps
+más finos que el `--wait` simple**, y cuentan una historia distinta a la
+esperada. Ejemplo real (`fraud-detection-migrate-hh5lz`, 2026-09-17):
+
+| Condición | Timestamp | Mensaje |
+|---|---|---|
+| `ContainerReady` | 05:44:31.320 | "Imported container image" |
+| `ResourcesAvailable` | 05:44:31.443 | "Provisioned imported containers" |
+| `Started` | 05:47:20.453 | "Started deployed execution in **2m49.01s**" |
+| `Completed` | 05:47:32.715 | "Execution completed successfully in 2m45.46s" |
+
+**La imagen está lista en ~3-4 segundos** desde que se emite el comando
+—confirmado en las dos corridas que se midieron así, Migrar y Sembrar—:
+el espejo de Artifact Registry no es el cuello de botella, se descarta la
+primera hipótesis. Los ~2m49s enteros pasan **entre
+`ContainerReady`/`ResourcesAvailable` y `Started`**, con **cero entradas
+de log de ningún tipo** (app, audit, platform) en esa ventana — no es
+código nuestro, es la plataforma tardando en poner a correr un contenedor
+que ya tiene listo.
+
+Revisando la config del job apareció el candidato concreto:
+`run.googleapis.com/execution-environment: gen2` — no seteado por
+nosotros, es el default de GCP. Gen2 es el sandbox más nuevo de Cloud Run
+(mejor compatibilidad de syscalls/red/filesystem que gen1), documentado
+por Google con cold-start más lento a cambio de esa compatibilidad.
+
+**Se intentó confirmar empíricamente** (cambiar el job a
+`--execution-environment=gen1` y remedir):
+
+```
+ERROR: (gcloud.run.jobs.update) spec.template.metadata.annotations:
+Annotation 'run.googleapis.com/execution-environment' with value 'gen1'
+is not supported on resources of kind Execution.
+```
+
+**`gen1` no existe para Cloud Run Jobs — sólo para Cloud Run Services.**
+No se pudo hacer el A/B, pero el resultado es igual de concluyente: `gen2`
+no es una opción mal elegida que se pueda cambiar, es el único execution
+environment que Jobs soporta. El cold-start de ~100-190s no es un bug de
+esta configuración ni del tamaño de la imagen — es el piso real de la
+plataforma para este tipo de recurso en GCP. Azure Container Apps Jobs no
+tiene un concepto equivalente expuesto a este nivel; no se investiga más
+a fondo por qué su arranque es estructuralmente más rápido, sólo que lo
+es, de forma consistente, en todas las corridas medidas.
 
 ## 3. Hallazgo real, no sólo una diferencia de plataforma: `Sembrar` en GCP no es lo que dice ser
 
@@ -163,9 +203,10 @@ Cloud Run que ya documenta §2.3. El fix de Sembrar quedó objetivamente
 confirmado (103s → 3s); lo que sigue empujando el total hacia arriba es
 la pregunta abierta de §2.3, no esto.
 
-## 4. Pendiente — resuelto (2026-09-17), con una pregunta nueva que queda abierta
+## 4. Pendiente — los 5 puntos resueltos (2026-09-17)
 
-Los cuatro puntos que este documento dejaba abiertos:
+Los cinco puntos que este documento dejaba abiertos (los últimos cuatro
+del cierre original, más la investigación de §2.3 que se sumó después):
 
 - **Tamaño real de la imagen — resuelto.** `docker manifest inspect`
   contra GHCR directo seguía fallando por autenticación; el camino que
@@ -173,13 +214,14 @@ Los cuatro puntos que este documento dejaba abiertos:
   (`gcloud auth configure-docker us-central1-docker.pkg.dev`) y usar
   `docker buildx imagetools inspect --raw` sobre el manifiesto `amd64`:
   **152.5 MiB comprimidos, 16 capas** (build `sha-83268ac`).
-- **¿El espejo cachea de verdad? — resuelto.** `gcloud artifacts docker
-  images list` muestra cada tag creado una única vez (mismo
-  `CREATE_TIME`/`UPDATE_TIME`, sin entradas duplicadas por pulls
-  repetidos) — consistente con el cacheo documentado del modo
-  `REMOTE_REPOSITORY`. El tiempo de "Starting execution" es Cloud Run
-  bajando la imagen al nodo de ejecución, no el espejo re-descargando de
-  GHCR en cada corrida.
+- **¿El espejo cachea de verdad? — resuelto, y descartado como causa del
+  tiempo lento.** `gcloud artifacts docker images list` muestra cada tag
+  creado una única vez (mismo `CREATE_TIME`/`UPDATE_TIME`, sin entradas
+  duplicadas por pulls repetidos) — consistente con el cacheo documentado
+  del modo `REMOTE_REPOSITORY`. Confirmado además con timestamps directos
+  en §2.3: la imagen queda lista (`ContainerReady`) en ~3-4s desde el
+  comando — el tiempo de "Starting execution" **no** es el espejo
+  re-descargando ni Cloud Run bajando la imagen, es otra cosa (ver §2.3).
 - **Detalle de fases para Azure — resuelto.** Ver §2.2: mismo nivel de
   detalle que GCP, cruzando `az containerapp job execution list` con
   `ContainerAppConsoleLogs_CL`.
@@ -188,13 +230,19 @@ Los cuatro puntos que este documento dejaba abiertos:
   originales, porque `gcloud run jobs execute` espera a que la ejecución
   *arranque* aunque no se le pida esperar a que termine. `--async` sí lo
   resolvió del todo: confirmado con un deploy real, 103s → 3s.
+- **Por qué Azure arranca la misma imagen 8-12x más rápido — investigado,
+  ver §2.3.** No es tamaño de imagen (idéntico en las dos nubes), no es
+  el espejo de Artifact Registry (imagen lista en ~3-4s), no es el código
+  de la app (cero logs durante el hueco). Es el cold-start del sandbox
+  `gen2` de Cloud Run — confirmado indirectamente porque `gen1` (el
+  sandbox más liviano) **no existe para Cloud Run Jobs**, sólo para
+  Services: no hay flag que lo evite, es el piso real de la plataforma
+  para este recurso.
 
-**Lo único que queda genuinamente abierto** es el hallazgo de §2.3: con
-el tamaño de imagen ya descartado como variable, Azure arranca el mismo
-contenedor 8-12x más rápido que GCP — y sigue siendo la razón por la que
-el total de GCP no baja proporcionalmente aunque `Sembrar` ya esté
-resuelto (ver la corrida del 2026-09-17 en §3, donde `Migrar` solo tardó
-190s). Candidatos para cuando se retome: comparar el tiempo de pull
-directo desde GHCR (Azure) contra pull desde el espejo de Artifact
-Registry (GCP) de forma aislada, o revisar si Cloud Run Jobs tiene algún
-parámetro de cold-start/concurrencia que Container Apps Jobs no necesita.
+**Lo que sigue sin explicarse, y probablemente no valga la pena perseguir
+más**: por qué el mecanismo interno de arranque de Azure Container Apps
+Jobs es estructuralmente más rápido que el de Cloud Run Jobs para el
+mismo contenedor — Azure no expone un concepto equivalente a
+`gen1`/`gen2` a este nivel, así que no hay un experimento simétrico para
+correr del lado de Azure. Se documenta como una diferencia de plataforma
+real y medida, no como conjetura, y se cierra la investigación acá.
