@@ -45,21 +45,37 @@ en los dos casos (9-19s).** Casi todo el tiempo de GCP se va en
 "Starting execution": Cloud Run Jobs bajando y arrancando el
 contenedor, antes de que corra una sola línea de nuestro Python.
 
-### 2.2 Desglose de Azure — más grueso, `az` no expone las mismas fases
+### 2.2 Desglose fino de Azure — resuelto, mismo nivel de detalle que GCP
 
-El log de Azure no imprime fases nombradas como el de `gcloud`; sólo se
-puede medir "cuánto tarda el comando en devolver el nombre de la
-ejecución" y "cuánto tarda el polling hasta que el estado es terminal":
+`az` no expone fases nombradas como `gcloud --wait`, pero cruzando
+`az containerapp job execution list` (timestamps reales de inicio/fin)
+contra el primer log real de la app en `ContainerAppConsoleLogs_CL`
+(mismo método que ya usó el incidente 0001) se separa arranque de
+contenedor de trabajo real, igual que en GCP:
 
-| Tramo | Migrar |
-|---|---|
-| Comando emitido → nombre de ejecución conocido | 22.3s |
-| Ejecución conocida → `Succeeded` (polling manual) | 30.6s |
-| **Total** | **52.9s** |
+| Job | Ejecución | Total | Arranque de contenedor (comando → primer log) | Trabajo real |
+|---|---|---|---|---|
+| Migrar | `caj-fraud-detection-migrate-bo3q668` (2026-09-17) | 31s | ~23.3s | ~7.7s (Alembic) |
+| Sembrar | `caj-fraud-detection-seed-k9fe74b` (2026-09-17) | 28s | ~16.3s | ~11.7s (seed) |
 
-No se puede separar, con este log, cuánto de esos 30.6s es arranque del
-contenedor y cuánto es el trabajo real de Alembic — a diferencia de
-GCP, donde `--wait` sí lo expone. Queda anotado como pendiente (§4).
+### 2.3 Hallazgo nuevo: Azure arranca la misma imagen 8-12x más rápido — pregunta abierta
+
+El tamaño real de la imagen ya se confirmó (§4): **152.5 MiB comprimidos**,
+mismo dígest `amd64` en las dos nubes — no hay diferencia de imagen que
+explique lo que sigue.
+
+Con el desglose de arriba, Azure tarda **~23.3s / ~16.3s** en arrancar el
+contenedor (comando → primer log real). GCP, con la **misma imagen**, tarda
+**189.3s / 123.3s** en "Starting execution" (§2.1). Es una diferencia de
+**8 a 12 veces**, no explicable por tamaño de imagen porque el tamaño es
+idéntico en los dos casos.
+
+Dos hipótesis, ninguna confirmada todavía: Azure Container Apps Jobs tira
+la imagen directo de GHCR, mientras que Cloud Run Jobs tira a través del
+espejo de Artifact Registry (§4) — o es, más llanamente, que el cold-start
+de Cloud Run Jobs es estructuralmente más lento que el de Container Apps
+Jobs para este tamaño de imagen. Queda como pregunta abierta genuina, no
+se investiga más en esta pasada (ver §4, Pendiente).
 
 ## 3. Hallazgo real, no sólo una diferencia de plataforma: `Sembrar` en GCP no es lo que dice ser
 
@@ -75,7 +91,7 @@ el mismo `continue-on-error: true`:
     az containerapp job start --name caj-fraud-detection-seed ...
     # no espera nada más — dispara y sigue
 
-# .github/workflows/deploy-gcp.yml:60
+# .github/workflows/deploy-gcp.yml:60 (antes del fix de abajo)
 - name: "Sembrar (no bloqueante, ADR-0010: idempotente, un fallo acá no revierte el deploy)"
   continue-on-error: true
   run: |
@@ -84,35 +100,46 @@ el mismo `continue-on-error: true`:
     #                                                                          ^^^^^
 ```
 
-**El de GCP tiene `--wait` — el de Azure no.** El nombre del paso dice
-"no bloqueante" en los dos archivos, pero sólo Azure cumple esa promesa.
-GCP bloquea el pipeline entero 148 segundos esperando un Job cuyo
+**El de GCP tenía `--wait` — el de Azure no.** El nombre del paso decía
+"no bloqueante" en los dos archivos, pero sólo Azure cumplía esa promesa.
+GCP bloqueaba el pipeline entero ~148 segundos esperando un Job cuyo
 resultado, por diseño (`continue-on-error: true`), a nadie le importa
-que termine antes de seguir. Es la explicación de buena parte de los
-7m16s totales — no una limitación de la nube, es una línea de más en el
+que termine antes de seguir. Era la explicación de buena parte de los
+7m16s totales — no una limitación de la nube, era una línea de más en el
 workflow.
 
-## 4. Pendiente — profundizar antes de sacar conclusiones definitivas
+**Resuelto (2026-09-17)**: se sacó el `--wait` de
+`.github/workflows/deploy-gcp.yml:64`. `Migrar` (línea 52) conserva el
+suyo — esa sí tiene que bloquear, ADR-0009: si falla, el deploy tiene que
+abortar antes de actualizar el servicio.
 
-- **Confirmar el tamaño real de la imagen** en el espejo de Artifact
-  Registry. Se intentó con `docker manifest inspect` contra GHCR
-  directo y falló por autenticación — hace falta credenciales de GHCR a
-  mano o correrlo con `gcloud artifacts docker images describe` con el
-  formato correcto (el intentado no devolvió tamaño).
-- **Verificar si el espejo de Artifact Registry (`ghcr-mirror`,
-  `REMOTE_REPOSITORY`, `infra/gcp/main.tf`) está cacheando de verdad**
-  o si cada ejecución de un Job re-descarga la imagen completa desde
-  GHCR a través del *pull-through cache* — eso explicaría gran parte de
-  "Starting execution" siendo tan largo y tan variable entre corridas
-  (189s vs 123s para el mismo tipo de operación, misma imagen).
-- **Conseguir el mismo nivel de detalle de fases para Azure** que
-  `gcloud --wait` da gratis, para poder comparar arranque-de-contenedor
-  contra trabajo-real de forma pareja en las dos nubes — necesita mirar
-  Log Analytics (timestamp del primer log de la app vs. timestamp de
-  creación de la réplica) o campos más finos de
-  `az containerapp job execution show`.
-- **Decidir si sacar el `--wait` de `Sembrar` en GCP** (§3) para que
-  quede igual de no-bloqueante que en Azure y que el pipeline no pague
-  esos ~148s de más en cada deploy — cambio chico, bajo riesgo, pero se
-  deja para cuando el usuario lo pida explícito, no se toca en este
-  documento.
+## 4. Pendiente — resuelto (2026-09-17), con una pregunta nueva que queda abierta
+
+Los cuatro puntos que este documento dejaba abiertos:
+
+- **Tamaño real de la imagen — resuelto.** `docker manifest inspect`
+  contra GHCR directo seguía fallando por autenticación; el camino que
+  funcionó fue autenticar Docker contra el propio espejo
+  (`gcloud auth configure-docker us-central1-docker.pkg.dev`) y usar
+  `docker buildx imagetools inspect --raw` sobre el manifiesto `amd64`:
+  **152.5 MiB comprimidos, 16 capas** (build `sha-83268ac`).
+- **¿El espejo cachea de verdad? — resuelto.** `gcloud artifacts docker
+  images list` muestra cada tag creado una única vez (mismo
+  `CREATE_TIME`/`UPDATE_TIME`, sin entradas duplicadas por pulls
+  repetidos) — consistente con el cacheo documentado del modo
+  `REMOTE_REPOSITORY`. El tiempo de "Starting execution" es Cloud Run
+  bajando la imagen al nodo de ejecución, no el espejo re-descargando de
+  GHCR en cada corrida.
+- **Detalle de fases para Azure — resuelto.** Ver §2.2: mismo nivel de
+  detalle que GCP, cruzando `az containerapp job execution list` con
+  `ContainerAppConsoleLogs_CL`.
+- **Sacar el `--wait` de `Sembrar` en GCP — resuelto.** Ver §3.
+
+**Lo que queda genuinamente abierto** es el hallazgo nuevo de §2.3: con
+el tamaño de imagen ya descartado como variable (es idéntico en las dos
+nubes), Azure arranca el mismo contenedor 8-12x más rápido que GCP. No se
+investiga en esta pasada — candidatos para cuando se retome: comparar el
+tiempo de pull directo desde GHCR (Azure) contra pull desde el espejo de
+Artifact Registry (GCP) de forma aislada, o revisar si Cloud Run Jobs
+tiene algún parámetro de cold-start/concurrencia que Container Apps Jobs
+no necesita.
