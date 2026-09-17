@@ -61,7 +61,7 @@ jobs:
         continue-on-error: true
         run: |
           gcloud run jobs update fraud-detection-seed --region "${{ env.REGION }}" --image "${{ env.IMAGE_BASE }}:${{ steps.image.outputs.tag }}"
-          gcloud run jobs execute fraud-detection-seed --region "${{ env.REGION }}" --wait
+          gcloud run jobs execute fraud-detection-seed --region "${{ env.REGION }}"
 
       - name: Mantener fetch-intel en la misma imagen
         run: |
