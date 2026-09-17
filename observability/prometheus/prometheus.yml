@@ -1,0 +1,5 @@
+# Sin scrape_configs propios a propósito: todo entra vía Alloy
+# (prometheus.scrape + remote_write), habilitado con
+# --web.enable-remote-write-receiver en el comando del servicio.
+global:
+  scrape_interval: 15s

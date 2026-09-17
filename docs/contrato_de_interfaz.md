@@ -107,8 +107,9 @@ réplicas que todavía no se reemplazaron.
 |---|---|---|
 | `GET /health` | El proceso vive | liveness probe |
 | `GET /ready` | Postgres responde | readiness probe |
+| `GET /metrics` 🆕 | — | scrape de métricas HTTP en formato Prometheus (ADR-0024) |
 
-Ambos sin autenticación, `200` cuando OK.
+Los tres sin autenticación, `200` cuando OK.
 
 ### 1.4 Configuración: 100% por variables de entorno
 
@@ -122,6 +123,8 @@ Ambos sin autenticación, `200` cuando OK.
 | `LANGSMITH_TRACING` | `true` |
 | `LANGSMITH_PROJECT` | `fraud-detection` |
 | `LOG_LEVEL` | `INFO` |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` 🆕 | `http://localhost:4317` (vacío = instrumentación OTel deshabilitada, ADR-0024) |
+| `OTEL_SERVICE_NAME` 🆕 | `fraud-detection-api` |
 | **`ENVIRONMENT`** | `local` \| `staging` \| `production` 🆕 |
 
 > `LOG_LEVEL` gobierna también el echo de SQL de SQLAlchemy: solo en `DEBUG`.
@@ -313,6 +316,7 @@ mediría la discrepancia de reglas en vez de la calidad del sistema.
 | `GET` | `/api/v1/metrics/llm` | 🆕 Costo y latencia del grafo, leídos de LangSmith (ADR-0019) | — | `LlmMetricsRead` | `200` |
 | `GET` | `/health` | Liveness | — | `{status}` | `200` |
 | `GET` | `/ready` | Readiness (Postgres) | — | `{status}` | `200` |
+| `GET` | `/metrics` | 🆕 Métricas HTTP (latencia, conteo) en formato Prometheus, para scrape (ADR-0024) | — | `text/plain` (Prometheus) | `200` |
 
 `GET /api/v1/cases/{case_id}/stream` emite eventos `node`
 (`{"node": "<nombre>"}`, uno por nodo del grafo que termina, incluidos los
