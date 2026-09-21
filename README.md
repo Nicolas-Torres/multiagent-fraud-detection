@@ -13,11 +13,16 @@ que no alcanzan confianza suficiente pasan a una cola de revisión humana.
 
 > Proyecto final del programa de especialización en IA Generativa.
 
-**Demo en vivo**: https://ca-fraud-detection-api.graywave-cc1ab2d2.eastus2.azurecontainerapps.io
-— Azure Container Apps, desplegado automáticamente desde `main` (ver
-[docs/runbook_azure_setup.md](docs/runbook_azure_setup.md)). También
-desplegado en GCP Cloud Run como segunda prueba de multi-nube, a modo
-de aprendizaje ([ADR-0022](docs/adr/0022-gcp-cloud-run-como-segundo-target-de-aprendizaje.md)).
+**Demo en vivo** — el mismo sistema, desplegado en dos nubes desde la misma
+rama `main`:
+
+| Nube | URL | Setup |
+|---|---|---|
+| Azure Container Apps | https://ca-fraud-detection-api.graywave-cc1ab2d2.eastus2.azurecontainerapps.io | [docs/runbook_azure_setup.md](docs/runbook_azure_setup.md) |
+| GCP Cloud Run | https://fraud-detection-api-im2rcartea-uc.a.run.app | [docs/runbook_gcp_setup.md](docs/runbook_gcp_setup.md) |
+
+GCP se sumó como segunda prueba de multi-nube, a modo de aprendizaje
+([ADR-0022](docs/adr/0022-gcp-cloud-run-como-segundo-target-de-aprendizaje.md)).
 
 ---
 
@@ -376,3 +381,9 @@ mismo contenido real.
 La documentación sigue **C4** (Context → Container → Component → Code) como
 columna estructural, más vistas dinámicas, y se escribe incrementalmente al
 cerrar cada etapa.
+
+---
+
+## Licencia
+
+[MIT](LICENSE).
