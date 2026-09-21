@@ -12,6 +12,7 @@ on:
       - "**.md"
       - "docs/**"
       - ".gitignore"
+      - "LICENSE"
   pull_request:
     paths-ignore: *docs_only
 
