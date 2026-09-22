@@ -3,7 +3,9 @@ import '@xyflow/react/dist/style.css'
 import { type CSSProperties, useMemo } from 'react'
 
 import topology from '@/data/graph_topology.json'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import { layoutTopology } from '@/lib/graphLayout'
+import { cn } from '@/lib/utils'
 
 interface GraphPanelProps {
   agentRoute: string[]
@@ -222,8 +224,13 @@ export function GraphPanel({
   animating = false,
   caseDecided = true,
 }: GraphPanelProps) {
+  // Bajo el breakpoint, el layout pasa a vertical (`graphLayout.ts`): un
+  // celular es angosto pero alto, así que apilar niveles aprovecha eso en
+  // vez de encoger el layout horizontal hasta ilegible.
+  const esMobile = useIsMobile()
+
   const { nodes, edges } = useMemo(() => {
-    const base = layoutTopology(topology)
+    const base = layoutTopology(topology, esMobile ? 'vertical' : 'horizontal')
     const ran = new Set(agentRoute)
     const degraded = new Set(degradedAgents)
     const synthById = new Map(topology.nodes.map((n) => [n.id, n.synthetic]))
@@ -334,11 +341,17 @@ export function GraphPanel({
     })
 
     return { nodes: [...decoracion, ...etiquetasSueltas, ...nodes], edges: base.edges }
-  }, [agentRoute, degradedAgents, animating, caseDecided])
+  }, [agentRoute, degradedAgents, animating, caseDecided, esMobile])
 
   return (
     <div
-      className="graph-panel-sin-handles h-80 w-full rounded-md border"
+      className={cn(
+        'graph-panel-sin-handles w-full rounded-md border',
+        // Más alto en vertical: son niveles apilados, no columnas -el
+        // ancho ya es 100% del panel, lo que falta es alto para que
+        // `fitView` no tenga que encoger tanto el texto.
+        esMobile ? 'h-[28rem]' : 'h-80',
+      )}
       // Fijo -no `var(--background)`- a propósito: el panel siempre está
       // oscuro, sin importar el tema del sitio. El amarillo/azul/naranja
       // de las etiquetas de categoría (`COLOR_CATEGORIA`) está pensado
@@ -373,9 +386,16 @@ export function GraphPanel({
         nodesDraggable={false}
         nodesConnectable={false}
         elementsSelectable={true}
-        panOnDrag={false}
+        // Abajo del breakpoint, pinch queda como válvula de escape para
+        // acercarse y leer una etiqueta puntual -`fitView` prioriza mostrar
+        // el pipeline completo sin recortar nada (por eso no hay `minZoom`:
+        // clampear el zoom mínimo aquí cortaba la fila más ancha en vez de
+        // encogerla, comprobado a mano con el layout real). En desktop se
+        // queda todo apagado, como siempre -es una vista de sólo estado,
+        // no un editor-.
+        panOnDrag={esMobile}
         zoomOnScroll={false}
-        zoomOnPinch={false}
+        zoomOnPinch={esMobile}
         zoomOnDoubleClick={false}
         proOptions={{ hideAttribution: true }}
       >

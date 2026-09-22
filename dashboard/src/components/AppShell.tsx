@@ -1,6 +1,16 @@
+import { useState } from 'react'
+import { MenuIcon } from 'lucide-react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet'
 import { useTheme } from '@/hooks/useTheme'
 import { cn } from '@/lib/utils'
 
@@ -26,48 +36,77 @@ function tituloDe(pathname: string): string {
 export function AppShell() {
   const [tema, alternarTema] = useTheme()
   const location = useLocation()
+  const [navAbierta, setNavAbierta] = useState(false)
+
+  const enlaces = (
+    <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3 text-sm">
+      {LINKS.map((link) => (
+        <NavLink
+          key={link.to}
+          to={link.to}
+          end={link.end}
+          onClick={() => setNavAbierta(false)}
+          className={({ isActive }) =>
+            cn(
+              'rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground',
+              isActive && 'bg-secondary font-medium text-secondary-foreground',
+            )
+          }
+        >
+          {link.label}
+        </NavLink>
+      ))}
+    </nav>
+  )
+
+  const toggleTema = (
+    <Button variant="ghost" size="sm" className="w-full justify-start" onClick={alternarTema}>
+      {tema === 'dark' ? '☀️ Modo claro' : '🌙 Modo oscuro'}
+    </Button>
+  )
 
   return (
-    <div className="flex h-svh overflow-hidden bg-background text-foreground">
-      <aside className="flex w-56 shrink-0 flex-col border-r">
-        <div className="border-b px-4 py-4">
-          <span className="font-semibold">Detección de Fraude</span>
-          <p className="text-xs text-muted-foreground">Dashboard del analista</p>
-        </div>
-        <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3 text-sm">
-          {LINKS.map((link) => (
-            <NavLink
-              key={link.to}
-              to={link.to}
-              end={link.end}
-              className={({ isActive }) =>
-                cn(
-                  'rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground',
-                  isActive && 'bg-secondary font-medium text-secondary-foreground',
-                )
+    <Sheet open={navAbierta} onOpenChange={setNavAbierta}>
+      <div className="flex h-svh overflow-hidden bg-background text-foreground">
+        <aside className="hidden w-56 shrink-0 flex-col border-r md:flex">
+          <div className="border-b px-4 py-4">
+            <span className="font-semibold">Detección de Fraude</span>
+            <p className="text-xs text-muted-foreground">Dashboard del analista</p>
+          </div>
+          {enlaces}
+          <div className="border-t p-3">{toggleTema}</div>
+        </aside>
+
+        {/* Mismo contenido que el `<aside>`, como drawer: sólo se monta bajo
+            `md` (el trigger de abajo tiene `md:hidden`), nunca compiten. */}
+        <SheetContent side="left" className="flex w-56 max-w-none flex-col gap-0 p-0 sm:max-w-none">
+          <SheetHeader className="border-b px-4 py-4">
+            <SheetTitle>Detección de Fraude</SheetTitle>
+            <SheetDescription>Dashboard del analista</SheetDescription>
+          </SheetHeader>
+          {enlaces}
+          <div className="border-t p-3">{toggleTema}</div>
+        </SheetContent>
+
+        {/* Segunda región de scroll, independiente del `<aside>`: el shell
+            entero queda fijo a la altura del viewport (`h-svh overflow-hidden`
+            arriba) y sólo esto -el `<main>` de abajo- scrollea. */}
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+          <header className="flex shrink-0 items-center gap-3 border-b px-6 py-4">
+            <SheetTrigger
+              render={
+                <Button variant="ghost" size="icon-sm" className="md:hidden" aria-label="Abrir navegación" />
               }
             >
-              {link.label}
-            </NavLink>
-          ))}
-        </nav>
-        <div className="border-t p-3">
-          <Button variant="ghost" size="sm" className="w-full justify-start" onClick={alternarTema}>
-            {tema === 'dark' ? '☀️ Modo claro' : '🌙 Modo oscuro'}
-          </Button>
+              <MenuIcon />
+            </SheetTrigger>
+            <h1 className="text-xl font-semibold">{tituloDe(location.pathname)}</h1>
+          </header>
+          <main className="@container flex-1 overflow-y-auto overflow-x-auto px-6 py-6">
+            <Outlet />
+          </main>
         </div>
-      </aside>
-      {/* Segunda región de scroll, independiente del `<aside>`: el shell
-          entero queda fijo a la altura del viewport (`h-svh overflow-hidden`
-          arriba) y sólo esto -el `<main>` de abajo- scrollea. */}
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="shrink-0 border-b px-6 py-4">
-          <h1 className="text-xl font-semibold">{tituloDe(location.pathname)}</h1>
-        </header>
-        <main className="flex-1 overflow-y-auto overflow-x-auto px-6 py-6">
-          <Outlet />
-        </main>
       </div>
-    </div>
+    </Sheet>
   )
 }
