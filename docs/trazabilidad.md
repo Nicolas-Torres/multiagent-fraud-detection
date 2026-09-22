@@ -23,7 +23,7 @@ evidencia que lo cubre en el repo, y declara los desvíos frente a
 | 4 | Implementación de la aplicación | `graph/`, `domain/`, `db/`, `api/`, `dashboard/`, `diagrams/likec4/c4-container.c4`, `contrato_de_interfaz.md` (v0.13) | ✅ |
 | 5 | Orquestación y despliegue | ADR-0008 (digest), ADR-0009 (migraciones), ADR-0010 (seed), ADR-0021 (Azure), ADR-0022 (GCP), `infra/azure/`, `infra/gcp/`, `.github/workflows/`, contrato §1 | ✅ |
 | 6 | Monitoreo y mantenimiento | LangSmith, contrato §3.3 (cuatro métricas operativas), cinco sellos de auditoría en `decisions`, tarjeta de costo/latencia en vivo (ADR-0019/0020), cola HITL en `dashboard/` | ✅ |
-| 7 | Evaluación de la aplicación | `check_policies.py` 7000/7000, ADR-0006 + ADR-0016 (brazo de control determinístico, ya en producción — no sólo planeado), ADR-0013 (métricas duras vs LLM-as-judge), `ground_truth.csv` | 🟡 |
+| 7 | Evaluación de la aplicación | `check_policies.py` 7000/7000, ADR-0006 + ADR-0016 (brazo de control determinístico, ya en producción — no sólo planeado), ADR-0013 (métricas duras vs LLM-as-judge), `ground_truth.csv` | 🟡 ver desvío D-07 |
 | 8 | Resultados y demostración | `smoke_decision.py`, `smoke_retrieval.py`, `smoke_api.py`, `smoke_agents.py`, demo en vivo (Azure + GCP, ver README) | 🟡 falta el video |
 | 9 | Conclusiones | `docs/reviews/` (doce actas) — la materia prima ya está escrita | ⬜ |
 | 10 | Recomendaciones | deudas declaradas: event-driven, feed en streaming, consolidación de listas de gobernanza, retry propio con backoff en el proveedor de embeddings (Gemini, ver acta 11) | ⬜ |
@@ -45,6 +45,7 @@ limitación argumentada, que puntúa más que el silencio.
 | D-04 | **No hay fine-tuning ni LoRA.** El ítem 3 los nombra como opciones; la adaptación del sistema es RAG y prompting versionado. Ajustar un modelo sobre once políticas sintéticas mediría el sobreajuste, no la capacidad | pendiente de ADR o nota en el informe |
 | D-05 | ~~El Arbiter es determinístico en la etapa actual~~ — **resuelto**: desde ADR-0016 (06-ago) el Arbiter tiene LLM y usa la precedencia determinística como *piso*, no como veredicto final. Queda acá, tachado, en vez de borrarse, para que quede registro de que fue una limitación real y ya no lo es | ADR-0006 (rol original), ADR-0016 (resolución) |
 | D-06 | `issuer_bank` no se modelaba por falta de consumidor; ahora sí | ADR-0015 |
+| D-07 | El ítem 7 nombra **F1, precisión, recall** como ejemplos de métrica. El sistema no usa ésas: el motor se compara por **match exacto** contra ground truth (7000/7000, no es un clasificador probabilístico), la recuperación se mide con **recall@k y MRR** (y deliberadamente sin precision — `expected_policies` no dice qué está permitido, sólo qué es obligatorio), y el juicio de los agentes con **G-Eval** (DeepEval) sobre un golden set curado | ADR-0013 |
 
 > **D-04 es el único sin respaldo escrito.** Es el que más fácil se lee como
 > "no lo hicieron" en vez de "decidieron no hacerlo".
