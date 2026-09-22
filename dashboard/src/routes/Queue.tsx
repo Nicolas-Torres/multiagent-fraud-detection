@@ -88,10 +88,10 @@ export function Queue() {
             <TableRow>
               <TableHead>Estado</TableHead>
               <TableHead>Veredicto</TableHead>
-              <TableHead>Confianza</TableHead>
+              <TableHead className="hidden @3xl:table-cell">Confianza</TableHead>
               <TableHead>Monto</TableHead>
-              <TableHead>Cliente</TableHead>
-              <TableHead>Creado</TableHead>
+              <TableHead className="hidden @3xl:table-cell">Cliente</TableHead>
+              <TableHead className="hidden @3xl:table-cell">Creado</TableHead>
               <TableHead>Acciones</TableHead>
             </TableRow>
           </TableHeader>
@@ -119,10 +119,10 @@ export function Queue() {
                     <span className="text-muted-foreground">—</span>
                   )}
                 </TableCell>
-                <TableCell>{item.confidence ?? '—'}</TableCell>
+                <TableCell className="hidden @3xl:table-cell">{item.confidence ?? '—'}</TableCell>
                 <TableCell>{formatAmount(item.amount)}</TableCell>
-                <TableCell>{item.customer_id}</TableCell>
-                <TableCell className="text-muted-foreground">
+                <TableCell className="hidden @3xl:table-cell">{item.customer_id}</TableCell>
+                <TableCell className="hidden text-muted-foreground @3xl:table-cell">
                   {formatDateTime(item.created_at)}
                 </TableCell>
                 <TableCell>

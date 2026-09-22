@@ -55,24 +55,28 @@ export function Policies() {
           <TableHeader>
             <TableRow>
               <TableHead>ID</TableHead>
-              <TableHead>Versión</TableHead>
+              <TableHead className="hidden @3xl:table-cell">Versión</TableHead>
               <TableHead>Estado</TableHead>
-              <TableHead>Acción</TableHead>
+              <TableHead className="hidden @3xl:table-cell">Acción</TableHead>
               <TableHead>Rule</TableHead>
-              <TableHead>Detalle</TableHead>
+              <TableHead className="hidden @3xl:table-cell">Detalle</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {query.data?.map((p) => (
               <TableRow key={p.policy_id}>
                 <TableCell className="font-medium">{p.policy_id}</TableCell>
-                <TableCell className="text-muted-foreground">{p.version}</TableCell>
+                <TableCell className="hidden text-muted-foreground @3xl:table-cell">
+                  {p.version}
+                </TableCell>
                 <TableCell>
                   <Badge variant={STATE_VARIANT[p.state]}>{STATE_LABEL[p.state]}</Badge>
                 </TableCell>
-                <TableCell>{p.action ?? '—'}</TableCell>
-                <TableCell className="text-sm text-muted-foreground">{p.text}</TableCell>
-                <TableCell>
+                <TableCell className="hidden @3xl:table-cell">{p.action ?? '—'}</TableCell>
+                <TableCell className="whitespace-normal text-sm text-muted-foreground">
+                  {p.text}
+                </TableCell>
+                <TableCell className="hidden @3xl:table-cell">
                   {p.excluded_reason ?? (p.evaluable ? 'Se evalúa' : '—')}
                 </TableCell>
               </TableRow>

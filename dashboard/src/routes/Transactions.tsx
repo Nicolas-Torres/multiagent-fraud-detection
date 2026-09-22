@@ -250,13 +250,13 @@ export function Transactions() {
               <TableHead>Acción</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead>Decisión del LLM</TableHead>
-              <TableHead className="border-l">Transacción</TableHead>
-              <TableHead>Cliente</TableHead>
-              <TableHead>Monto</TableHead>
-              <TableHead>Canal</TableHead>
-              <TableHead>País</TableHead>
-              <TableHead>Banco</TableHead>
-              <TableHead>Fecha</TableHead>
+              <TableHead className="hidden border-l @3xl:table-cell">Transacción</TableHead>
+              <TableHead className="hidden @3xl:table-cell">Cliente</TableHead>
+              <TableHead className="hidden @3xl:table-cell">Monto</TableHead>
+              <TableHead className="hidden @3xl:table-cell">Canal</TableHead>
+              <TableHead className="hidden @3xl:table-cell">País</TableHead>
+              <TableHead className="hidden @3xl:table-cell">Banco</TableHead>
+              <TableHead className="hidden @3xl:table-cell">Fecha</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -387,15 +387,25 @@ function FilaTransaccion({
             <span className="text-muted-foreground">—</span>
           )}
         </TableCell>
-        <TableCell className="text-muted-foreground border-l">
+        <TableCell className="hidden text-muted-foreground border-l @3xl:table-cell">
           {formatTransactionId(detalle.data?.transaction.transaction_id ?? transactionId ?? '—')}
         </TableCell>
-        <TableCell className="text-muted-foreground">{payload.customer_id}</TableCell>
-        <TableCell>{formatAmount(String(payload.amount), payload.currency)}</TableCell>
-        <TableCell className="text-muted-foreground">{payload.channel.toUpperCase()}</TableCell>
-        <TableCell className="text-muted-foreground">{payload.country}</TableCell>
-        <TableCell className="text-muted-foreground">{payload.issuer_bank ?? '—'}</TableCell>
-        <TableCell className="text-muted-foreground">
+        <TableCell className="hidden text-muted-foreground @3xl:table-cell">
+          {payload.customer_id}
+        </TableCell>
+        <TableCell className="hidden @3xl:table-cell">
+          {formatAmount(String(payload.amount), payload.currency)}
+        </TableCell>
+        <TableCell className="hidden text-muted-foreground @3xl:table-cell">
+          {payload.channel.toUpperCase()}
+        </TableCell>
+        <TableCell className="hidden text-muted-foreground @3xl:table-cell">
+          {payload.country}
+        </TableCell>
+        <TableCell className="hidden text-muted-foreground @3xl:table-cell">
+          {payload.issuer_bank ?? '—'}
+        </TableCell>
+        <TableCell className="hidden text-muted-foreground @3xl:table-cell">
           {formatDateTime(payload.timestamp)}
         </TableCell>
       </TableRow>

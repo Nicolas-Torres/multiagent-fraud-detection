@@ -24,14 +24,27 @@ export interface Topology {
 const COL_GAP = 200
 const ROW_GAP = 90
 
+export type GraphDirection = 'horizontal' | 'vertical'
+
 /**
  * Posiciona por nivel topológico (distancia más larga desde `__start__`), no
  * por orden de `agent_route`. `agent_route` es una secuencia de supersteps
  * **aplanada** sin precedencia causal dentro de un grupo (contrato §2.5) —
  * ramas del mismo nivel se dibujan una al lado de la otra, nunca en cadena,
  * para no sugerir un orden que el sistema no garantiza.
+ *
+ * `direction: 'vertical'` (mobile, GraphPanel bajo el breakpoint) no es un
+ * espejo ingenuo de x/y: `COL_GAP` está calibrado contra `NODE_WIDTH` (170,
+ * en `GraphPanel.tsx`) y `ROW_GAP` contra `NODE_HEIGHT` (40) — así que
+ * `COL_GAP` se queda siempre en el eje X y `ROW_GAP` siempre en el eje Y,
+ * sin importar si ese eje representa el nivel o los hermanos. Lo único que
+ * cambia con `direction` es *cuál* de las dos (nivel o índice de hermano)
+ * maneja cada eje.
  */
-export function layoutTopology(topology: Topology): { nodes: Node[]; edges: Edge[] } {
+export function layoutTopology(
+  topology: Topology,
+  direction: GraphDirection = 'horizontal',
+): { nodes: Node[]; edges: Edge[] } {
   const children = new Map<string, string[]>()
   for (const e of topology.edges) {
     children.set(e.source, [...(children.get(e.source) ?? []), e.target])
@@ -74,9 +87,13 @@ export function layoutTopology(topology: Topology): { nodes: Node[]; edges: Edge
     const fila = porNivel.get(lvl) ?? []
     const idx = fila.indexOf(n.id)
     const offset = (fila.length - 1) / 2
+    const position =
+      direction === 'vertical'
+        ? { x: (idx - offset) * COL_GAP, y: lvl * ROW_GAP }
+        : { x: lvl * COL_GAP, y: (idx - offset) * ROW_GAP }
     return {
       id: n.id,
-      position: { x: lvl * COL_GAP, y: (idx - offset) * ROW_GAP },
+      position,
       // `level` viaja en `data` para que `GraphPanel` pueda escalonar la
       // animación de "analizando" en el mismo orden topológico que ya
       // gobierna el layout — un nodo no puede "pulsar antes" que sus
@@ -85,12 +102,13 @@ export function layoutTopology(topology: Topology): { nodes: Node[]; edges: Edge
       // Estilo real (color por estado de ejecución) lo aplica GraphPanel;
       // acá sólo la geometría.
       style: { width: 170 },
-      // El layout es estrictamente izquierda→derecha (`x = nivel * COL_GAP`);
-      // sin esto, React Flow usa el default del tipo `default`
-      // (`Top`/`Bottom`), que dibuja cada conector saliendo por arriba/abajo
-      // del nodo y obliga a una curva innecesaria para volver a la horizontal.
-      sourcePosition: Position.Right,
-      targetPosition: Position.Left,
+      // En horizontal el flujo es izquierda→derecha; en vertical,
+      // arriba→abajo. Sin esto, React Flow usa el default del tipo
+      // `default` (`Top`/`Bottom` fijo), que en modo horizontal dibuja cada
+      // conector saliendo por arriba/abajo del nodo y obliga a una curva
+      // innecesaria para volver a la horizontal.
+      sourcePosition: direction === 'vertical' ? Position.Bottom : Position.Right,
+      targetPosition: direction === 'vertical' ? Position.Top : Position.Left,
     }
   })
 

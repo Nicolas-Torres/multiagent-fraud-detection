@@ -277,9 +277,9 @@ function LatenciaYCostoPorNodo({
               <TableHeader>
                 <TableRow>
                   <TableHead>Nodo</TableHead>
-                  <TableHead>Corridas</TableHead>
+                  <TableHead className="hidden @3xl:table-cell">Corridas</TableHead>
                   <TableHead>Latencia prom.</TableHead>
-                  <TableHead>Tokens prom.</TableHead>
+                  <TableHead className="hidden @3xl:table-cell">Tokens prom.</TableHead>
                   <TableHead>Costo prom.</TableHead>
                 </TableRow>
               </TableHeader>
@@ -287,9 +287,11 @@ function LatenciaYCostoPorNodo({
                 {metricas.data.nodes!.map((n) => (
                   <TableRow key={n.name}>
                     <TableCell className="font-mono text-xs">{n.name}</TableCell>
-                    <TableCell className="text-muted-foreground">{n.run_count}</TableCell>
+                    <TableCell className="hidden text-muted-foreground @3xl:table-cell">
+                      {n.run_count}
+                    </TableCell>
                     <TableCell>{n.avg_latency_seconds.toFixed(2)}s</TableCell>
-                    <TableCell className="text-muted-foreground">
+                    <TableCell className="hidden text-muted-foreground @3xl:table-cell">
                       {n.avg_tokens > 0 ? Math.round(n.avg_tokens) : '—'}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
