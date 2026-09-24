@@ -126,10 +126,12 @@ export function Dashboard() {
         ).toFixed(1)
       : null
 
+  // `\n` sólo se respeta bajo `md` (`max-md:whitespace-pre-line`, abajo):
+  // en mobile las cards van de a dos y el título en una línea las ensancha.
   const stats = [
-    { label: 'Transacciones totales', value: casos.data?.total ?? items.length },
+    { label: 'Transacciones\ntotales', value: casos.data?.total ?? items.length },
     {
-      label: 'Políticas activas',
+      label: 'Políticas\nactivas',
       value: politicas.data?.filter((p) => p.state === 'active').length ?? 0,
     },
     {
@@ -147,11 +149,11 @@ export function Dashboard() {
         <p className="text-destructive">No se pudieron cargar los datos.</p>
       ) : (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
             {stats.map((s) => (
               <Card key={s.label}>
                 <CardHeader>
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                  <CardTitle className="text-sm font-medium text-muted-foreground max-md:whitespace-pre-line">
                     {s.label}
                   </CardTitle>
                 </CardHeader>
