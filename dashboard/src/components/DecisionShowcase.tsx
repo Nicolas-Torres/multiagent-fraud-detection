@@ -20,7 +20,7 @@ export function GraphSection({ decision }: { decision: DecisionRead }) {
       <CardHeader>
         <CardTitle>Recorrido por el grafo</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="max-md:px-0">
         <GraphPanel agentRoute={decision.agent_route} degradedAgents={decision.degraded_agents} />
       </CardContent>
     </Card>

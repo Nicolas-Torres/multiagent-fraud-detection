@@ -588,7 +588,12 @@ export function GraphPanel({
     <div
       // En vertical el alto sale de la proporción del grafo (`proporcionDe`),
       // no de un alto fijo: así `fitView` usa todo el ancho del panel.
-      className={cn('graph-panel-sin-handles w-full rounded-md border', !proporcion && 'h-80')}
+      // En mobile el panel va de borde a borde de su card: sin esquinas
+      // redondeadas ni bordes laterales que dupliquen los de la card.
+      className={cn(
+        'graph-panel-sin-handles w-full rounded-md border max-md:rounded-none max-md:border-x-0',
+        !proporcion && 'h-80',
+      )}
       // Fijo -no `var(--background)`- a propósito: el panel siempre está
       // oscuro, sin importar el tema del sitio. El amarillo/azul/naranja
       // de las etiquetas de categoría (`COLOR_CATEGORIA`) está pensado
@@ -623,6 +628,7 @@ export function GraphPanel({
         edges={edges}
         nodeTypes={NODE_TYPES}
         fitView
+        fitViewOptions={{ padding: esMobile ? 0.03 : 0.1 }}
         nodesDraggable={false}
         nodesConnectable={false}
         elementsSelectable={true}
