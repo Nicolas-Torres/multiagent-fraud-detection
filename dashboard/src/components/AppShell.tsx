@@ -17,7 +17,7 @@ import { cn } from '@/lib/utils'
 const LINKS = [
   { to: '/', label: 'Dashboard', end: true },
   { to: '/transactions', label: 'Transactions', end: false },
-  { to: '/queue', label: 'Cases / HITL', end: false },
+  { to: '/queue', label: 'Human-in-the-loop (HITL)', end: false },
   { to: '/policies', label: 'Policies', end: false },
   { to: '/architecture', label: 'Cómo se construyó', end: false },
 ]
