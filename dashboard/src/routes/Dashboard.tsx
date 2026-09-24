@@ -30,6 +30,10 @@ type DecisionType = components['schemas']['DecisionType']
 const DECISIONS: DecisionType[] = ['APPROVE', 'CHALLENGE', 'BLOCK', 'ESCALATE_TO_HUMAN']
 const CON_SENAL: DecisionType[] = ['CHALLENGE', 'BLOCK', 'ESCALATE_TO_HUMAN']
 
+// Oculta, no borrada: el benchmark de modelos todavía no se corrió, y una
+// tarjeta vacía en producción no aporta nada. Se vuelve a `true` cuando exista.
+const MOSTRAR_BENCHMARK = false
+
 export function Dashboard() {
   // Agregación en el cliente sobre `GET /cases` — no hay endpoint de
   // agregación (§4.5, decidido): esta vista arranca con lo que ya es
@@ -219,12 +223,14 @@ export function Dashboard() {
         justoActualizado={justoActualizado}
       />
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <PendingCard
-          title="Resultados del benchmark de modelos"
-          reason="Corrida manual de DeepEval sobre un golden set curado (scripts/eval_golden_set.py, ADR-0013) — no es un dato que crezca con cada transacción en vivo como el de arriba, así que no se automatizó junto con eso. Encaja mejor como parte de la etapa de CI/imagen/despliegue, donde además tendría sentido correrlo en un job programado."
-        />
-      </div>
+      {MOSTRAR_BENCHMARK && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <PendingCard
+            title="Resultados del benchmark de modelos"
+            reason="Corrida manual de DeepEval sobre un golden set curado (scripts/eval_golden_set.py, ADR-0013) — no es un dato que crezca con cada transacción en vivo como el de arriba, así que no se automatizó junto con eso. Encaja mejor como parte de la etapa de CI/imagen/despliegue, donde además tendría sentido correrlo en un job programado."
+          />
+        </div>
+      )}
     </div>
   )
 }
