@@ -86,13 +86,13 @@ export function Queue() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead>Acciones</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead>Veredicto</TableHead>
               <TableHead className="hidden @3xl:table-cell">Confianza</TableHead>
               <TableHead>Monto</TableHead>
               <TableHead className="hidden @3xl:table-cell">Cliente</TableHead>
               <TableHead className="hidden @3xl:table-cell">Creado</TableHead>
-              <TableHead>Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -110,6 +110,13 @@ export function Queue() {
                 onClick={() => navigate(`/cases/${item.case_id}`)}
               >
                 <TableCell>
+                  {item.status === 'PENDING_HUMAN' ? (
+                    <Badge variant="default">Revisar</Badge>
+                  ) : (
+                    <Badge variant="secondary">Revisado</Badge>
+                  )}
+                </TableCell>
+                <TableCell>
                   <Badge variant="outline">{item.status}</Badge>
                 </TableCell>
                 <TableCell>
@@ -124,13 +131,6 @@ export function Queue() {
                 <TableCell className="hidden @3xl:table-cell">{item.customer_id}</TableCell>
                 <TableCell className="hidden text-muted-foreground @3xl:table-cell">
                   {formatDateTime(item.created_at)}
-                </TableCell>
-                <TableCell>
-                  {item.status === 'PENDING_HUMAN' ? (
-                    <Badge variant="default">Revisar</Badge>
-                  ) : (
-                    <Badge variant="secondary">Revisado</Badge>
-                  )}
                 </TableCell>
               </TableRow>
             ))}

@@ -50,11 +50,13 @@ export function AnalyzingPanel({ identificador, status, ranNodes, connected }: A
             ? 'Cada nodo se ilumina apenas termina, en vivo (SSE).'
             : 'Conectando el progreso en vivo — el barrido de abajo sólo marca que el proceso sigue corriendo.'}
         </p>
-        {connected ? (
-          <GraphPanel agentRoute={ranNodes} degradedAgents={[]} caseDecided={false} />
-        ) : (
-          <GraphPanel agentRoute={[]} degradedAgents={[]} animating />
-        )}
+        <div className="max-md:-mx-(--card-spacing)">
+          {connected ? (
+            <GraphPanel agentRoute={ranNodes} degradedAgents={[]} caseDecided={false} />
+          ) : (
+            <GraphPanel agentRoute={[]} degradedAgents={[]} animating />
+          )}
+        </div>
       </CardContent>
     </Card>
   )

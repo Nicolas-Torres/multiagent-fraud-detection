@@ -7,6 +7,7 @@ import type { components } from '@/api/schema'
 import { Field } from '@/components/Field'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import topology from '@/data/graph_topology.json'
 import {
   Table,
   TableBody,
@@ -16,6 +17,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { useCaseProgress } from '@/hooks/useCaseProgress'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import { cn } from '@/lib/utils'
 
 // Cuánto dura el destello de "esto acaba de cambiar" en la tabla de costo
@@ -27,6 +29,10 @@ type DecisionType = components['schemas']['DecisionType']
 
 const DECISIONS: DecisionType[] = ['APPROVE', 'CHALLENGE', 'BLOCK', 'ESCALATE_TO_HUMAN']
 const CON_SENAL: DecisionType[] = ['CHALLENGE', 'BLOCK', 'ESCALATE_TO_HUMAN']
+
+// Oculta, no borrada: el benchmark de modelos todavía no se corrió, y una
+// tarjeta vacía en producción no aporta nada. Se vuelve a `true` cuando exista.
+const MOSTRAR_BENCHMARK = false
 
 export function Dashboard() {
   // Agregación en el cliente sobre `GET /cases` — no hay endpoint de
@@ -66,6 +72,7 @@ export function Dashboard() {
   })
 
   const queryClient = useQueryClient()
+  const esMobile = useIsMobile()
 
   // Descubre si hay algo corriendo ahora mismo — sin importar quién lo
   // disparó ni desde qué pestaña (mismo filtro que ya usa la Cola,
@@ -126,10 +133,12 @@ export function Dashboard() {
         ).toFixed(1)
       : null
 
+  // `\n` sólo se respeta bajo `md` (`max-md:whitespace-pre-line`, abajo):
+  // en mobile las cards van de a dos y el título en una línea las ensancha.
   const stats = [
-    { label: 'Transacciones totales', value: casos.data?.total ?? items.length },
+    { label: 'Transacciones\ntotales', value: casos.data?.total ?? items.length },
     {
-      label: 'Políticas activas',
+      label: 'Políticas\nactivas',
       value: politicas.data?.filter((p) => p.state === 'active').length ?? 0,
     },
     {
@@ -147,11 +156,11 @@ export function Dashboard() {
         <p className="text-destructive">No se pudieron cargar los datos.</p>
       ) : (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
             {stats.map((s) => (
               <Card key={s.label}>
                 <CardHeader>
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                  <CardTitle className="text-sm font-medium text-muted-foreground max-md:whitespace-pre-line">
                     {s.label}
                   </CardTitle>
                 </CardHeader>
@@ -168,11 +177,26 @@ export function Dashboard() {
                 <CardTitle>Distribución de decisiones</CardTitle>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={240}>
-                  <BarChart data={distribucion}>
+                {/* En mobile, las cuatro etiquetas horizontales no entran y
+                    Recharts oculta las que se pisan (`interval` automático):
+                    en diagonal entran todas, sin sumar una leyenda. El eje Y
+                    angosto (`width`) evita el hueco que dejan sus 60px por
+                    defecto para números de dos dígitos. */}
+                <ResponsiveContainer width="100%" height={esMobile ? 270 : 240}>
+                  <BarChart
+                    data={distribucion}
+                    margin={{ top: 8, right: esMobile ? 8 : 32, left: 0, bottom: 0 }}
+                  >
                     <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                    <XAxis dataKey="decision" tick={{ fontSize: 12 }} />
-                    <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
+                    <XAxis
+                      dataKey="decision"
+                      interval={0}
+                      tick={{ fontSize: esMobile ? 10 : 12 }}
+                      angle={esMobile ? -30 : 0}
+                      textAnchor={esMobile ? 'end' : 'middle'}
+                      height={esMobile ? 70 : 30}
+                    />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 12 }} width={28} />
                     <Bar dataKey="casos" fill="var(--primary)" radius={4} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -202,17 +226,23 @@ export function Dashboard() {
         justoActualizado={justoActualizado}
       />
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <PendingCard
-          title="Resultados del benchmark de modelos"
-          reason="Corrida manual de DeepEval sobre un golden set curado (scripts/eval_golden_set.py, ADR-0013) — no es un dato que crezca con cada transacción en vivo como el de arriba, así que no se automatizó junto con eso. Encaja mejor como parte de la etapa de CI/imagen/despliegue, donde además tendría sentido correrlo en un job programado."
-        />
-      </div>
+      {MOSTRAR_BENCHMARK && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <PendingCard
+            title="Resultados del benchmark de modelos"
+            reason="Corrida manual de DeepEval sobre un golden set curado (scripts/eval_golden_set.py, ADR-0013) — no es un dato que crezca con cada transacción en vivo como el de arriba, así que no se automatizó junto con eso. Encaja mejor como parte de la etapa de CI/imagen/despliegue, donde además tendría sentido correrlo en un job programado."
+          />
+        </div>
+      )}
     </div>
   )
 }
 
 type LlmMetricsRead = components['schemas']['LlmMetricsRead']
+
+// Mismo nombre que muestra el grafo (`GraphPanel`), no el id técnico del
+// nodo: la tabla y el grafo describen los mismos diez pasos.
+const ETIQUETA_NODO = new Map(topology.nodes.map((n) => [n.id, n.label]))
 
 function formatUsd(valor: number): string {
   return `$${valor.toFixed(valor < 1 ? 4 : 2)}`
@@ -278,15 +308,23 @@ function LatenciaYCostoPorNodo({
                 <TableRow>
                   <TableHead>Nodo</TableHead>
                   <TableHead className="hidden @3xl:table-cell">Corridas</TableHead>
-                  <TableHead>Latencia prom.</TableHead>
+                  <TableHead>
+                    Latencia <br className="md:hidden" />
+                    prom.
+                  </TableHead>
                   <TableHead className="hidden @3xl:table-cell">Tokens prom.</TableHead>
-                  <TableHead>Costo prom.</TableHead>
+                  <TableHead>
+                    Costo <br className="md:hidden" />
+                    prom.
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {metricas.data.nodes!.map((n) => (
                   <TableRow key={n.name}>
-                    <TableCell className="font-mono text-xs">{n.name}</TableCell>
+                    <TableCell className="whitespace-normal">
+                      {ETIQUETA_NODO.get(n.name) ?? n.name}
+                    </TableCell>
                     <TableCell className="hidden text-muted-foreground @3xl:table-cell">
                       {n.run_count}
                     </TableCell>

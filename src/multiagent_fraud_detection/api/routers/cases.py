@@ -136,8 +136,7 @@ async def _caso_existente(session: AsyncSession, transaction_id: str) -> Case | 
     )
 
 
-@router.post(
-    "/cases",
+@router.post("/cases",
     response_model=CaseCreated,
     status_code=status.HTTP_202_ACCEPTED,
 )
