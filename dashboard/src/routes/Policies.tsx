@@ -43,7 +43,8 @@ export function Policies() {
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        Sólo lectura esta etapa (ADR-0017) — el alta no está disponible todavía.
+        Las políticas del banco en su forma ejecutable: se evalúan con reglas
+        determinísticas, no con un LLM, y fijan el veredicto mínimo de cada caso.
       </p>
 
       {query.isLoading ? (
