@@ -183,7 +183,10 @@ export function Dashboard() {
                     angosto (`width`) evita el hueco que dejan sus 60px por
                     defecto para números de dos dígitos. */}
                 <ResponsiveContainer width="100%" height={esMobile ? 270 : 240}>
-                  <BarChart data={distribucion} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                  <BarChart
+                    data={distribucion}
+                    margin={{ top: 8, right: esMobile ? 8 : 32, left: 0, bottom: 0 }}
+                  >
                     <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                     <XAxis
                       dataKey="decision"
