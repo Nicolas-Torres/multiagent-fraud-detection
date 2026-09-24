@@ -247,10 +247,10 @@ export function Transactions() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Acción</TableHead>
+              <TableHead>Transacción</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead>Decisión del LLM</TableHead>
-              <TableHead className="hidden border-l @3xl:table-cell">Transacción</TableHead>
+              <TableHead className="hidden border-l @3xl:table-cell">Tx ID</TableHead>
               <TableHead className="hidden @3xl:table-cell">Cliente</TableHead>
               <TableHead className="hidden @3xl:table-cell">Monto</TableHead>
               <TableHead className="hidden @3xl:table-cell">Canal</TableHead>
