@@ -17,6 +17,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { useCaseProgress } from '@/hooks/useCaseProgress'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import { cn } from '@/lib/utils'
 
 // Cuánto dura el destello de "esto acaba de cambiar" en la tabla de costo
@@ -67,6 +68,7 @@ export function Dashboard() {
   })
 
   const queryClient = useQueryClient()
+  const esMobile = useIsMobile()
 
   // Descubre si hay algo corriendo ahora mismo — sin importar quién lo
   // disparó ni desde qué pestaña (mismo filtro que ya usa la Cola,
@@ -171,11 +173,23 @@ export function Dashboard() {
                 <CardTitle>Distribución de decisiones</CardTitle>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={240}>
-                  <BarChart data={distribucion}>
+                {/* En mobile, las cuatro etiquetas horizontales no entran y
+                    Recharts oculta las que se pisan (`interval` automático):
+                    en diagonal entran todas, sin sumar una leyenda. El eje Y
+                    angosto (`width`) evita el hueco que dejan sus 60px por
+                    defecto para números de dos dígitos. */}
+                <ResponsiveContainer width="100%" height={esMobile ? 270 : 240}>
+                  <BarChart data={distribucion} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                    <XAxis dataKey="decision" tick={{ fontSize: 12 }} />
-                    <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
+                    <XAxis
+                      dataKey="decision"
+                      interval={0}
+                      tick={{ fontSize: esMobile ? 10 : 12 }}
+                      angle={esMobile ? -30 : 0}
+                      textAnchor={esMobile ? 'end' : 'middle'}
+                      height={esMobile ? 70 : 30}
+                    />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 12 }} width={28} />
                     <Bar dataKey="casos" fill="var(--primary)" radius={4} />
                   </BarChart>
                 </ResponsiveContainer>
