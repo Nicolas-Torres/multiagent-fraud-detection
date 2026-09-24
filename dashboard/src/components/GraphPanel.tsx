@@ -614,6 +614,9 @@ export function GraphPanel({
         .graph-panel-sin-handles .react-flow__handle {
           opacity: 0;
         }
+        .graph-panel-sin-handles .react-flow__pane {
+          touch-action: pan-y;
+        }
       `}</style>
       <ReactFlow
         nodes={nodes}
@@ -623,17 +626,16 @@ export function GraphPanel({
         nodesDraggable={false}
         nodesConnectable={false}
         elementsSelectable={true}
-        // Abajo del breakpoint, pinch queda como válvula de escape para
-        // acercarse y leer una etiqueta puntual -`fitView` prioriza mostrar
-        // el pipeline completo sin recortar nada (por eso no hay `minZoom`:
-        // clampear el zoom mínimo aquí cortaba la fila más ancha en vez de
-        // encogerla, comprobado a mano con el layout real). En desktop se
-        // queda todo apagado, como siempre -es una vista de sólo estado,
-        // no un editor-.
-        panOnDrag={esMobile}
+        // Vista de sólo estado, no un editor: sin pan ni zoom en ningún
+        // tamaño. En mobile, `preventScrolling={false}` y el `touch-action`
+        // de arriba dejan que deslizar el dedo sobre el grafo mueva la
+        // página, que si no quedaría trabada bajo un panel que ocupa casi
+        // toda la pantalla.
+        panOnDrag={false}
         zoomOnScroll={false}
-        zoomOnPinch={esMobile}
+        zoomOnPinch={false}
         zoomOnDoubleClick={false}
+        preventScrolling={!esMobile}
         proOptions={{ hideAttribution: true }}
       >
         <Background />
