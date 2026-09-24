@@ -73,24 +73,37 @@ const COLOR_CATEGORIA: Record<Categoria, string> = {
 // `\n` entre el texto y el paréntesis -junto con `whiteSpace: 'pre-line'`
 // en el estilo del nodo de etiqueta, más abajo- para que no compita por
 // ancho con el recuadro que describe.
-const GRUPOS: { key: string; label: string; nodeIds: string[]; color: string }[] = [
+// `etiquetaVertical`: dónde va el título en mobile, donde centrado arriba
+// queda justo sobre las aristas que bajan a los nodos. `costado` usa el
+// hueco a la izquierda de la fila con más espacio libre; `arriba` es para
+// el grupo que ocupa todo el ancho y no tiene costado libre.
+const GRUPOS: {
+  key: string
+  label: string
+  nodeIds: string[]
+  color: string
+  etiquetaVertical: 'arriba' | 'costado'
+}[] = [
   {
     key: 'deterministico',
     label: 'Determinísticos\n(no LLM)',
     nodeIds: ['transaction_context', 'behavioral_pattern', 'external_threat_intel'],
     color: COLOR_CATEGORIA.deterministico,
+    etiquetaVertical: 'arriba',
   },
   {
     key: 'rag',
     label: 'Retrieval semántico\n(gemini-embedding-2)',
     nodeIds: ['internal_policy_rag'],
     color: COLOR_CATEGORIA.rag,
+    etiquetaVertical: 'costado',
   },
   {
     key: 'llm',
     label: 'LLM Anthropic\n(claude-sonnet-5)',
     nodeIds: ['debate_pro_fraud', 'debate_pro_customer', 'decision_arbiter', 'explainability'],
     color: COLOR_CATEGORIA.llm,
+    etiquetaVertical: 'costado',
   },
 ]
 
@@ -119,6 +132,227 @@ interface BBox {
   y: number
   width: number
   height: number
+}
+
+// --- Layout vertical (mobile) ---
+//
+// En vertical, `ROW_GAP` (90) no alcanza para el padding de los recuadros
+// ni para los nodos que se parten en dos líneas ("Evidence Aggregation"),
+// y los recuadros de niveles vecinos se pisaban. Acá cada nivel se ubica
+// debajo del anterior según su alto estimado, más el aire que pida el
+// borde de recuadro que haya entre los dos.
+const V_ARISTA = 36
+const V_PAD = 16
+// Banda del título de `Determinísticos` sobre su fila: los 36px del texto
+// más 20 de separación, para que la arista START→Behavioral, que en su
+// tramo final baja casi vertical al centro del nodo, pase a la derecha del
+// texto y no por encima.
+const V_BANDA_TITULO = 56
+const V_ANCHO_ETIQUETA = 130
+const V_SEPARACION_ETIQUETA = 12
+// Ancho útil del texto de un nodo: `NODE_WIDTH` menos padding (12 + 12) y
+// borde (2 + 2), ver `BASE`/`ESTILOS`.
+const ANCHO_TEXTO_NODO = NODE_WIDTH - 28
+
+let lienzoMedicion: CanvasRenderingContext2D | null | undefined
+
+// Alto real aproximado de un nodo: una o dos líneas según el ancho del
+// texto medido con la misma fuente, en vez de adivinar por cantidad de
+// caracteres.
+function altoEstimado(label: string, synthetic: boolean): number {
+  if (synthetic) return 34
+  if (lienzoMedicion === undefined) {
+    lienzoMedicion = document.createElement('canvas').getContext('2d')
+  }
+  let lineas = 1
+  if (lienzoMedicion) {
+    lienzoMedicion.font = `500 14px ${getComputedStyle(document.body).fontFamily}`
+    lineas = lienzoMedicion.measureText(label).width > ANCHO_TEXTO_NODO ? 2 : 1
+  }
+  return lineas * 20 + 20
+}
+
+interface LayoutVertical {
+  nodos: Node[]
+  alto: Map<string, number>
+  yNivel: number[]
+  altoNivel: number[]
+}
+
+function reespaciarVertical(nodos: Node[], synthById: Map<string, boolean>): LayoutVertical {
+  const nivel = (n: Node) => (n.data as { level?: number }).level ?? 0
+  const alto = new Map(
+    nodos.map((n) => [
+      n.id,
+      altoEstimado((n.data as { label?: string }).label ?? '', synthById.get(n.id) ?? false),
+    ]),
+  )
+  const maxNivel = Math.max(...nodos.map(nivel))
+  const altoNivel = Array.from({ length: maxNivel + 1 }, (_, l) =>
+    Math.max(0, ...nodos.filter((n) => nivel(n) === l).map((n) => alto.get(n.id) ?? 0)),
+  )
+
+  const nivelesDe = (ids: string[]) =>
+    nodos.filter((n) => ids.includes(n.id)).map(nivel)
+  const abre = new Set(GRUPOS.map((g) => Math.min(...nivelesDe(g.nodeIds))))
+  const cierra = new Set(GRUPOS.map((g) => Math.max(...nivelesDe(g.nodeIds))))
+  const conBanda = new Set(
+    GRUPOS.filter((g) => g.etiquetaVertical === 'arriba').map((g) =>
+      Math.min(...nivelesDe(g.nodeIds)),
+    ),
+  )
+
+  const yNivel = [0]
+  for (let l = 1; l <= maxNivel; l++) {
+    let hueco = V_ARISTA
+    if (cierra.has(l - 1)) hueco += V_PAD
+    if (abre.has(l)) hueco += V_PAD
+    if (conBanda.has(l)) hueco += V_BANDA_TITULO
+    yNivel.push(yNivel[l - 1] + altoNivel[l - 1] + hueco)
+  }
+
+  return {
+    nodos: nodos.map((n) => ({ ...n, position: { x: n.position.x, y: yNivel[nivel(n)] } })),
+    alto,
+    yNivel,
+    altoNivel,
+  }
+}
+
+const ESTILO_ETIQUETA: CSSProperties = {
+  border: 'none',
+  background: 'transparent',
+  padding: 0,
+  fontWeight: 600,
+  whiteSpace: 'pre-line',
+  lineHeight: 1.3,
+}
+
+const DECORATIVO = {
+  selectable: false,
+  draggable: false,
+  connectable: false,
+  focusable: false,
+  zIndex: -1,
+} as const
+
+function decoracionVertical({ nodos, yNivel, altoNivel }: LayoutVertical): Node[] {
+  const nivel = (n: Node) => (n.data as { level?: number }).level ?? 0
+
+  const grupos = GRUPOS.flatMap((g) => {
+    const miembros = nodos.filter((n) => g.nodeIds.includes(n.id))
+    const niveles = miembros.map(nivel)
+    const primero = Math.min(...niveles)
+    const ultimo = Math.max(...niveles)
+    const conBanda = g.etiquetaVertical === 'arriba'
+
+    let x = Math.min(...miembros.map((n) => n.position.x)) - GROUP_PADDING_X
+    const derecha = Math.max(...miembros.map((n) => n.position.x)) + NODE_WIDTH + GROUP_PADDING_X
+    const y = yNivel[primero] - V_PAD - (conBanda ? V_BANDA_TITULO : 0)
+    const abajo = yNivel[ultimo] + altoNivel[ultimo] + V_PAD
+
+    let etiqueta: Node
+    if (conBanda) {
+      etiqueta = {
+        id: `group-label-${g.key}`,
+        type: 'etiqueta',
+        position: { x: x + 8, y: y + 4 },
+        style: { ...ESTILO_ETIQUETA, width: derecha - x - 16, fontSize: '0.7rem', color: g.color, textAlign: 'left' },
+        data: { label: g.label },
+        ...DECORATIVO,
+      }
+    } else {
+      // Filas con más hueco a la izquierda: donde el miembro más a la
+      // izquierda está más a la derecha. Ahí no pasa ninguna arista: entran
+      // por arriba del nodo y salen por abajo.
+      const izquierdaDe = (l: number) =>
+        Math.min(...miembros.filter((n) => nivel(n) === l).map((n) => n.position.x))
+      const libre = Math.max(...niveles.map(izquierdaDe))
+      const filas = niveles.filter((l) => izquierdaDe(l) === libre)
+      const desde = Math.min(...filas)
+      const hasta = Math.max(...filas)
+      const xEtiqueta = libre - V_SEPARACION_ETIQUETA - V_ANCHO_ETIQUETA
+      x = Math.min(x, xEtiqueta - 8)
+      etiqueta = {
+        id: `group-label-${g.key}`,
+        type: 'etiqueta',
+        position: { x: xEtiqueta, y: yNivel[desde] },
+        style: {
+          ...ESTILO_ETIQUETA,
+          width: V_ANCHO_ETIQUETA,
+          height: yNivel[hasta] + altoNivel[hasta] - yNivel[desde],
+          display: 'flex',
+          alignItems: 'center',
+          fontSize: '0.7rem',
+          color: g.color,
+          textAlign: 'left',
+        },
+        data: { label: g.label },
+        ...DECORATIVO,
+      }
+    }
+
+    const recuadro: Node = {
+      id: `group-box-${g.key}`,
+      type: 'group',
+      position: { x, y },
+      style: {
+        width: derecha - x,
+        height: abajo - y,
+        border: `1.5px dashed ${g.color}`,
+        backgroundColor: `color-mix(in oklch, ${g.color} 6%, transparent)`,
+        borderRadius: '10px',
+      },
+      data: {},
+      ...DECORATIVO,
+    }
+    return [recuadro, etiqueta]
+  })
+
+  const sueltas = ETIQUETAS_SUELTAS.flatMap((e) => {
+    const nodo = nodos.find((n) => n.id === e.nodeId)
+    if (!nodo) return []
+    const l = nivel(nodo)
+    const suelta: Node = {
+      id: `loose-label-${e.nodeId}`,
+      type: 'etiqueta',
+      position: { x: nodo.position.x - V_SEPARACION_ETIQUETA - V_ANCHO_ETIQUETA, y: yNivel[l] },
+      style: {
+        ...ESTILO_ETIQUETA,
+        width: V_ANCHO_ETIQUETA,
+        height: altoNivel[l],
+        display: 'flex',
+        alignItems: 'center',
+        fontSize: '0.65rem',
+        color: e.color,
+        textAlign: 'left',
+      },
+      data: { label: e.label },
+      ...DECORATIVO,
+    }
+    return [suelta]
+  })
+
+  return [...grupos, ...sueltas]
+}
+
+// Proporción del grafo completo (nodos + recuadros), para que en mobile el
+// panel tenga exactamente esa forma y `fitView` quede limitado por el
+// ancho: sin zoom ni pan, el tamaño del texto depende sólo de eso.
+function proporcionDe(nodos: Node[], alto: Map<string, number>): number {
+  let minX = Infinity
+  let maxX = -Infinity
+  let minY = Infinity
+  let maxY = -Infinity
+  for (const n of nodos) {
+    const ancho = Number(n.style?.width ?? NODE_WIDTH)
+    const h = Number(n.style?.height ?? alto.get(n.id) ?? NODE_HEIGHT)
+    minX = Math.min(minX, n.position.x)
+    maxX = Math.max(maxX, n.position.x + ancho)
+    minY = Math.min(minY, n.position.y)
+    maxY = Math.max(maxY, n.position.y + h)
+  }
+  return (maxX - minX) / (maxY - minY)
 }
 
 function bboxDeGrupo(nodos: Node[], ids: string[]): BBox {
@@ -229,13 +463,15 @@ export function GraphPanel({
   // vez de encoger el layout horizontal hasta ilegible.
   const esMobile = useIsMobile()
 
-  const { nodes, edges } = useMemo(() => {
+  const { nodes, edges, proporcion } = useMemo(() => {
     const base = layoutTopology(topology, esMobile ? 'vertical' : 'horizontal')
     const ran = new Set(agentRoute)
     const degraded = new Set(degradedAgents)
     const synthById = new Map(topology.nodes.map((n) => [n.id, n.synthetic]))
+    const vertical = esMobile ? reespaciarVertical(base.nodes, synthById) : null
+    const posicionados = vertical?.nodos ?? base.nodes
 
-    const nodes: Node[] = base.nodes.map((n) => {
+    const nodes: Node[] = posicionados.map((n) => {
       if (animating) {
         const level = (n.data as { level?: number }).level ?? 0
         return {
@@ -261,6 +497,11 @@ export function GraphPanel({
     // miembros -no coordenadas fijas a mano-, más su etiqueta de texto.
     // Van primero en el array (detrás, en z-order) y son puramente
     // decorativos: sin interacción, sin afectar `estadoDe`/`acentoDe`.
+    if (vertical) {
+      const todos = [...decoracionVertical(vertical), ...nodes]
+      return { nodes: todos, edges: base.edges, proporcion: proporcionDe(todos, vertical.alto) }
+    }
+
     const decoracion: Node[] = GRUPOS.flatMap((g) => {
       const box = bboxDeGrupo(base.nodes, g.nodeIds)
       const recuadro: Node = {
@@ -340,18 +581,14 @@ export function GraphPanel({
       return [suelta]
     })
 
-    return { nodes: [...decoracion, ...etiquetasSueltas, ...nodes], edges: base.edges }
+    return { nodes: [...decoracion, ...etiquetasSueltas, ...nodes], edges: base.edges, proporcion: null }
   }, [agentRoute, degradedAgents, animating, caseDecided, esMobile])
 
   return (
     <div
-      className={cn(
-        'graph-panel-sin-handles w-full rounded-md border',
-        // Más alto en vertical: son niveles apilados, no columnas -el
-        // ancho ya es 100% del panel, lo que falta es alto para que
-        // `fitView` no tenga que encoger tanto el texto.
-        esMobile ? 'h-[28rem]' : 'h-80',
-      )}
+      // En vertical el alto sale de la proporción del grafo (`proporcionDe`),
+      // no de un alto fijo: así `fitView` usa todo el ancho del panel.
+      className={cn('graph-panel-sin-handles w-full rounded-md border', !proporcion && 'h-80')}
       // Fijo -no `var(--background)`- a propósito: el panel siempre está
       // oscuro, sin importar el tema del sitio. El amarillo/azul/naranja
       // de las etiquetas de categoría (`COLOR_CATEGORIA`) está pensado
@@ -360,7 +597,7 @@ export function GraphPanel({
       // elegido a mano (no referencia `--background` de `.dark` en
       // `index.css`): tiene que quedar igual aunque alguien cambie ese
       // token ahí.
-      style={{ backgroundColor: 'oklch(0.25 0 0)' }}
+      style={{ backgroundColor: 'oklch(0.25 0 0)', aspectRatio: proporcion ?? undefined }}
     >
       {/* Puramente estético, a pedido: los puntos de conexión de React Flow
           (`.react-flow__handle`) no aportan nada acá -`nodesConnectable`
