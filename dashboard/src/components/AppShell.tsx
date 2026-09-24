@@ -92,7 +92,7 @@ export function AppShell() {
             entero queda fijo a la altura del viewport (`h-svh overflow-hidden`
             arriba) y sólo esto -el `<main>` de abajo- scrollea. */}
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          <header className="flex shrink-0 items-center gap-3 border-b px-6 py-4">
+          <header className="flex shrink-0 items-center gap-3 border-b px-3 py-4 md:px-6">
             <SheetTrigger
               render={
                 <Button variant="ghost" size="icon-sm" className="md:hidden" aria-label="Abrir navegación" />
@@ -102,7 +102,7 @@ export function AppShell() {
             </SheetTrigger>
             <h1 className="text-xl font-semibold">{tituloDe(location.pathname)}</h1>
           </header>
-          <main className="@container flex-1 overflow-y-auto overflow-x-auto px-6 py-6">
+          <main className="@container flex-1 overflow-y-auto overflow-x-auto px-2 py-4 md:px-6 md:py-6">
             <Outlet />
           </main>
         </div>
