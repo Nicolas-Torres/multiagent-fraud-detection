@@ -5,6 +5,23 @@
 
 ## Contexto
 
+> **Nota** (2026-09-22, [ADR-0011](0011-citacion-por-identidad-descubrimiento-por-similitud.md),
+> [ADR-0014](0014-la-inteligencia-externa-se-recoge-en-build-y-se-consulta-congelada.md)):
+> el **criterio** de este ADR —sensores determinísticos, juicio con LLM— no
+> cambia. Cambió el **conteo**, porque dos decisiones posteriores le sacaron el
+> LLM a dos nodos en tiempo de ejecución:
+>
+> - **External Threat Intel**: la búsqueda web con LLM se movió a un paso de
+>   build (`fetch_threat_intel.py`); en el grafo el nodo sólo hace lookup en
+>   Postgres (ADR-0014).
+> - **Internal Policy RAG**: la "síntesis de política" nunca se implementó. El
+>   nodo cita por identidad y descubre por similitud (ADR-0011); llama a un
+>   modelo de **embeddings**, que no genera texto.
+>
+> Hoy son **4 nodos con LLM** (Debate ×2, Arbiter, Explainability), **1 con
+> embeddings** (Internal Policy RAG) y **5 sin modelo**. La tabla y las cifras
+> de abajo ya reflejan ese reparto.
+
 El reto enumera ocho agentes y exige "un equipo multi-agente orquestado". El grafo
 implementado tiene diez nodos —los ocho del reto, más un segundo agente de debate
 y el persistidor—.
@@ -37,15 +54,15 @@ El criterio que ordena el reparto:
 | Transaction Context | determinístico | compara umbrales explícitos del catálogo |
 | Behavioral Pattern | determinístico | contrasta contra perfil e historial |
 | Evidence Aggregation | determinístico | fusiona señales y compone `risk_score` |
-| Internal Policy RAG | **LLM** | recuperación semántica y síntesis de política |
-| External Threat Intel | **LLM** | leer web no estructurada |
+| Internal Policy RAG | **embeddings** | cita por identidad; descubre por similitud (ADR-0011) |
+| External Threat Intel | determinístico | lookup del snapshot congelado; el LLM lee la web en build (ADR-0014) |
 | Debate Pro-Fraude | **LLM** | construir el argumento acusatorio |
 | Debate Pro-Cliente | **LLM** | construir el descargo |
 | Decision Arbiter | **LLM** | juicio bajo evidencia contradictoria |
 | Explainability | **LLM** | lenguaje natural para cliente y auditoría |
 | Persistencia | — | no es agente: es la costura con la base |
 
-Seis de los nueve agentes usan LLM.
+Cuatro de los nueve agentes usan LLM y uno usa un modelo de embeddings.
 
 Tres razones sostienen el lado determinístico:
 
@@ -100,9 +117,9 @@ indemostrable. Es el primer candidato a revisar si aparece evidencia.
 ## Consecuencias
 
 **Se gana** un harness que mide algo estable, evidencia auditable línea por línea,
-y latencia y costo acotados: seis llamadas a LLM por caso en vez de nueve.
+y latencia y costo acotados: cuatro llamadas a LLM por caso en vez de nueve.
 
-**Se paga** que el sistema es menos "agéntico" de lo que la etiqueta sugiere. Tres
+**Se paga** que el sistema es menos "agéntico" de lo que la etiqueta sugiere. Cuatro
 de los nueve agentes son funciones puras con una firma de nodo. Quien cuente LLMs
 va a objetar, y **el argumento tiene que estar explícito en el informe**, no
 implícito en el código. Argumentado, suma en la rúbrica; no argumentado, resta.
