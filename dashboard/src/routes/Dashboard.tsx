@@ -7,6 +7,7 @@ import type { components } from '@/api/schema'
 import { Field } from '@/components/Field'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import topology from '@/data/graph_topology.json'
 import {
   Table,
   TableBody,
@@ -216,6 +217,10 @@ export function Dashboard() {
 
 type LlmMetricsRead = components['schemas']['LlmMetricsRead']
 
+// Mismo nombre que muestra el grafo (`GraphPanel`), no el id técnico del
+// nodo: la tabla y el grafo describen los mismos diez pasos.
+const ETIQUETA_NODO = new Map(topology.nodes.map((n) => [n.id, n.label]))
+
 function formatUsd(valor: number): string {
   return `$${valor.toFixed(valor < 1 ? 4 : 2)}`
 }
@@ -280,15 +285,23 @@ function LatenciaYCostoPorNodo({
                 <TableRow>
                   <TableHead>Nodo</TableHead>
                   <TableHead className="hidden @3xl:table-cell">Corridas</TableHead>
-                  <TableHead>Latencia prom.</TableHead>
+                  <TableHead>
+                    Latencia <br className="md:hidden" />
+                    prom.
+                  </TableHead>
                   <TableHead className="hidden @3xl:table-cell">Tokens prom.</TableHead>
-                  <TableHead>Costo prom.</TableHead>
+                  <TableHead>
+                    Costo <br className="md:hidden" />
+                    prom.
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {metricas.data.nodes!.map((n) => (
                   <TableRow key={n.name}>
-                    <TableCell className="font-mono text-xs">{n.name}</TableCell>
+                    <TableCell className="whitespace-normal">
+                      {ETIQUETA_NODO.get(n.name) ?? n.name}
+                    </TableCell>
                     <TableCell className="hidden text-muted-foreground @3xl:table-cell">
                       {n.run_count}
                     </TableCell>
