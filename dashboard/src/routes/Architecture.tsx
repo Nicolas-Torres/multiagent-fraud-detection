@@ -1,6 +1,14 @@
 import { useState } from 'react'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 
 const GITHUB_DOCS_BASE =
   'https://github.com/Nicolas-Torres/multiagent-fraud-detection/blob/main/docs/'
@@ -46,6 +54,60 @@ const DECISIONES: DecisionDestacada[] = [
   },
 ]
 
+const RECORRIDO: string[] = [
+  'Llega la transacción: la API responde 202 y el análisis corre en segundo plano.',
+  'Tres sensores en paralelo, con reglas: contexto, comportamiento e inteligencia externa.',
+  'RAG de políticas: cita las que dispararon y busca otras relacionadas.',
+  'Agregación: puntaje de riesgo y confianza, sin LLM.',
+  'Debate: dos agentes LLM argumentan a favor y en contra, en paralelo.',
+  'Árbitro: el LLM decide sin bajar el piso de las reglas; se redacta la explicación y se sellan las versiones usadas.',
+  'Si el veredicto es escalar, el caso entra a la cola Human-in-the-loop.',
+]
+
+const EVALUACION: { que: string; metodo: string; resultado: string }[] = [
+  {
+    que: 'Motor de reglas',
+    metodo: 'Match exacto contra el ground truth, como gate de CI',
+    resultado: '7000/7000',
+  },
+  {
+    que: 'Recuperación semántica (ablación)',
+    metodo: 'recall@1 y MRR sobre las 653 transacciones con política esperada',
+    resultado: '0.79 / 0.88',
+  },
+  {
+    que: 'Razonamiento de los agentes',
+    metodo: 'LLM-as-judge (DeepEval) sobre un golden set curado',
+    resultado: 'Se vigila por tendencia; nunca bloquea el CI',
+  },
+]
+
+const TECNOLOGIAS: { nombre: string; uso: string }[] = [
+  { nombre: 'Python + FastAPI', uso: 'API async: ingesta de casos, progreso en vivo por SSE, cola HITL' },
+  { nombre: 'LangGraph', uso: 'Orquestación del grafo de 10 nodos con ramas en paralelo' },
+  {
+    nombre: 'Claude Sonnet 5 (Anthropic)',
+    uso: 'Debate, árbitro con salida estructurada y explicación al cliente',
+  },
+  { nombre: 'Claude + web search', uso: 'Recolección de inteligencia externa, en build, no en cada caso' },
+  { nombre: 'Gemini Embedding 2', uso: 'Índice vectorial de las políticas para el RAG' },
+  {
+    nombre: 'PostgreSQL + pgvector (Neon)',
+    uso: 'Datos, índice vectorial y sellos de auditoría en una sola base',
+  },
+  { nombre: 'SQLAlchemy 2 + Alembic', uso: 'ORM async y migraciones versionadas' },
+  { nombre: 'DeepEval', uso: 'LLM-as-judge sobre un golden set curado' },
+  { nombre: 'LangSmith', uso: 'Trazas, costo y latencia por nodo (alimenta este dashboard)' },
+  { nombre: 'OpenTelemetry + Grafana', uso: 'Trazas, logs y métricas de infraestructura' },
+  { nombre: 'React + TypeScript + React Flow', uso: 'Este dashboard y el grafo en vivo' },
+  {
+    nombre: 'Docker + GitHub Actions',
+    uso: 'Imagen única y CI con gates (tests, 7000/7000, migraciones)',
+  },
+  { nombre: 'Terraform', uso: 'Infraestructura como código en Azure y GCP' },
+  { nombre: 'Azure Container Apps + GCP Cloud Run', uso: 'Despliegue en dos nubes' },
+]
+
 function DiagramaC4() {
   const [falta, setFalta] = useState(false)
 
@@ -81,6 +143,15 @@ export function Architecture() {
       </section>
 
       <section className="space-y-3">
+        <h2 className="text-lg font-semibold">Recorrido de una transacción</h2>
+        <ol className="list-decimal space-y-1.5 pl-5 text-sm text-muted-foreground marker:text-foreground">
+          {RECORRIDO.map((paso) => (
+            <li key={paso}>{paso}</li>
+          ))}
+        </ol>
+      </section>
+
+      <section className="space-y-3">
         <h2 className="text-lg font-semibold">Decisiones de diseño</h2>
         <div className="grid gap-4 sm:grid-cols-2">
           {DECISIONES.map((d) => (
@@ -102,6 +173,48 @@ export function Architecture() {
             </Card>
           ))}
         </div>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold">Cómo se evalúa</h2>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Qué se mide</TableHead>
+              <TableHead>Método</TableHead>
+              <TableHead>Resultado</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {EVALUACION.map((e) => (
+              <TableRow key={e.que}>
+                <TableCell className="whitespace-normal font-medium">{e.que}</TableCell>
+                <TableCell className="whitespace-normal text-muted-foreground">{e.metodo}</TableCell>
+                <TableCell className="whitespace-normal">{e.resultado}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold">Tecnologías</h2>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Tecnología</TableHead>
+              <TableHead>Dónde se usa</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {TECNOLOGIAS.map((t) => (
+              <TableRow key={t.nombre}>
+                <TableCell className="whitespace-normal font-medium">{t.nombre}</TableCell>
+                <TableCell className="whitespace-normal text-muted-foreground">{t.uso}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       </section>
     </div>
   )
