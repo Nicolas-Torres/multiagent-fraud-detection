@@ -26,7 +26,7 @@ evidencia que lo cubre en el repo, y declara los desvíos frente a
 | 7 | Evaluación de la aplicación | `check_policies.py` 7000/7000, ADR-0006 + ADR-0016 (brazo de control determinístico, ya en producción — no sólo planeado), ADR-0013 (métricas duras vs LLM-as-judge), `ground_truth.csv` | 🟡 ver desvío D-07 |
 | 8 | Resultados y demostración | `smoke_decision.py`, `smoke_retrieval.py`, `smoke_api.py`, `smoke_agents.py`, demo en vivo (Azure + GCP, ver README) | 🟡 falta el video |
 | 9 | Conclusiones | `docs/reviews/` (doce actas) — la materia prima ya está escrita | ⬜ |
-| 10 | Recomendaciones | deudas declaradas: event-driven, feed en streaming, consolidación de listas de gobernanza, retry propio con backoff en el proveedor de embeddings (Gemini, ver acta 11) | ⬜ |
+| 10 | Recomendaciones | deudas declaradas: event-driven, feed en streaming, consolidación de listas de gobernanza, retry propio con backoff en el proveedor de embeddings (Gemini, ver acta 11), alertas de 4xx y de consumo de Neon (incidente 0006) | ⬜ |
 | 11 | Referencias (≥5, APA) | — | ⬜ **nadie las está juntando** |
 | 12 | Video de exposición | — | ⬜ |
 
