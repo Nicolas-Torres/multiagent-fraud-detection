@@ -3,6 +3,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 
+import { CasoNoEncontrado } from '@/api/cases'
 import { AppShell } from '@/components/AppShell'
 import { Architecture } from '@/routes/Architecture'
 import { CaseDetail } from '@/routes/CaseDetail'
@@ -13,7 +14,15 @@ import { Transactions } from '@/routes/Transactions'
 
 import './index.css'
 
-const queryClient = new QueryClient()
+// Un caso que no existe no va a aparecer reintentando: el resto de los
+// errores conserva los 3 reintentos por defecto.
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: (intentos, error) => !(error instanceof CasoNoEncontrado) && intentos < 3,
+    },
+  },
+})
 
 const router = createBrowserRouter([
   {

@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronDownIcon } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
+import { CasoNoEncontrado, consultarCaso } from '@/api/cases'
 import { api } from '@/api/client'
 import type { components } from '@/api/schema'
 import { AnalyzingPanel } from '@/components/AnalyzingPanel'
@@ -27,6 +28,16 @@ import { cn } from '@/lib/utils'
 
 type TransactionIn = components['schemas']['TransactionIn']
 type CaseDetailType = components['schemas']['CaseDetail']
+
+// Sondea cada 3s hasta que el caso tenga veredicto. Con error (un 404, el
+// caso ya no existe) deja de sondear: sin esto, un caso inexistente se
+// consultaba cada 3s mientras la pestaña estuviera abierta.
+function sondearHastaDecidir(query: {
+  state: { status: string; data?: CaseDetailType }
+}): number | false {
+  if (query.state.status === 'error') return false
+  return query.state.data?.decision ? false : 3_000
+}
 
 // Sin `case_id`: ese campo se resuelve en vivo con GET /cases/showcase
 // (contrato §2.3), nunca horneado en el build — ver el docstring de
@@ -160,15 +171,9 @@ export function Transactions() {
   const panelCaseId = chipSeleccionado ?? casoInicial
   const panelDetalle = useQuery({
     queryKey: ['case', panelCaseId],
-    queryFn: async () => {
-      const { data, error } = await api.GET('/api/v1/cases/{case_id}', {
-        params: { path: { case_id: panelCaseId! } },
-      })
-      if (error) throw error
-      return data
-    },
+    queryFn: () => consultarCaso(panelCaseId!),
     enabled: !!panelCaseId,
-    refetchInterval: (query) => (query.state.data?.decision ? false : 3_000),
+    refetchInterval: sondearHastaDecidir,
   })
   const progreso = useCaseProgress(
     chipSeleccionado && !panelDetalle.data?.decision ? chipSeleccionado : null,
@@ -205,6 +210,15 @@ export function Transactions() {
     },
     onError: (error: Error) => setErrorEjecucion(error.message),
   })
+
+  function olvidarCaso(escenarioId: string) {
+    setCaseIdPorEscenario((previos) => {
+      if (!(escenarioId in previos)) return previos
+      const { [escenarioId]: _olvidado, ...resto } = previos
+      localStorage.setItem(CASE_IDS_STORAGE_KEY, JSON.stringify(resto))
+      return resto
+    })
+  }
 
   function restanteMs(id: string): number {
     const ultima = ultimasCorridas[id]
@@ -285,6 +299,7 @@ export function Transactions() {
                 accionLabel="Ejecutar"
                 onEjecutar={() => ejecutar.mutate(escenario)}
                 ejecutando={ejecutar.isPending}
+                onCasoInexistente={() => olvidarCaso(escenario.id)}
               />
             ))}
           </TableBody>
@@ -311,6 +326,7 @@ function FilaTransaccion({
   accionLabel,
   onEjecutar,
   ejecutando,
+  onCasoInexistente,
 }: {
   claveEscenario: string
   transactionId: string | null
@@ -320,6 +336,7 @@ function FilaTransaccion({
   accionLabel: string
   onEjecutar: () => void
   ejecutando: boolean
+  onCasoInexistente?: () => void
 }) {
   const [detalleAbierto, setDetalleAbierto] = useState(false)
 
@@ -331,17 +348,20 @@ function FilaTransaccion({
   // siempre.
   const detalle = useQuery({
     queryKey: ['case', caseId],
-    queryFn: async () => {
-      const { data, error } = await api.GET('/api/v1/cases/{case_id}', {
-        params: { path: { case_id: caseId! } },
-      })
-      if (error) throw error
-      return data as CaseDetailType
-    },
+    queryFn: () => consultarCaso(caseId!),
     enabled: !!caseId,
-    refetchInterval: (query) => (query.state.data?.decision ? false : 3_000),
+    refetchInterval: sondearHastaDecidir,
   })
   const enCooldown = restante > 0
+
+  // Un `case_id` guardado en `localStorage` cuyo caso ya no existe (se borró
+  // en la base): se olvida, y la fila vuelve a "—" lista para ejecutarse.
+  const casoInexistente = detalle.error instanceof CasoNoEncontrado
+  const onCasoInexistenteRef = useRef(onCasoInexistente)
+  onCasoInexistenteRef.current = onCasoInexistente
+  useEffect(() => {
+    if (casoInexistente) onCasoInexistenteRef.current?.()
+  }, [casoInexistente])
 
   return (
     <>
@@ -457,14 +477,8 @@ function ChipEnCurso({
   // seleccionado) y la fila de abajo -React Query la deduplica.
   const detalle = useQuery({
     queryKey: ['case', caseId],
-    queryFn: async () => {
-      const { data, error } = await api.GET('/api/v1/cases/{case_id}', {
-        params: { path: { case_id: caseId } },
-      })
-      if (error) throw error
-      return data as CaseDetailType
-    },
-    refetchInterval: (query) => (query.state.data?.decision ? false : 3_000),
+    queryFn: () => consultarCaso(caseId),
+    refetchInterval: sondearHastaDecidir,
   })
   const decidido = !!detalle.data?.decision
 
