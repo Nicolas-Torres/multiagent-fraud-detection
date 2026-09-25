@@ -51,11 +51,15 @@ export function AnalyzingPanel({ identificador, status, ranNodes, connected }: A
             : 'Conectando el progreso en vivo — el barrido de abajo sólo marca que el proceso sigue corriendo.'}
         </p>
         <div className="max-md:-mx-(--card-spacing)">
-          {connected ? (
-            <GraphPanel agentRoute={ranNodes} degradedAgents={[]} caseDecided={false} />
-          ) : (
-            <GraphPanel agentRoute={[]} degradedAgents={[]} animating />
-          )}
+          {/* Un solo `GraphPanel` que cambia de props: dos elementos
+              alternados por `connected` desmontaban React Flow en cada
+              cambio, y el nuevo se pintaba vacío hasta su `fitView`. */}
+          <GraphPanel
+            agentRoute={connected ? ranNodes : []}
+            degradedAgents={[]}
+            caseDecided={false}
+            animating={!connected}
+          />
         </div>
       </CardContent>
     </Card>
