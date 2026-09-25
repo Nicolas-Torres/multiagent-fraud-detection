@@ -35,10 +35,30 @@ Dependencias con `uv`, nunca `pip`. Windows + Git Bash.
 - Las decisiones de diseño se resuelven **antes** de implementar y quedan en un
   ADR bajo `docs/adr/`. Un ADR aceptado es inmutable: si cambia, se escribe otro
   y el viejo se marca *reemplazado*.
+- **Revisar las consecuencias antes de cerrar un cambio** (ver sección abajo).
 - **Leer toda migración autogenerada antes de aplicarla.** No es ceremonia: ha
   atrapado `sa.ARRAY` genérico donde debía ir `postgresql.ARRAY` e índices que
   ninguna consulta usa.
 - No aplicar migraciones ni correr `--reset` sin confirmación explícita.
+
+---
+
+## Antes de cerrar un cambio
+
+Un cambio no termina cuando funciona el camino feliz. El incidente 0006 vino de
+un borrado de datos (incidente 0003) que sólo miró las cascadas de la base.
+
+- **Referencias fuera de la base.** Al borrar o renombrar datos, buscar a todos
+  los que los guardan: código, `localStorage`, cachés, JSON horneados en el
+  build, la otra nube. Anotarlo en el PR.
+- **Estado que sobrevive.** El estado del cliente puede vencer: un ID guardado
+  que la API ya no conoce se olvida, no se reintenta.
+- **Caminos de error.** Probar al menos un error (404, stream cortado), una
+  recarga y una segunda visita, además del camino feliz.
+- **Todo lo periódico cuesta.** Sondeo, probe o cron necesitan condición de
+  salida ante error y una estimación de consultas por hora: cada una despierta
+  la base serverless (Neon, incidente 0005).
+- **Después del deploy**, revisar consola y red en Azure y GCP, no sólo en local.
 
 ---
 
