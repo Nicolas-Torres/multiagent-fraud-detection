@@ -35,6 +35,10 @@ export function useCaseProgress(caseId: string | null, onDone?: () => void): Cas
     if (!caseId) return
 
     const fuente = new EventSource(`/api/v1/cases/${caseId}/stream`)
+    // El servidor cierra el stream después de `done`, y `EventSource`
+    // reporta ese cierre como error: si llega antes que el `close()` de
+    // abajo, no es una desconexión y no tiene que volver a "Conectando…".
+    let terminado = false
 
     fuente.addEventListener('open', () => setConnected(true))
     fuente.addEventListener('node', (evento) => {
@@ -48,11 +52,14 @@ export function useCaseProgress(caseId: string | null, onDone?: () => void): Cas
     // dependiente de `done` puede cancelarse a mitad de camino por esa
     // razón ajena, y quien esperaba reaccionar al final nunca se entera.
     fuente.addEventListener('done', () => {
+      terminado = true
       setDone(true)
       onDoneRef.current?.()
       fuente.close()
     })
-    fuente.onerror = () => setConnected(false)
+    fuente.onerror = () => {
+      if (!terminado) setConnected(false)
+    }
 
     return () => fuente.close()
   }, [caseId])

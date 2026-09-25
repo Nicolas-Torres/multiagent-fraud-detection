@@ -1,6 +1,14 @@
-import { Background, ReactFlow, type Node, type NodeProps } from '@xyflow/react'
+import {
+  Background,
+  Position,
+  ReactFlow,
+  type Node,
+  type NodeChange,
+  type NodeHandle,
+  type NodeProps,
+} from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { type CSSProperties, useMemo } from 'react'
+import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import topology from '@/data/graph_topology.json'
 import { useIsMobile } from '@/hooks/useIsMobile'
@@ -434,6 +442,34 @@ function EtiquetaNode({ data }: NodeProps) {
 
 const NODE_TYPES = { etiqueta: EtiquetaNode }
 
+// Medidas que React Flow reportó, por layout e id de nodo (`h:…`/`v:…`):
+// compartidas entre instancias porque el mismo nodo mide lo mismo en todas.
+const MEDIDAS_CONOCIDAS = new Map<string, { width: number; height: number }>()
+
+// Anclajes de las aristas calculados como los ubica el CSS de React Flow
+// (un cuadrado de 6px centrado sobre el borde). Sólo para el primer cuadro
+// de un panel recién montado: sin esto, React Flow no dibuja ninguna arista
+// hasta medir los anclajes en el DOM.
+function anclajesEstimados(n: Node, medida: { width: number; height: number }): NodeHandle[] {
+  const { width: w, height: h } = medida
+  const centro = (p: Position) =>
+    p === Position.Top
+      ? { x: w / 2, y: 0 }
+      : p === Position.Bottom
+        ? { x: w / 2, y: h }
+        : p === Position.Left
+          ? { x: 0, y: h / 2 }
+          : { x: w, y: h / 2 }
+  const anclaje = (type: 'source' | 'target', position: Position): NodeHandle => {
+    const c = centro(position)
+    return { type, position, x: c.x - 3, y: c.y - 3, width: 6, height: 6 }
+  }
+  return [
+    anclaje('source', n.sourcePosition ?? Position.Bottom),
+    anclaje('target', n.targetPosition ?? Position.Top),
+  ]
+}
+
 function estadoDe(
   nodeId: string,
   synthetic: boolean,
@@ -584,6 +620,50 @@ export function GraphPanel({
     return { nodes: [...decoracion, ...etiquetasSueltas, ...nodes], edges: base.edges, proporcion: null }
   }, [agentRoute, degradedAgents, animating, caseDecided, esMobile])
 
+  // Los nodos se recalculan como objetos nuevos con cada evento del stream,
+  // y React Flow toma el tamaño medido de esos objetos: sin `measured`, da
+  // cada nodo por no medido, lo oculta (`visibility: hidden`) y descarta los
+  // anclajes de sus aristas hasta volver a medirlo — un parpadeo que, con
+  // actualizaciones seguidas, puede dejar el grafo vacío. Guardar lo que
+  // React Flow reporta y devolvérselo en cada objeto lo evita.
+  // Arranca del caché de módulo: un panel recién montado (el card de
+  // vitrina que pasa a "Analizando…", y ése que pasa a "Recorrido por el
+  // grafo") ya conoce las medidas y no se pinta vacío en su primer cuadro.
+  const layout = esMobile ? 'v' : 'h'
+  const [medidas, setMedidas] = useState(() => new Map(MEDIDAS_CONOCIDAS))
+
+  const alCambiarNodos = useCallback(
+    (cambios: NodeChange[]) => {
+      const nuevas = cambios.flatMap((c) =>
+        c.type === 'dimensions' && c.dimensions ? [[`${layout}:${c.id}`, c.dimensions] as const] : [],
+      )
+      if (nuevas.length === 0) return
+      for (const [clave, medida] of nuevas) MEDIDAS_CONOCIDAS.set(clave, medida)
+      setMedidas((previas) => new Map([...previas, ...nuevas]))
+    },
+    [layout],
+  )
+
+  const primerCuadro = useRef(true)
+  useEffect(() => {
+    primerCuadro.current = false
+  }, [])
+
+  const nodosMedidos = useMemo(
+    () =>
+      nodes.map((n) => {
+        const medida = medidas.get(`${layout}:${n.id}`)
+        if (!medida) return n
+        // Sólo los nodos del grafo tienen aristas; los de decoración
+        // (`group`, `etiqueta`) no llevan anclajes.
+        const conAnclajes = primerCuadro.current && !n.type
+        return conAnclajes
+          ? { ...n, measured: medida, handles: anclajesEstimados(n, medida) }
+          : { ...n, measured: medida }
+      }),
+    [nodes, medidas, layout],
+  )
+
   return (
     <div
       // En vertical el alto sale de la proporción del grafo (`proporcionDe`),
@@ -624,7 +704,8 @@ export function GraphPanel({
         }
       `}</style>
       <ReactFlow
-        nodes={nodes}
+        nodes={nodosMedidos}
+        onNodesChange={alCambiarNodos}
         edges={edges}
         nodeTypes={NODE_TYPES}
         fitView
