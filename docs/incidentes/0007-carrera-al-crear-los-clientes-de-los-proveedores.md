@@ -54,13 +54,23 @@ Reproducido en local con 16 hilos sobre un `GeminiEmbedder` compartido en frío:
 
 ## Fix
 
-Un `threading.Lock` por adaptador alrededor de la creación del cliente, y un
-test que lanza varios hilos en frío contra un constructor lento y verifica que
-se crea un solo cliente.
+Commit `b554606`, rama `fix/provider-client-race-and-live-scenarios`:
+
+- Los cuatro adaptadores crean su cliente dentro de `with self._lock:`, un
+  `threading.Lock` por instancia (`field(default_factory=threading.Lock)`).
+  Nada copia ni serializa los adaptadores, así que el lock no rompe ningún
+  `deepcopy`.
+- `tests/test_provider_clients.py`: 8 hilos sincronizados con una barrera piden
+  el cliente en frío contra un constructor lento (50 ms), en los cuatro
+  adaptadores. Verifica que se crea un solo cliente y que todos reciben el mismo.
 
 ## Verificación
 
-*(pendiente: se completa con el PR)*
+- **Sin el lock, el test falla en los cuatro adaptadores**: 8 clientes creados
+  en lugar de 1. Con el lock, pasa.
+- `pytest` completo y `ruff` en verde.
+- **Después del deploy** (pendiente): repetir la carga de 8 análisis en paralelo
+  contra GCP recién arrancado. Tiene que salir sin agentes degradados.
 
 ## Aprendizaje
 

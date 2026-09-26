@@ -43,19 +43,44 @@ el timestamp del escenario es fijo (ADR-0004). Sin el sufijo, cada corrida suma
 un cargo más de CU-0038 a M-999 ese mismo día y, con el uso, el escenario deriva
 hacia `BLOCK`: el mismo problema que el sufijo existe para evitar.
 
+## Hallazgo relacionado: la etiqueta de FP-02
+
+Al revisar los escenarios apareció el mismo defecto en el texto:
+`POLITICA_A_FRASE` describía FP-02 como *"canal nuevo con monto alto"*, pero
+FP-02 es `country_not_usual() ∧ device_not_usual()`: una compra internacional
+desde un dispositivo nuevo. La fila `t1026` prometía una señal que no es la que
+evalúa el motor.
+
 ## Fix
 
-`seed_diverse_scenarios.py` descarta los candidatos cuya señal depende del
-dispositivo o del comercio (FP-03, FP-07, FP-11), y `diverse_scenarios.json` se
-regenera: `t1249` se reemplaza por otro caso `ESCALATE_TO_HUMAN` cuya señal sí
-sobrevive al sufijo.
+Commit `5adfdd9`, rama `fix/provider-client-race-and-live-scenarios`:
 
-Se pierde la fila que mostraba la lista negra de comercios en vivo. Es el costo
+- `seed_diverse_scenarios.py` descarta los candidatos con FP-03, FP-07 o FP-11
+  (`NO_SOBREVIVEN_AL_SUFIJO`).
+- FP-02 pasa a describirse como *"compra internacional desde un dispositivo
+  nuevo"*.
+- `diverse_scenarios.json` regenerado: `t1249` sale y entra `t1155` (FP-08,
+  cuenta nueva con un monto grande, `ESCALATE_TO_HUMAN`). Los otros cinco
+  escenarios no cambian. Sólo cambia la etiqueta de `t1026`.
+- `tests/test_diverse_scenarios.py`:
+  - Ningún escenario elegido depende del dispositivo o del comercio. El
+    conjunto se declara en el test, no se importa del script, para que vaciar
+    la constante no lo deje pasando.
+  - El JSON comprometido es exactamente el que genera el selector.
+
+Se pierde la fila que mostraba en vivo la lista negra de comercios. Es el costo
 de que cada fila ejecutable cumpla lo que promete.
+
+Los IDs de `t1249` guardados en el `localStorage` de los visitantes quedan
+inertes: sólo los lee su propia fila, que ya no existe.
 
 ## Verificación
 
-*(pendiente: se completa con el PR)*
+- **Sin el filtro, los dos tests fallan** y nombran `t1249` con `['FP-07']`.
+  Con el filtro, pasan.
+- `pytest` completo, `ruff`, `tsc` y el build del dashboard en verde.
+- **Después del deploy** (pendiente): ejecutar `t1155` y `t1026` en una nube y
+  comprobar que el veredicto y las políticas coinciden con su fila.
 
 ## Aprendizaje
 
