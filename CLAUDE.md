@@ -28,7 +28,9 @@ Dependencias con `uv`, nunca `pip`. Windows + Git Bash.
 
 ## Flujo de trabajo
 
-- GitHub Flow: `feature/*` → PR → `main`, con **squash merge**.
+- GitHub Flow: `feature/*` → PR → `main`, con **merge commit**
+  (`gh pr merge --merge`), no squash: la rama y sus commits quedan visibles en
+  la historia, y los hashes que citan los incidentes siguen existiendo en `main`.
 - Commits intermedios: **sólo el subject line** de Conventional Commits, sin
   cuerpo. Ej: `feat(db): add threat_indicators governance table`.
 - Descripción del PR: **máximo 6 líneas**.

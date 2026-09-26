@@ -504,9 +504,9 @@ az containerapp update --name ca-fraud-detection-api --resource-group rg-fraud-d
 ```
 
 El tag `sha-231fd93` se calculó **después** del merge, no del commit en
-la rama — el repo usa *squash merge* (CLAUDE.md), así que el hash del
-commit en la rama (`d2b85dd`) no es el que terminó existiendo en
-`main`. Usar el hash de la rama habría producido un tag que, según
+la rama: el merge crea un commit nuevo en `main` (entonces con *squash*,
+hoy con *merge commit*, ver CLAUDE.md), así que el hash del commit en la
+rama (`d2b85dd`) no es el que dispara el build en `main`. Usar el hash de la rama habría producido un tag que, según
 ADR-0008 (`sha-<7>` = commit real en `main`), apunta a un commit que
 nunca estuvo ahí.
 

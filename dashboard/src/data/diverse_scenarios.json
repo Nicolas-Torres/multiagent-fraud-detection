@@ -64,25 +64,9 @@
     }
   },
   {
-    "id": "t1249",
-    "label": "Comercio con historial de fraude",
-    "description": "Señal real del dataset: comercio con historial de fraude (FP-07).",
-    "payload": {
-      "customer_id": "CU-0038",
-      "amount": "352.68",
-      "currency": "EUR",
-      "country": "ES",
-      "channel": "web",
-      "device_id": "D-0038",
-      "timestamp": "2025-12-06T11:15:00Z",
-      "merchant_id": "M-999",
-      "issuer_bank": "CABK"
-    }
-  },
-  {
     "id": "t1026",
-    "label": "Canal nuevo con monto alto",
-    "description": "Señal real del dataset: canal nuevo con monto alto (FP-02).",
+    "label": "Compra internacional desde un dispositivo nuevo",
+    "description": "Señal real del dataset: compra internacional desde un dispositivo nuevo (FP-02).",
     "payload": {
       "customer_id": "CU-0653",
       "amount": "1962453.90",
@@ -93,6 +77,22 @@
       "timestamp": "2025-12-07T14:23:00Z",
       "merchant_id": "M-034",
       "issuer_bank": "SAN"
+    }
+  },
+  {
+    "id": "t1155",
+    "label": "Cuenta nueva con un monto grande",
+    "description": "Señal real del dataset: cuenta nueva con un monto grande (FP-08).",
+    "payload": {
+      "customer_id": "CU-0481",
+      "amount": "42587.53",
+      "currency": "PEN",
+      "country": "PE",
+      "channel": "web",
+      "device_id": "D-0481",
+      "timestamp": "2025-12-14T21:07:00Z",
+      "merchant_id": "M-039",
+      "issuer_bank": "IBK"
     }
   }
 ]

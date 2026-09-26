@@ -46,6 +46,12 @@ CLIENTES_EN_USO = {"CU-0643", "CU-0543", "CU-0364", "CU-0054", "CU-0587", "CU-04
 
 VENTANA_COLISION = timedelta(hours=3)
 
+# Políticas cuya señal depende de la historia o la identidad del dispositivo o
+# del comercio. `transaccionParaCorridaEnVivo` (`liveScenarios.ts`) sufija los
+# dos en cada corrida, así que un escenario en vivo nunca las reproduce: la
+# fila prometería una señal que el sistema no puede ver (incidente 0008).
+NO_SOBREVIVEN_AL_SUFIJO = {"FP-03", "FP-07", "FP-11"}
+
 # expected_decision -> cuántos candidatos elegir. Nada de APPROVE extra: ya
 # hay de sobra con la vitrina y el escenario "approve" de `liveScenarios.ts`.
 CUPOS = {"CHALLENGE": 2, "BLOCK": 2, "ESCALATE_TO_HUMAN": 2}
@@ -55,7 +61,7 @@ CUPOS = {"CHALLENGE": 2, "BLOCK": 2, "ESCALATE_TO_HUMAN": 2}
 # señal, nunca el veredicto.
 POLITICA_A_FRASE = {
     "FP-01": "monto y horario fuera de lo habitual",
-    "FP-02": "canal nuevo con monto alto",
+    "FP-02": "compra internacional desde un dispositivo nuevo",
     "FP-03": "velocity: mismo dispositivo, varias transacciones seguidas",
     "FP-04": "card testing: cobros chicos seguidos de uno grande",
     "FP-05": "geolocalización imposible entre dos transacciones",
@@ -115,6 +121,7 @@ def elegir() -> list[dict]:
             if (
                 gt["decision"] == decision
                 and gt["policies"]
+                and not NO_SOBREVIVEN_AL_SUFIJO.intersection(gt["policies"])
                 and tid in por_id
                 and por_id[tid].customer_id not in CLIENTES_EN_USO
             ):

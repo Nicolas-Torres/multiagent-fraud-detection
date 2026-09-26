@@ -38,6 +38,7 @@ aparte: reporta, no bloquea.
 
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
@@ -73,25 +74,32 @@ class AnthropicNarrator:
     model: str = MODEL
     max_tokens: int = MAX_TOKENS
     _client: Any = field(default=None, init=False, repr=False)
+    # Incidente 0007: el grafo comparte el adaptador entre hilos. Sin lock, dos
+    # hilos en frío crean dos clientes y el recolector cierra el huérfano con
+    # un request en vuelo.
+    _lock: threading.Lock = field(
+        default_factory=threading.Lock, init=False, repr=False
+    )
 
     def _cliente(self) -> Any:
-        if self._client is None:
-            from anthropic import Anthropic
-            from langsmith.wrappers import wrap_anthropic
+        with self._lock:
+            if self._client is None:
+                from anthropic import Anthropic
+                from langsmith.wrappers import wrap_anthropic
 
-            clave = self.api_key or settings.anthropic_api_key
-            if not clave:
-                raise NarrationError(
-                    "falta `ANTHROPIC_API_KEY`. Es la única variable de entorno "
-                    "del proveedor: el modelo y el prompt viven en código, "
-                    "porque cambiarlos por `env` haría mentir a "
-                    "`explanation_prompt_version`."
-                )
-            # No-op si `LANGSMITH_TRACING` no esta en `os.environ`
-            # (`config.settings` lo propaga sólo cuando hay clave y flag
-            # encendida) — envolver siempre es más simple que duplicar ese
-            # chequeo acá.
-            self._client = wrap_anthropic(Anthropic(api_key=clave))
+                clave = self.api_key or settings.anthropic_api_key
+                if not clave:
+                    raise NarrationError(
+                        "falta `ANTHROPIC_API_KEY`. Es la única variable de entorno "
+                        "del proveedor: el modelo y el prompt viven en código, "
+                        "porque cambiarlos por `env` haría mentir a "
+                        "`explanation_prompt_version`."
+                    )
+                # No-op si `LANGSMITH_TRACING` no esta en `os.environ`
+                # (`config.settings` lo propaga sólo cuando hay clave y flag
+                # encendida) — envolver siempre es más simple que duplicar ese
+                # chequeo acá.
+                self._client = wrap_anthropic(Anthropic(api_key=clave))
         return self._client
 
     def narrate(self, system: str, user: str) -> str:
