@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -162,9 +163,10 @@ async def crear_caso(
     if restante is not None:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            # El dashboard muestra este texto tal cual al visitante.
             detail=(
-                "este escenario de demo se corrió hace poco, "
-                f"reintentá en {int(restante.total_seconds())}s"
+                "Este escenario se corrió hace poco. "
+                f"Probá de nuevo en {math.ceil(restante.total_seconds())} segundos."
             ),
         )
 

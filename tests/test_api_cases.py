@@ -243,6 +243,10 @@ def test_segundo_disparo_del_mismo_escenario_da_429():
 
     assert primera.status_code == 202
     assert segunda.status_code == 429
+    # El dashboard muestra este texto tal cual: tiene que ser para el visitante.
+    assert segunda.json()["detail"] == (
+        "Este escenario se corrió hace poco. Probá de nuevo en 60 segundos."
+    )
     # El grafo sólo corrió una vez: la segunda ni siquiera llegó a agendarse.
     assert grafo.invocado
     assert len(contexto.marcas) == 1
