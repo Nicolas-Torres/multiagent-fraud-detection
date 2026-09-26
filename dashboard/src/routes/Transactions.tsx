@@ -65,7 +65,7 @@ const escenariosEnVivo: LiveScenario[] = [...LIVE_SCENARIOS, ...diverseScenarios
 // silencio confuso de clickear "Ejecutar" y que no pase nada visible.
 // Cubre las tres fuentes de fila (vitrina, escenarios fijos, diversos): las
 // tres comparten el mismo backend y el mismo prefijo `LIVE-`.
-const COOLDOWN_MS = 10 * 60 * 1000
+const COOLDOWN_MS = 60 * 1000
 const STORAGE_KEY = 'ultima-corrida-en-vivo'
 
 function leerUltimasCorridas(): Record<string, number> {
@@ -190,7 +190,7 @@ export function Transactions() {
         if (response.status === 429) {
           throw new Error(
             motivoDelError(error) ??
-              'Este escenario se corrió hace poco — probá de nuevo en unos minutos.',
+              'Este escenario se corrió hace poco. Probá de nuevo en un minuto.',
           )
         }
         throw new Error('No se pudo iniciar el análisis.')
