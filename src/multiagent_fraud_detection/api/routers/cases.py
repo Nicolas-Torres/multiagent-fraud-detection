@@ -26,7 +26,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from multiagent_fraud_detection.api import case_progress
+from multiagent_fraud_detection.api import case_progress, limites_demo
 from multiagent_fraud_detection.api.deps import (
     get_graph,
     get_graph_context,
@@ -172,6 +172,12 @@ async def crear_caso(
     if existente is not None:
         response.status_code = status.HTTP_200_OK
         return CaseCreated.model_validate(existente)
+
+    # Después de la idempotencia: repetir un `transaction_id` no corre el
+    # grafo, así que no gasta ni cuenta contra el techo.
+    motivo = await limites_demo.exceso(session, Case.created_at, limites_demo.EJECUCIONES)
+    if motivo is not None:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=motivo)
 
     caso = Case(transaction_id=transaction.transaction_id, status=CaseStatus.RECEIVED)
     try:
@@ -334,6 +340,12 @@ async def resolver_caso(
             status_code=409,
             detail=f"el caso está en {caso.status.value}, no en PENDING_HUMAN",
         )
+
+    motivo = await limites_demo.exceso(
+        session, HumanResolution.resolved_at, limites_demo.RESOLUCIONES
+    )
+    if motivo is not None:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=motivo)
 
     session.add(HumanResolution(case_id=case_id, **resolucion.model_dump()))
     caso.status = CaseStatus.RESOLVED

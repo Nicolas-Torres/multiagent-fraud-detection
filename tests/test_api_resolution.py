@@ -109,3 +109,38 @@ def test_caso_que_no_esta_pendiente_da_409():
 
     assert respuesta.status_code == 409
     assert caso.status is CaseStatus.DECIDED
+
+
+def test_techo_de_resoluciones_agotado_da_429_sin_escribir(monkeypatch):
+    """ADR-0025: en producción, más de 20 resoluciones en la última hora se
+    rechazan antes de escribir nada. El entorno se cambia dentro del
+    `TestClient`, después del `lifespan` (ver `test_api_cases.py`)."""
+    from multiagent_fraud_detection.config.settings import settings
+
+    caso = _caso(CaseStatus.PENDING_HUMAN)
+    sesion = _SesionResolucion(caso)
+
+    async def _execute(stmt):
+        class _Resultado:
+            def one(self):
+                return (20, 20)
+
+        return _Resultado()
+
+    sesion.execute = _execute
+
+    async def _sesion_override():
+        yield sesion
+
+    app.dependency_overrides[get_session] = _sesion_override
+    try:
+        with TestClient(app) as client:
+            monkeypatch.setattr(settings, "environment", "production")
+            respuesta = client.post(f"/api/v1/cases/{caso.case_id}/resolution", json=BODY)
+    finally:
+        app.dependency_overrides.clear()
+
+    assert respuesta.status_code == 429
+    assert "resoluciones por hora" in respuesta.json()["detail"]
+    assert not sesion.comprometido
+    assert caso.status is CaseStatus.PENDING_HUMAN
