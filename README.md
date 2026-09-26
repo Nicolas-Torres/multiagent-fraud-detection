@@ -11,6 +11,11 @@ evidencia desde dos posturas opuestas y arbitra un veredicto. Cada decisión
 queda con sus señales, sus citas y su ruta de agentes en la base de datos, y las
 que no alcanzan confianza suficiente pasan a una cola de revisión humana.
 
+![Una transacción real recorriendo el grafo de agentes en el dashboard](docs/diagrams/grafo-en-vivo.gif)
+
+*Una transacción real recorriendo el grafo en el dashboard. Los primeros pasos van
+en cámara lenta: en tiempo real duran milisegundos.*
+
 > Proyecto final del programa de especialización en IA Generativa.
 
 **Demo en vivo** — el mismo sistema, desplegado en dos nubes desde la misma
