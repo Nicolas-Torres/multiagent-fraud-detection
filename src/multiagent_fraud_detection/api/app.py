@@ -69,9 +69,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
 
 
 def create_app() -> FastAPI:
+    # En producción la API es pública y sin autenticación: Swagger le serviría a
+    # cualquiera un formulario para disparar el grafo (ADR-0025). El contrato
+    # está documentado en el repo, y los tipos del dashboard se generan con
+    # `app.openapi()` en proceso (`scripts/export_openapi.py`), no por URL.
+    produccion = settings.environment == "production"
     app = FastAPI(
         title="Sistema Multi-Agente de Detección de Fraude",
         lifespan=lifespan,
+        docs_url=None if produccion else "/docs",
+        redoc_url=None if produccion else "/redoc",
+        openapi_url=None if produccion else "/openapi.json",
     )
     instrumentar_observabilidad(app)
 
