@@ -29,8 +29,6 @@
   en producción. Falta reflejarlo en las tablas de respuestas de §2.3 y en la
   lista de endpoints de §1.3.
 - **Modelos por llamada** (ADR-0026):
-  - La explicación al cliente pasa a `claude-haiku-4-5-20251001`:
-    `explanation_prompt_version` cambia de valor.
   - La inteligencia externa pasa a Haiku con prompt de sistema:
     `threat_intel_version` pasa a `claude-haiku-4-5-20251001:issuer-alert:v2`.
     El ejemplo de §2.3 (`claude-sonnet-4-6:issuer-alert:v1`) queda viejo.
