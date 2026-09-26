@@ -28,6 +28,14 @@ Lo que sigue siendo responsabilidad nuestra es el otro segmento: editar el promp
 sin subir la generación produce textos nuevos bajo una versión vieja, y ninguna
 consulta lo detecta.
 
+## El modelo lo declara quien sella
+
+El narrador lo comparten tres nodos: los dos del debate y la explicación. Por eso
+el adaptador **no tiene modelo ni tope propios**: cada llamada los pasa desde el
+módulo que arma su `PROMPT_VERSION`. Con un modelo por defecto en el adaptador,
+el debate usó durante meses el modelo y el tope de la explicación, mientras su
+sello decía otra cosa (ADR-0026).
+
 ## El texto generado no se evalúa acá
 
 Los gates determinísticos del proyecto —`check_policies`, `check_retrieval`—
@@ -43,7 +51,6 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 from multiagent_fraud_detection.config.settings import settings
-from multiagent_fraud_detection.explain.customer import MAX_TOKENS, MODEL
 
 
 class NarrationError(Exception):
@@ -58,7 +65,9 @@ class Narrator(Protocol):
     darle al modelo un rol que no tiene.
     """
 
-    def narrate(self, system: str, user: str) -> str: ...
+    def narrate(
+        self, system: str, user: str, *, model: str, max_tokens: int
+    ) -> str: ...
 
 
 @dataclass
@@ -71,8 +80,6 @@ class AnthropicNarrator:
     """
 
     api_key: str | None = None
-    model: str = MODEL
-    max_tokens: int = MAX_TOKENS
     _client: Any = field(default=None, init=False, repr=False)
     # Incidente 0007: el grafo comparte el adaptador entre hilos. Sin lock, dos
     # hilos en frío crean dos clientes y el recolector cierra el huérfano con
@@ -102,10 +109,10 @@ class AnthropicNarrator:
                 self._client = wrap_anthropic(Anthropic(api_key=clave))
         return self._client
 
-    def narrate(self, system: str, user: str) -> str:
+    def narrate(self, system: str, user: str, *, model: str, max_tokens: int) -> str:
         respuesta = self._cliente().messages.create(
-            model=self.model,
-            max_tokens=self.max_tokens,
+            model=model,
+            max_tokens=max_tokens,
             system=system,
             messages=[{"role": "user", "content": user}],
         )
@@ -132,5 +139,5 @@ class FakeNarrator:
 
     texto: str = "[explicación de prueba]"
 
-    def narrate(self, system: str, user: str) -> str:
+    def narrate(self, system: str, user: str, *, model: str, max_tokens: int) -> str:
         return self.texto

@@ -50,7 +50,7 @@ class FakeGraphContext:
 
 
 class NarradorRoto:
-    def narrate(self, system, user):
+    def narrate(self, system, user, *, model, max_tokens):
         raise ConnectionError("proveedor caído")
 
 

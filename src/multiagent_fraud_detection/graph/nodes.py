@@ -41,6 +41,8 @@ from multiagent_fraud_detection.domain.scoring import (
 from multiagent_fraud_detection.enums import CaseStatus, DecisionType, Severity
 from multiagent_fraud_detection.explain.audit import build_audit_explanation
 from multiagent_fraud_detection.explain.customer import (
+    MAX_TOKENS,
+    MODEL,
     PROMPT_VERSION,
     SYSTEM_PROMPT,
     build_prompt,
@@ -513,6 +515,8 @@ async def debate_pro_fraud(
             runtime.context.narrator.narrate,
             pro_fraud.SYSTEM_PROMPT,
             pro_fraud.build_prompt(evidencia, politicas, riesgo),
+            model=pro_fraud.MODEL,
+            max_tokens=pro_fraud.MAX_TOKENS,
         )
     except Exception as exc:
         logger.exception("argumento pro-fraude degradado; se usa el respaldo")
@@ -545,6 +549,8 @@ async def debate_pro_customer(
             runtime.context.narrator.narrate,
             pro_customer.SYSTEM_PROMPT,
             pro_customer.build_prompt(evidencia, politicas, riesgo),
+            model=pro_customer.MODEL,
+            max_tokens=pro_customer.MAX_TOKENS,
         )
     except Exception as exc:
         logger.exception("argumento pro-cliente degradado; se usa el respaldo")
@@ -713,6 +719,8 @@ async def explainability(
             runtime.context.narrator.narrate,
             SYSTEM_PROMPT,
             build_prompt(decision, temas),
+            model=MODEL,
+            max_tokens=MAX_TOKENS,
         )
         salida["explanation_prompt_version"] = PROMPT_VERSION
     except Exception as exc:

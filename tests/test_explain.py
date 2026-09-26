@@ -266,4 +266,7 @@ def test_la_auditoria_sin_debate_no_menciona_el_parrafo():
 
 
 def test_el_narrador_falso_no_se_disfraza_de_real():
-    assert FakeNarrator().narrate("s", "u") == "[explicación de prueba]"
+    assert (
+        FakeNarrator().narrate("s", "u", model="m", max_tokens=1)
+        == "[explicación de prueba]"
+    )
