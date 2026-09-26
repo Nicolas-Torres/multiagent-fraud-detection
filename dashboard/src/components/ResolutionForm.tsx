@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 
-import { api } from '@/api/client'
+import { api, motivoDelError } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
@@ -24,7 +24,7 @@ export function ResolutionForm({ caseId }: ResolutionFormProps) {
         params: { path: { case_id: caseId } },
         body: { action, analyst_id: ANALYST_ID, notes: notes || null },
       })
-      if (error) throw error
+      if (error) throw new Error(motivoDelError(error) ?? 'No se pudo registrar la resolución.')
       return data
     },
     onSuccess: () => {
@@ -58,7 +58,7 @@ export function ResolutionForm({ caseId }: ResolutionFormProps) {
           </Button>
         </div>
         {mutation.isError && (
-          <p className="text-sm text-destructive">No se pudo registrar la resolución.</p>
+          <p className="text-sm text-destructive">{mutation.error.message}</p>
         )}
       </CardContent>
     </Card>

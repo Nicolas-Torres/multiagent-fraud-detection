@@ -21,6 +21,7 @@ from multiagent_fraud_detection.api.deps import (
     get_session,
 )
 from multiagent_fraud_detection.api.routers import cases as cases_router
+from multiagent_fraud_detection.config.settings import settings
 from multiagent_fraud_detection.db.models import Case
 from multiagent_fraud_detection.enums import CaseStatus
 
@@ -52,13 +53,27 @@ class _SesionFake:
     `add`/`commit` que aplican los defaults que Postgres aplicaría, y
     `rollback`/`refresh` como no-ops."""
 
-    def __init__(self, existente: Case | None = None):
+    def __init__(self, existente: Case | None = None, conteos: tuple[int, int] = (0, 0)):
         self._existente = existente
+        self._conteos = conteos
+        self.consultas_de_conteo = 0
         self.agregados: list = []
         self.comprometido = False
 
     async def scalar(self, stmt):
         return self._existente
+
+    async def execute(self, stmt):
+        # El conteo del techo de la demo (`limites_demo.exceso`): ejecuciones
+        # en la última hora y en el último día.
+        self.consultas_de_conteo += 1
+        conteos = self._conteos
+
+        class _Resultado:
+            def one(self):
+                return conteos
+
+        return _Resultado()
 
     def add(self, obj):
         self.agregados.append(obj)
@@ -275,3 +290,85 @@ def test_transaction_id_sin_prefijo_live_nunca_tiene_cooldown():
         app.dependency_overrides.clear()
 
     assert segunda.status_code == 202
+
+
+# --- Techo de la demo (ADR-0025) ---
+
+
+def _postear_en_produccion(sesion: _SesionFake, monkeypatch, transaction_id: str = "T-TECHO"):
+    """El techo sólo existe en producción. El entorno se cambia recién dentro
+    del `TestClient`, después del `lifespan`: en producción, el arranque
+    precalienta las métricas contra LangSmith, que acá no interesa."""
+    grafo = _GrafoFake()
+    contexto = _ContextoFake()
+    _override(sesion, grafo, contexto)
+    try:
+        with TestClient(app) as client:
+            monkeypatch.setattr(settings, "environment", "production")
+            respuesta = client.post("/api/v1/cases", json=_payload_live(transaction_id))
+    finally:
+        app.dependency_overrides.clear()
+    return respuesta, grafo
+
+
+def test_techo_por_hora_agotado_da_429_sin_correr_el_grafo(monkeypatch):
+    sesion = _SesionFake(existente=None, conteos=(40, 40))
+
+    respuesta, grafo = _postear_en_produccion(sesion, monkeypatch)
+
+    assert respuesta.status_code == 429
+    assert "por hora" in respuesta.json()["detail"]
+    assert not sesion.comprometido
+    assert not grafo.invocado
+
+
+def test_techo_por_dia_agotado_da_429(monkeypatch):
+    sesion = _SesionFake(existente=None, conteos=(3, 200))
+
+    respuesta, grafo = _postear_en_produccion(sesion, monkeypatch)
+
+    assert respuesta.status_code == 429
+    assert "por día" in respuesta.json()["detail"]
+    assert not grafo.invocado
+
+
+def test_por_debajo_del_techo_corre_normal(monkeypatch):
+    sesion = _SesionFake(existente=None, conteos=(39, 199))
+
+    respuesta, grafo = _postear_en_produccion(sesion, monkeypatch)
+
+    assert respuesta.status_code == 202
+    assert sesion.consultas_de_conteo == 1
+    assert grafo.invocado
+
+
+def test_transaccion_existente_no_cuenta_contra_el_techo(monkeypatch):
+    """Repetir un `transaction_id` no corre el grafo: devuelve 200 aunque el
+    techo esté agotado, y ni siquiera consulta el conteo."""
+    existente = Case(
+        case_id=uuid4(),
+        transaction_id="T-TECHO",
+        status=CaseStatus.DECIDED,
+        created_at=datetime.now(UTC),
+    )
+    sesion = _SesionFake(existente=existente, conteos=(40, 200))
+
+    respuesta, grafo = _postear_en_produccion(sesion, monkeypatch)
+
+    assert respuesta.status_code == 200
+    assert sesion.consultas_de_conteo == 0
+    assert not grafo.invocado
+
+
+def test_fuera_de_produccion_no_consulta_el_techo():
+    sesion = _SesionFake(existente=None, conteos=(999, 999))
+    grafo = _GrafoFake()
+    _override(sesion, grafo, _ContextoFake())
+    try:
+        with TestClient(app) as client:
+            respuesta = client.post("/api/v1/cases", json=_payload_live("T-LOCAL"))
+    finally:
+        app.dependency_overrides.clear()
+
+    assert respuesta.status_code == 202
+    assert sesion.consultas_de_conteo == 0

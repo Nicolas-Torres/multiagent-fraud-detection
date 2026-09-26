@@ -59,3 +59,31 @@ def test_ready_falla_cuando_la_sesion_no_responde():
         assert respuesta.status_code == 500
     finally:
         app.dependency_overrides.clear()
+
+
+def test_swagger_y_openapi_no_existen_en_produccion(monkeypatch):
+    """ADR-0025: en producción la API es pública y sin autenticación; Swagger
+    le serviría a cualquiera un formulario para disparar el grafo.
+
+    Lo que se afirma es que no se sirve ni Swagger ni el esquema, no un código
+    puntual: sin `dashboard/dist` (CI) la ruta da 404, y con `dist` (la nube,
+    o una máquina que compiló el dashboard) el catch-all del SPA responde
+    `index.html` con 200, que tampoco expone nada."""
+    from multiagent_fraud_detection.api.app import create_app
+    from multiagent_fraud_detection.config.settings import settings
+
+    monkeypatch.setattr(settings, "environment", "production")
+    cliente = TestClient(create_app())
+
+    for ruta in ("/docs", "/redoc", "/openapi.json"):
+        respuesta = cliente.get(ruta)
+        cuerpo = respuesta.text.lower()
+        assert "swagger" not in cuerpo and "redoc" not in cuerpo, ruta
+        assert '"openapi"' not in cuerpo and '"paths"' not in cuerpo, ruta
+
+
+def test_swagger_sigue_disponible_fuera_de_produccion():
+    cliente = TestClient(app)
+
+    assert cliente.get("/docs").status_code == 200
+    assert cliente.get("/openapi.json").status_code == 200
