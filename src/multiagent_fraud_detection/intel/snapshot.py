@@ -14,9 +14,13 @@ generación anterior dejan de ser visibles para el lookup. Es el costo aceptado 
 ADR-0014 a cambio de que el sello no pueda mentir.
 """
 
-MODEL = "claude-sonnet-4-6"
+# Haiku y no Sonnet (ADR-0026): el modelo sólo formula la búsqueda; las fuentes
+# salen de los bloques de la herramienta. ID con fecha: fijo, no se mueve por
+# debajo del sello.
+MODEL = "claude-haiku-4-5-20251001"
 TEMPLATE_TAG = "issuer-alert"
-GENERATION = 1
+# 2: se agregó `SYSTEM_PROMPT` y cambió el modelo (ADR-0026).
+GENERATION = 2
 
 SNAPSHOT_VERSION = f"{MODEL}:{TEMPLATE_TAG}:v{GENERATION}"
 
@@ -30,6 +34,16 @@ SNAPSHOT_VERSION = f"{MODEL}:{TEMPLATE_TAG}:v{GENERATION}"
 QUERY_TEMPLATE = (
     "Alertas públicas de fraude, phishing o compromiso de seguridad "
     "sobre el banco emisor {issuer_bank} en Perú."
+)
+
+
+# Parámetro de derivación, igual que la plantilla: puede cambiar la consulta que
+# el modelo le pasa a la herramienta. Pide que no redacte nada: el texto se
+# descarta (`searcher._extraer`) y se paga igual (incidente 0010).
+SYSTEM_PROMPT = (
+    "Tu única tarea es ejecutar la herramienta de búsqueda web con la consulta "
+    "del usuario. Haz exactamente una búsqueda, sin escribir nada antes. Después "
+    "de recibir los resultados, responde solamente: LISTO"
 )
 
 
