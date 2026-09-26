@@ -1,6 +1,6 @@
 # Enmiendas pendientes — Contrato de Interfaz
 
-**Estado**: 1 enmienda acumulada. Vigente: v0.14.
+**Estado**: 2 enmiendas acumuladas. Vigente: v0.14.
 
 > Documento de trabajo: se **vacía** al publicar una versión, no se archiva.
 > Nunca hay dos.
@@ -22,6 +22,12 @@
   sólo el bump de versión y el `CHANGELOG.md` al cerrar esta etapa.
   Trae consigo dos variables de entorno nuevas en §1.4:
   `OTEL_EXPORTER_OTLP_ENDPOINT` y `OTEL_SERVICE_NAME`.
+- **Techo de la demo pública** (ADR-0025): en producción, `POST /cases` y
+  `POST /cases/{case_id}/resolution` pueden responder `429` con el motivo en
+  `detail` cuando se supera el techo global (40 ejecuciones por hora y 200 por
+  día; 20 resoluciones por hora). `/docs`, `/redoc` y `/openapi.json` no existen
+  en producción. Falta reflejarlo en las tablas de respuestas de §2.3 y en la
+  lista de endpoints de §1.3.
 
 ---
 
