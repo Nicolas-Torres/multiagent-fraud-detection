@@ -101,3 +101,28 @@ influye en la demo.
 - La explicación de Haiku puede redactar distinto que la de Sonnet. Las reglas
   que la protegen (sin umbrales, códigos ni identificadores) son las mismas y
   siguen en el prompt.
+
+## Nota (2026-09-26): la explicación al cliente vuelve a Sonnet 5
+
+La parte de la explicación se revirtió el mismo día. El resto de la decisión
+sigue vigente: fetch-intel en Haiku, sin prosa y semanal, y el modelo declarado
+en cada llamada.
+
+En producción, Haiku 4.5 cumplió las reglas de divulgación, pero omitía los
+motivos seguros. Para el escenario "Monto y horario inusual":
+
+- **Sonnet 5:** "…presenta un importe distinto al que sueles manejar, se realizó
+  desde un dispositivo que no habíamos visto antes en tu cuenta y en un horario
+  poco frecuente…".
+- **Haiku 4.5:** "Hemos detectado esta operación y necesitamos verificar tu
+  identidad…", sin ningún motivo.
+
+Con el mismo prompt, Haiku nombró 0 de 3 temas en dos llamadas. Con un prompt
+que exigía nombrarlos todos, los nombró en una de dos llamadas.
+
+La explicación es lo que más se ve de la demo, y el ahorro era de ~USD 0.003
+por decisión. El juicio de "el modelo más chico que alcanza" dio que, para esta
+tarea, Haiku no alcanza. La explicación queda en `claude-sonnet-5`, con el
+mismo `explanation_prompt_version` que antes de este ADR. La decisión sellada
+con `claude-haiku-4-5-20251001:customer:1` durante la prueba sigue siendo
+verdadera: dice qué modelo la redactó.

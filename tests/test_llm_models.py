@@ -68,12 +68,6 @@ async def test_la_explicacion_usa_su_propio_modelo_y_tope():
     assert modelo == _modelo_sellado(customer.PROMPT_VERSION)
 
 
-def test_explicacion_y_debate_no_comparten_modelo_por_accidente():
-    """La explicación está en Haiku y el debate en Sonnet (ADR-0026). Si
-    alguien los iguala, que sea a propósito y actualizando este test."""
-    assert customer.MODEL != pro_fraud.MODEL
-
-
 class _MensajesFalsos:
     def __init__(self):
         self.kwargs: dict = {}

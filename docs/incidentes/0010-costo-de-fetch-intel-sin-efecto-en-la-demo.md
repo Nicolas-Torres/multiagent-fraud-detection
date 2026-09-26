@@ -56,7 +56,20 @@ de 2025. Una alerta recogida hoy nunca cae en esa ventana.
     intactos.
 
   Costo estimado: ~USD 0.02 por búsqueda.
-- Después del deploy: *(se completa con el PR)*.
+- **Después del deploy** ([PR #61](https://github.com/Nicolas-Torres/multiagent-fraud-detection/pull/61),
+  `sha-954de16`):
+  - Cron semanal (`0 6 * * 1`) aplicado por CLI en Azure y GCP. Terraform ya
+    tiene el mismo valor, pero `apply` necesita `infra/shared.secrets.tfvars`,
+    que no estaba disponible.
+  - `fetch-intel` ejecutado a mano en Azure: 15 llamadas con Haiku 4.5, con
+    8 093 tokens de entrada y 166 de salida de media. Se cortaron las 15, pero
+    el corte cae sobre la prosa. LangSmith calcula USD 0.134 en tokens; con las
+    15 búsquedas, unos **USD 0.28 por ejecución (antes ~USD 1.17)**. Con la
+    cadencia semanal, de ~USD 35 a ~USD 1.2 al mes.
+  - Corpus v2: 5 filas guardadas y 135 descartadas por fecha no reconocible
+    (ver el hallazgo lateral).
+  - La explicación al cliente también pasó a Haiku en ese PR y se revirtió a
+    Sonnet 5, porque omitía los motivos (ver la nota del ADR-0026).
 
 ## Hallazgo lateral
 

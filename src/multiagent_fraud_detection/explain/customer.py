@@ -52,11 +52,11 @@ from collections.abc import Sequence
 
 from multiagent_fraud_detection.enums import DecisionType
 
-# Haiku (ADR-0026): redacta 2 a 4 oraciones sobre temas ya traducidos, sin
-# razonar sobre la evidencia; eso lo hacen el debate y el árbitro, en Sonnet 5.
-# ID con fecha: Haiku 4.5 es anterior a los IDs fijos de la generación 4.6, y el
-# ID con fecha es el que no se mueve por debajo del sello.
-MODEL = "claude-haiku-4-5-20251001"
+# Sonnet, no Haiku (ADR-0026, nota): en producción Haiku 4.5 omitía los motivos
+# seguros y redactaba un mensaje genérico, aun con un prompt que exigía
+# nombrarlos. La explicación es lo que más se ve de la demo y el ahorro era de
+# ~USD 0.003 por decisión.
+MODEL = "claude-sonnet-5"
 TEMPLATE_TAG = "customer"
 GENERATION = 1
 
