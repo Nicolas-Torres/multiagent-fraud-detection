@@ -32,6 +32,7 @@ verificable el resultado.
 
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
@@ -99,19 +100,26 @@ class GeminiEmbedder:
     model: str = MODEL
     dimensions: int = DIMENSIONS
     _client: Any = field(default=None, init=False, repr=False)
+    # Incidente 0007: el grafo comparte el adaptador entre hilos. Sin lock, dos
+    # hilos en frío crean dos clientes y el recolector cierra el huérfano con
+    # un request en vuelo.
+    _lock: threading.Lock = field(
+        default_factory=threading.Lock, init=False, repr=False
+    )
 
     def _cliente(self) -> Any:
-        if self._client is None:
-            from google import genai
+        with self._lock:
+            if self._client is None:
+                from google import genai
 
-            clave = self.api_key or settings.gemini_api_key
-            if not clave:
-                raise EmbeddingError(
-                    "falta `GEMINI_API_KEY`. Es la única variable de entorno del "
-                    "proveedor: el modelo y la dimensión viven en código, porque "
-                    "cambiarlos por `env` haría mentir a `index_version`."
-                )
-            self._client = genai.Client(api_key=clave)
+                clave = self.api_key or settings.gemini_api_key
+                if not clave:
+                    raise EmbeddingError(
+                        "falta `GEMINI_API_KEY`. Es la única variable de entorno del "
+                        "proveedor: el modelo y la dimensión viven en código, porque "
+                        "cambiarlos por `env` haría mentir a `index_version`."
+                    )
+                self._client = genai.Client(api_key=clave)
         return self._client
 
     def embed(self, text: str) -> list[float]:
