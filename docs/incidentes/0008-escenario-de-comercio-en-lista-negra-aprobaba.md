@@ -79,8 +79,10 @@ inertes: sólo los lee su propia fila, que ya no existe.
 - **Sin el filtro, los dos tests fallan** y nombran `t1249` con `['FP-07']`.
   Con el filtro, pasan.
 - `pytest` completo, `ruff`, `tsc` y el build del dashboard en verde.
-- **Después del deploy** (pendiente): ejecutar `t1155` y `t1026` en una nube y
-  comprobar que el veredicto y las políticas coinciden con su fila.
+- **Después del deploy** ([PR #59](https://github.com/Nicolas-Torres/multiagent-fraud-detection/pull/59),
+  `sha-904b426`, GCP): `t1155` dio `ESCALATE_TO_HUMAN` con `FP-08`, y `t1026`
+  dio `ESCALATE_TO_HUMAN` con `FP-02` (señales `FOREIGN_COUNTRY` y
+  `NEW_DEVICE`). Las dos coinciden con su fila.
 
 ## Aprendizaje
 

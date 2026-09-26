@@ -17,6 +17,20 @@ on:
     types: [completed]
     branches: [main]
 
+# Dos merges seguidos disparan dos deploys casi a la vez. En paralelo, el job de
+# migración choca consigo mismo y el que termina último gana aunque sea el
+# commit viejo: así quedaron las dos nubes sin el PR #59. `concurrency` los pone
+# en fila, y el paso `vigente` salta el deploy si la nube ya corre un commit
+# más nuevo. No se compara contra `main`: un push sólo de docs no corre CI, y el
+# commit de código anterior quedaría sin deployar.
+#
+# Consecuencia: un rollback no se hace relanzando el deploy de un commit viejo
+# (se saltaría); se apunta la app a la imagen anterior a mano, como en
+# docs/runbook_azure_setup.md.
+concurrency:
+  group: deploy-azure
+  cancel-in-progress: false
+
 permissions:
   id-token: write # OIDC (azure/login) - sin secreto estático de larga vida
   contents: read
@@ -47,7 +61,27 @@ jobs:
       - name: Instalar la extensión containerapp
         run: az extension add --name containerapp --upgrade --yes
 
+      - name: "Saltar si la nube ya corre un commit más nuevo"
+        id: vigente
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -uo pipefail
+          sha="${{ github.event.workflow_run.head_sha }}"
+          actual=$(az containerapp show --name ca-fraud-detection-api --resource-group "${{ env.RESOURCE_GROUP }}" --query "properties.template.containers[0].image" -o tsv | sed -n 's/.*:sha-//p')
+          # "behind": la nube ya corre un descendiente de este commit. Ante
+          # cualquier otra respuesta —o un error— se deploya, como antes.
+          estado=$(gh api "repos/${{ github.repository }}/compare/${actual}...${sha}" --jq .status 2>/dev/null || echo "desconocido")
+          echo "Nube en sha-${actual:-?}, este run sha-${sha:0:7}: $estado"
+          if [ -n "$actual" ] && [ "$estado" = "behind" ]; then
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::La nube ya corre sha-$actual, más nuevo que sha-${sha:0:7}: se salta el deploy."
+          else
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: "Migrar (ADR-0009: si falla, aborta el deploy sin tocar la app que sirve)"
+        if: steps.vigente.outputs.deploy == 'true'
         id: migrate
         run: |
           set -euo pipefail
@@ -80,6 +114,7 @@ jobs:
           fi
 
       - name: "Actualizar la Container App al nuevo digest (recién si migrar salió bien)"
+        if: steps.vigente.outputs.deploy == 'true'
         run: |
           az containerapp update \
             --name ca-fraud-detection-api \
@@ -87,6 +122,7 @@ jobs:
             --image "${{ env.IMAGE_BASE }}:${{ steps.image.outputs.tag }}"
 
       - name: "Sembrar (no bloqueante, ADR-0010: idempotente, un fallo acá no revierte el deploy)"
+        if: steps.vigente.outputs.deploy == 'true'
         continue-on-error: true
         run: |
           az containerapp job update \
@@ -98,6 +134,7 @@ jobs:
             --resource-group "${{ env.RESOURCE_GROUP }}"
 
       - name: Mantener fetch-intel en la misma imagen
+        if: steps.vigente.outputs.deploy == 'true'
         run: |
           az containerapp job update \
             --name caj-fraud-detection-fetch-intel \
@@ -105,6 +142,7 @@ jobs:
             --image "${{ env.IMAGE_BASE }}:${{ steps.image.outputs.tag }}"
 
       - name: Resumen
+        if: steps.vigente.outputs.deploy == 'true'
         run: |
           {
             echo "### Deploy a Azure"

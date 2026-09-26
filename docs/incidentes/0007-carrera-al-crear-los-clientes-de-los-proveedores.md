@@ -69,8 +69,12 @@ Commit `b554606`, rama `fix/provider-client-race-and-live-scenarios`:
 - **Sin el lock, el test falla en los cuatro adaptadores**: 8 clientes creados
   en lugar de 1. Con el lock, pasa.
 - `pytest` completo y `ruff` en verde.
-- **Después del deploy** (pendiente): repetir la carga de 8 análisis en paralelo
-  contra GCP recién arrancado. Tiene que salir sin agentes degradados.
+- **Después del deploy** ([PR #59](https://github.com/Nicolas-Torres/multiagent-fraud-detection/pull/59),
+  `sha-904b426`): 9 análisis en paralelo contra la revisión nueva de GCP, sin
+  ningún análisis previo en ella (los clientes todavía sin crear). Resultado:
+  9/9 terminados, **0 agentes degradados**, y cada veredicto coincide con su
+  escenario. En los logs no aparece ni `record layer failure` ni `client has
+  been closed`.
 
 ## Aprendizaje
 
