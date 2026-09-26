@@ -167,8 +167,9 @@ mentirían a la vez ([ADR-0012](docs/adr/0012-el-indice-vectorial-es-dato-deriva
 | Pydantic v2 | Validación en la frontera |
 | LangGraph | Orquestación del grafo de agentes |
 | Gemini (`gemini-embedding-2`) | Embeddings: recuperación |
-| Anthropic (`claude-sonnet-5`) | Generación: explicación al cliente |
-| Anthropic (`claude-sonnet-4-6`) | Inteligencia externa: búsqueda web gobernada, sólo en build ([ADR-0014](docs/adr/0014-la-inteligencia-externa-se-recoge-en-build-y-se-consulta-congelada.md)) |
+| Anthropic (`claude-sonnet-5`) | Generación: debate y árbitro con salida estructurada |
+| Anthropic (`claude-haiku-4-5`) | Generación: explicación al cliente ([ADR-0026](docs/adr/0026-cada-llamada-a-un-llm-usa-el-modelo-mas-chico-que-alcanza.md)) |
+| Anthropic (`claude-haiku-4-5`) | Inteligencia externa: búsqueda web gobernada, semanal y sólo en build ([ADR-0014](docs/adr/0014-la-inteligencia-externa-se-recoge-en-build-y-se-consulta-congelada.md), [ADR-0026](docs/adr/0026-cada-llamada-a-un-llm-usa-el-modelo-mas-chico-que-alcanza.md)) |
 
 Dos proveedores, tres roles y tres sellos. Los tres entran **por un puerto**:
 cambiar de proveedor es un adaptador y una versión nueva, no una reescritura.

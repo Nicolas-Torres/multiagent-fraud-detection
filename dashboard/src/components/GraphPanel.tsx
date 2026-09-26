@@ -108,7 +108,7 @@ const GRUPOS: {
   },
   {
     key: 'llm',
-    label: 'LLM Anthropic\n(claude-sonnet-5)',
+    label: 'LLM Anthropic\n(Sonnet 5 · Haiku 4.5)',
     nodeIds: ['debate_pro_fraud', 'debate_pro_customer', 'decision_arbiter', 'explainability'],
     color: COLOR_CATEGORIA.llm,
     etiquetaVertical: 'costado',
