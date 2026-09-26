@@ -29,13 +29,16 @@ from datetime import date, datetime
 from typing import Any, Protocol
 
 from multiagent_fraud_detection.config.settings import settings
-from multiagent_fraud_detection.intel.snapshot import MODEL
+from multiagent_fraud_detection.intel.snapshot import MODEL, SYSTEM_PROMPT
 
 # En 3 costaba ~20x mas que el resto del sistema junto (docs/incidentes/
 # 0004-...md): la query es una busqueda puntual, no necesita las rondas
 # adicionales que el proveedor gasta tratando de refinarla.
 MAX_USES = 1
-MAX_TOKENS = 1024
+# La búsqueda ocurre antes de cualquier texto, así que el tope sólo corta la prosa
+# que `_extraer` descarta. Con 1024 se pagaban ~1 200 tokens por llamada y se
+# cortaba igual (incidente 0010); con 100, los resultados llegan intactos.
+MAX_TOKENS = 100
 
 # El único formato que la API documenta y ejemplifica para `page_age`
 # ("April 30, 2025"). No hay garantía de que sea el único que el proveedor
@@ -119,6 +122,7 @@ class AnthropicSearcher:
         respuesta = self._cliente().messages.create(
             model=self.model,
             max_tokens=MAX_TOKENS,
+            system=SYSTEM_PROMPT,
             messages=[{"role": "user", "content": query}],
             tools=[
                 {

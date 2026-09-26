@@ -86,10 +86,10 @@ const TECNOLOGIAS: { nombre: string; uso: string }[] = [
   { nombre: 'Python + FastAPI', uso: 'API async: ingesta de casos, progreso en vivo por SSE, cola HITL' },
   { nombre: 'LangGraph', uso: 'Orquestación del grafo de 10 nodos con ramas en paralelo' },
   {
-    nombre: 'Claude Sonnet 5 (Anthropic)',
-    uso: 'Debate, árbitro con salida estructurada y explicación al cliente',
+    nombre: 'Claude Sonnet 5 y Haiku 4.5 (Anthropic)',
+    uso: 'Sonnet: debate y árbitro con salida estructurada. Haiku: explicación al cliente',
   },
-  { nombre: 'Claude + web search', uso: 'Recolección de inteligencia externa, en build, no en cada caso' },
+  { nombre: 'Claude Haiku + web search', uso: 'Recolección semanal de inteligencia externa, en build, no en cada caso' },
   { nombre: 'Gemini Embedding 2', uso: 'Índice vectorial de las políticas para el RAG' },
   {
     nombre: 'PostgreSQL + pgvector (Neon)',

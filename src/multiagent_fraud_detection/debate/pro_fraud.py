@@ -38,7 +38,10 @@ GENERATION = 1
 
 PROMPT_VERSION = f"{MODEL}:{TEMPLATE_TAG}:{GENERATION}"
 
-MAX_TOKENS = 300
+# 400, no 300: hasta ADR-0026 este valor no se aplicaba y el debate corría con el
+# tope de la explicación (400), con salidas de hasta 378 tokens. Bajarlo ahora
+# cortaría argumentos a mitad de frase.
+MAX_TOKENS = 400
 
 SYSTEM_PROMPT = """\
 Eres el analista que argumenta a favor de tratar una operación como

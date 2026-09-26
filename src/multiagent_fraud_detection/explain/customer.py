@@ -52,9 +52,11 @@ from collections.abc import Sequence
 
 from multiagent_fraud_detection.enums import DecisionType
 
-# Confirmar en la consola antes de la primera llamada: los IDs son fijos, pero la
-# familia disponible cambia con cada release.
-MODEL = "claude-sonnet-5"
+# Haiku (ADR-0026): redacta 2 a 4 oraciones sobre temas ya traducidos, sin
+# razonar sobre la evidencia; eso lo hacen el debate y el árbitro, en Sonnet 5.
+# ID con fecha: Haiku 4.5 es anterior a los IDs fijos de la generación 4.6, y el
+# ID con fecha es el que no se mueve por debajo del sello.
+MODEL = "claude-haiku-4-5-20251001"
 TEMPLATE_TAG = "customer"
 GENERATION = 1
 
