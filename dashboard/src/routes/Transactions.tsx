@@ -3,7 +3,7 @@ import { ChevronDownIcon } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
 import { CasoNoEncontrado, consultarCaso } from '@/api/cases'
-import { api } from '@/api/client'
+import { api, motivoDelError } from '@/api/client'
 import type { components } from '@/api/schema'
 import { AnalyzingPanel } from '@/components/AnalyzingPanel'
 import { DecisionDetail, GraphSection } from '@/components/DecisionShowcase'
@@ -185,8 +185,13 @@ export function Transactions() {
         body: transaccionParaCorridaEnVivo(escenario),
       })
       if (error) {
+        // Dos límites dan 429: el cooldown del escenario y el techo global de
+        // la demo (ADR-0025). El motivo lo explica la API.
         if (response.status === 429) {
-          throw new Error('Este escenario se corrió hace poco — probá de nuevo en unos minutos.')
+          throw new Error(
+            motivoDelError(error) ??
+              'Este escenario se corrió hace poco — probá de nuevo en unos minutos.',
+          )
         }
         throw new Error('No se pudo iniciar el análisis.')
       }
