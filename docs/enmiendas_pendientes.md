@@ -1,6 +1,6 @@
 # Enmiendas pendientes — Contrato de Interfaz
 
-**Estado**: 3 enmiendas acumuladas. Vigente: v0.14.
+**Estado**: 4 enmiendas acumuladas. Vigente: v0.14.
 
 > Documento de trabajo: se **vacía** al publicar una versión, no se archiva.
 > Nunca hay dos.
@@ -33,6 +33,10 @@
     `threat_intel_version` pasa a `claude-haiku-4-5-20251001:issuer-alert:v2`.
     El ejemplo de §2.3 (`claude-sonnet-4-6:issuer-alert:v1`) queda viejo.
   - El fetch pasa a ser semanal.
+- **Readiness de Azure** (ADR-0027): en la tabla de §1.3, `GET /health` pasa a
+  ser liveness **y** readiness probe de Azure. `GET /ready` sigue chequeando
+  que Postgres responda, sin caché, y su uso pasa a ser "diagnóstico, smoke y
+  startup probe de GCP", nunca un probe periódico.
 
 ---
 

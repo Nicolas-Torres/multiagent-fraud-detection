@@ -124,9 +124,12 @@ resource "azurerm_container_app" "api" {
         path      = "/health"
         port      = 8000
       }
+      # `/health`, no `/ready` (ADR-0027): `/ready` consulta Neon, y un probe
+      # cada 10 s lo despertaba (incidente 0005). Además, despertarlo supera el
+      # timeout de 1 s del probe y dejaba la réplica sin tráfico ~30 s.
       readiness_probe {
         transport = "HTTP"
-        path      = "/ready"
+        path      = "/health"
         port      = 8000
       }
     }

@@ -21,7 +21,6 @@ import asyncio
 import sys
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from fastapi import Depends, FastAPI
@@ -46,15 +45,6 @@ from multiagent_fraud_detection.graph.context import GraphContext
 # artefacto de build de `dashboard/` —gitignored—, así que no existe hasta
 # que alguien corre `npm run build` o el Dockerfile multi-etapa lo genera.
 DASHBOARD_DIST = Path(__file__).resolve().parents[3] / "dashboard" / "dist"
-
-# Incidente 0005: el readiness_probe de Azure golpea /ready cada 10s las
-# 24hs — con `SELECT 1` en cada llamada, Neon nunca tiene un hueco de
-# inactividad para autosuspender su compute serverless (~180 CU-hours/mes
-# de un plan con 100 gratis, sólo por eso). 60 minutos deja margen de sobra
-# dentro del free tier y sigue detectando una caída real en el próximo
-# chequeo, nunca más tarde.
-READY_CACHE_MINUTES = 60
-_ultimo_ready_ok: datetime | None = None
 
 
 @asynccontextmanager
@@ -90,36 +80,21 @@ def create_app() -> FastAPI:
 
     @app.get("/ready")
     async def ready(session: AsyncSession = Depends(get_session)) -> dict[str, str]:
-        """Readiness: Postgres responde. Un `SELECT 1` sin éxito propaga la
-        excepción a un `500` — la señal correcta para un probe, no un caso a
-        degradar.
+        """Postgres responde. Un `SELECT 1` sin éxito propaga la excepción a un
+        `500`.
+
+        Lo consultan personas, `scripts/smoke_api.py` y el startup probe de
+        GCP, que corre una vez por arranque de instancia. **Nunca un probe
+        periódico** (ADR-0027): cada llamada despierta a Neon, y un probe cada
+        10 s lo mantendría encendido todo el día (incidente 0005). El readiness
+        de Azure apunta a `/health`. Por eso no hay caché: cada llamada dice
+        la verdad sobre la base en ese momento.
 
         La sesión llega por `Depends`, no por `AsyncSessionLocal` directo:
         es lo que le permite a un test sobreescribirla con un doble sin
         tocar Postgres — ver `tests/test_api_health.py`.
-
-        En producción (incidente 0005), el chequeo real sólo se repite cada
-        `READY_CACHE_MINUTES` — un contenedor recién arrancado no tiene nada
-        cacheado todavía, así que su primera llamada siempre chequea de
-        verdad, y un fallo nunca se cachea: la siguiente llamada vuelve a
-        intentar en vez de esperar a que venza la ventana. Gateado por
-        `environment` (mismo criterio que `metrics_router.precalentar()`):
-        en test/local cada llamada golpea la sesión, sin lo cual dos tests
-        de esta misma suite (éxito y fallo) competirían por el mismo
-        caché global.
         """
-        global _ultimo_ready_ok
-
-        if settings.environment == "production" and _ultimo_ready_ok is not None:
-            vencido = datetime.now(UTC) - _ultimo_ready_ok > timedelta(
-                minutes=READY_CACHE_MINUTES
-            )
-            if not vencido:
-                return {"status": "ok"}
-
         await session.execute(text("SELECT 1"))
-        if settings.environment == "production":
-            _ultimo_ready_ok = datetime.now(UTC)
         return {"status": "ok"}
 
     from multiagent_fraud_detection.api.routers import (
