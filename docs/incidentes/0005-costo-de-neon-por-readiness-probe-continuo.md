@@ -107,3 +107,16 @@ proyecto de portafolio.
 - El mismo patrón (readiness probe DB-touching, sin costo por el lado de
   GCP porque `min_instance_count = 0` ya escala a cero) no aplica a GCP —
   confirmado, no hace falta el mismo fix ahí.
+
+## Nota (2026-09-29): el caché queda reemplazado por el ADR-0027
+
+El caché de 60 minutos bajó el consumo, pero el probe seguía despertando a Neon
+una vez por hora: ~15 CU-h al mes sin visitas, visibles como un pico por hora en
+el monitoreo de Neon. Además, cuando la consulta encontraba a Neon dormido,
+superaba el timeout de 1 s del probe: `ReplicaUnhealthy … Client.Timeout
+exceeded` el 29/09 a las 04:15 y 06:16 UTC, con la réplica ~30 s sin tráfico.
+
+El [ADR-0027](../adr/0027-el-readiness-de-azure-responde-por-el-proceso-no-por-neon.md)
+lo resuelve de fondo: el readiness de Azure apunta a `/health`, que no hace I/O,
+y `/ready` vuelve a consultar la base en cada llamada, sin caché, porque ya
+ningún probe periódico lo usa.

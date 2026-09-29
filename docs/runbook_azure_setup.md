@@ -271,7 +271,8 @@ que pasarlos con `-var`/`TF_VAR_*`. Nunca en el `.tf` ni commiteados.
 - `azurerm_container_app.api` — el modo *servir*: `min_replicas = 1` y
   `max_replicas = 1` (ADR-0021: costo fijo a propósito, nunca en cero),
   `ingress` externo en el puerto 8000, `liveness_probe`/
-  `readiness_probe` contra `/health` y `/ready`. La imagen inicial es
+  `readiness_probe` contra `/health` (el readiness apuntó a `/ready` hasta
+  el ADR-0027). La imagen inicial es
   `var.image` (la última publicada en Fase 2) — a partir del primer
   deploy real, Fase 4 la actualiza con `az containerapp update --image`
   sin volver a correr `apply`.
