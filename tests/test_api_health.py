@@ -61,6 +61,38 @@ def test_ready_falla_cuando_la_sesion_no_responde():
         app.dependency_overrides.clear()
 
 
+class _SesionContadora:
+    def __init__(self):
+        self.consultas = 0
+
+    async def execute(self, stmt):
+        self.consultas += 1
+
+
+def test_ready_consulta_la_base_en_cada_llamada_tambien_en_produccion(monkeypatch):
+    """Sin caché (ADR-0027): `/ready` ya no lo usa un probe periódico, así que
+    cada llamada tiene que reflejar el estado real de la base. Con el caché del
+    incidente 0005, la segunda llamada respondía de memoria."""
+    from multiagent_fraud_detection.config.settings import settings
+
+    sesion = _SesionContadora()
+
+    async def _sesion():
+        yield sesion
+
+    app.dependency_overrides[get_session] = _sesion
+    try:
+        with TestClient(app) as client:
+            monkeypatch.setattr(settings, "environment", "production")
+            primera = client.get("/ready")
+            segunda = client.get("/ready")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert (primera.status_code, segunda.status_code) == (200, 200)
+    assert sesion.consultas == 2
+
+
 def test_swagger_y_openapi_no_existen_en_produccion(monkeypatch):
     """ADR-0025: en producción la API es pública y sin autenticación; Swagger
     le serviría a cualquiera un formulario para disparar el grafo.
