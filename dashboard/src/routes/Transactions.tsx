@@ -5,8 +5,8 @@ import { useEffect, useRef, useState } from 'react'
 import { CasoNoEncontrado, consultarCaso } from '@/api/cases'
 import { api, motivoDelError } from '@/api/client'
 import type { components } from '@/api/schema'
-import { AnalyzingPanel } from '@/components/AnalyzingPanel'
-import { DecisionDetail, GraphSection } from '@/components/DecisionShowcase'
+import { DatosDelCasoMobile, TarjetaGrafo } from '@/components/CasoEnVivo'
+import { DecisionDetail } from '@/components/DecisionShowcase'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -116,6 +116,7 @@ export function Transactions() {
   // caso de vitrina (`casoInicial`), nunca un chip vacío.
   const [chipSeleccionado, setChipSeleccionado] = useState<string | null>(null)
   const [ahora, setAhora] = useState(() => Date.now())
+  const seccionGrafoRef = useRef<HTMLElement>(null)
   const queryClient = useQueryClient()
 
   // Los `case_id` reales de la vitrina, resueltos en vivo (contrato §2.3) —
@@ -202,6 +203,9 @@ export function Transactions() {
     },
     onSuccess: (data, escenario) => {
       setErrorEjecucion(null)
+      // El botón puede estar lejos del grafo (sobre todo en mobile): se lleva
+      // la vista al grafo para que el análisis en vivo se vea (mejoras2).
+      seccionGrafoRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
       setCasosEnCurso((previos) => [...previos, data.case_id])
       seleccionar(data.case_id)
       setCaseIdPorEscenario((previos) => {
@@ -235,35 +239,39 @@ export function Transactions() {
   }
 
   return (
-    <div className="space-y-6">
-      {casosEnCurso.length > 0 && (
-        <section className="flex flex-wrap gap-2">
-          {casosEnCurso.map((caseId) => (
-            <ChipEnCurso
-              key={caseId}
-              caseId={caseId}
-              seleccionado={chipSeleccionado === caseId}
-              onSeleccionar={() => seleccionar(caseId)}
-              onQuitar={() => quitarChip(caseId)}
-            />
-          ))}
-        </section>
-      )}
-
-      {/* Panel destacado: ver comentario junto a `panelCaseId` arriba. */}
-      <section>
+    // En mobile, menos aire entre el header y el grafo (mejoras2).
+    <div className="space-y-3 max-md:-mt-2 md:space-y-6">
+      {/* Panel destacado: ver comentario junto a `panelCaseId` arriba. El
+          grafo queda siempre en el mismo lugar; los chips van en su
+          encabezado y el estado en vivo, en su descripción. */}
+      <section ref={seccionGrafoRef} className="scroll-mt-2">
         {panelDetalle.isLoading && <Skeleton className="h-96 w-full" />}
         {panelDetalle.isError && <p className="text-destructive">No se pudo cargar el caso.</p>}
-        {panelDetalle.data?.decision && <GraphSection decision={panelDetalle.data.decision} />}
-        {panelDetalle.data && !panelDetalle.data.decision && (
-          <AnalyzingPanel
-            identificador={`${formatTransactionId(panelDetalle.data.transaction.transaction_id)} · ${panelDetalle.data.transaction.customer_id}`}
-            status={panelDetalle.data.status}
+        {panelDetalle.data && (
+          <TarjetaGrafo
+            caso={panelDetalle.data}
             ranNodes={progreso.ranNodes}
             connected={progreso.connected}
+            chips={
+              casosEnCurso.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {casosEnCurso.map((caseId) => (
+                    <ChipEnCurso
+                      key={caseId}
+                      caseId={caseId}
+                      seleccionado={chipSeleccionado === caseId}
+                      onSeleccionar={() => seleccionar(caseId)}
+                      onQuitar={() => quitarChip(caseId)}
+                    />
+                  ))}
+                </div>
+              )
+            }
           />
         )}
       </section>
+
+      {panelDetalle.data && <DatosDelCasoMobile caso={panelDetalle.data} />}
 
       <section className="space-y-3">
         <Table>
