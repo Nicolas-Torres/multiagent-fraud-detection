@@ -9,7 +9,7 @@ variable "region" {
 }
 
 variable "image_repository" {
-  description = "Referencia de la imagen tal como CI la publica en GHCR (sin el host ghcr.io, sin tag) — p. ej. nicolas-torres/multiagent-fraud-detection. Cloud Run no puede pull-earla directo: pasa por el espejo de Artifact Registry (ver artifact_registry.tf)."
+  description = "Referencia de la imagen tal como CI la publica en GHCR (sin el host ghcr.io, sin tag) — p. ej. nicolas-torres/multiagent-fraud-detection. Es también su ruta dentro del repositorio `images` de Artifact Registry, adonde deploy-gcp.yml la promueve por digest (ADR-0028)."
   type        = string
   default     = "nicolas-torres/multiagent-fraud-detection"
 }
@@ -20,15 +20,10 @@ variable "image_tag" {
   default     = "sha-149bbfd"
 }
 
-variable "ghcr_username" {
-  description = "Usuario de GitHub para el espejo de Artifact Registry hacia GHCR (el registry es privado, contrato §1.5)."
+variable "deployer_service_account" {
+  description = "Cuenta de servicio que usa deploy-gcp.yml por Workload Identity Federation (creada a mano en el bootstrap, docs/runbook_gcp_setup.md). Recibe permiso de escritura sólo sobre el repositorio `images` (ADR-0028)."
   type        = string
-}
-
-variable "ghcr_token" {
-  description = "Personal Access Token de GitHub con permiso read:packages — igual que ghcr_token en infra/azure, nunca el GITHUB_TOKEN de un workflow."
-  type        = string
-  sensitive   = true
+  default     = "github-actions-deployer@fraud-detection-portafolio.iam.gserviceaccount.com"
 }
 
 variable "database_url" {
