@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis } from 'recharts'
+import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, XAxis, YAxis } from 'recharts'
 
 import { api } from '@/api/client'
 import type { components } from '@/api/schema'
@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/table'
 import { useCaseProgress } from '@/hooks/useCaseProgress'
 import { useIsMobile } from '@/hooks/useIsMobile'
+import { CLAVE_COLOR_DECISION, ETIQUETA_DECISION } from '@/lib/etiquetas'
 import { cn } from '@/lib/utils'
 
 // Cuánto dura el destello de "esto acaba de cambiar" en la tabla de costo
@@ -124,6 +125,7 @@ export function Dashboard() {
   const conVeredicto = items.filter((i) => i.decision !== null)
   const distribucion = DECISIONS.map((d) => ({
     decision: d,
+    etiqueta: ETIQUETA_DECISION[d],
     casos: conVeredicto.filter((i) => i.decision === d).length,
   }))
   const tasaEscalamiento =
@@ -189,15 +191,21 @@ export function Dashboard() {
                   >
                     <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                     <XAxis
-                      dataKey="decision"
+                      dataKey="etiqueta"
                       interval={0}
-                      tick={{ fontSize: esMobile ? 10 : 12 }}
+                      tick={{ fontSize: esMobile ? 10 : 11 }}
                       angle={esMobile ? -30 : 0}
                       textAnchor={esMobile ? 'end' : 'middle'}
-                      height={esMobile ? 70 : 30}
+                      height={esMobile ? 90 : 30}
                     />
                     <YAxis allowDecimals={false} tick={{ fontSize: 12 }} width={28} />
-                    <Bar dataKey="casos" fill="var(--primary)" radius={4} />
+                    {/* Cada barra con el color de su decisión (mejoras2): el mismo
+                        que la etiqueta en la tabla, en claro y en oscuro. */}
+                    <Bar dataKey="casos" radius={4}>
+                      {distribucion.map((d) => (
+                        <Cell key={d.decision} fill={`var(--decision-${CLAVE_COLOR_DECISION[d.decision]}-fg)`} />
+                      ))}
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>

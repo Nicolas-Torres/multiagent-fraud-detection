@@ -22,7 +22,8 @@ import diverseScenariosRaw from '@/data/diverse_scenarios.json'
 import { LIVE_SCENARIOS, type LiveScenario, transaccionParaCorridaEnVivo } from '@/data/liveScenarios'
 import showcaseCasesRaw from '@/data/showcase_cases.json'
 import { useCaseProgress } from '@/hooks/useCaseProgress'
-import { decisionVariant } from '@/lib/badges'
+import { DecisionBadge } from '@/components/DecisionBadge'
+import { ESTADOS_TERMINALES, ETIQUETA_ESTADO } from '@/lib/etiquetas'
 import { formatAmount, formatDateTime, formatTransactionId } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
@@ -36,7 +37,9 @@ function sondearHastaDecidir(query: {
   state: { status: string; data?: CaseDetailType }
 }): number | false {
   if (query.state.status === 'error') return false
-  return query.state.data?.decision ? false : 3_000
+  const caso = query.state.data
+  // `FAILED` nunca tiene decisión: sin mirar el estado, se sondearía siempre.
+  return caso && (caso.decision || ESTADOS_TERMINALES.includes(caso.status)) ? false : 3_000
 }
 
 // Sin `case_id`: ese campo se resuelve en vivo con GET /cases/showcase
@@ -388,7 +391,7 @@ function FilaTransaccion({
           ) : detalle.isLoading ? (
             <Skeleton className="h-5 w-20" />
           ) : detalle.data ? (
-            <Badge variant="outline">{detalle.data.status}</Badge>
+            <Badge variant="outline">{ETIQUETA_ESTADO[detalle.data.status]}</Badge>
           ) : null}
         </TableCell>
         <TableCell>
@@ -398,9 +401,7 @@ function FilaTransaccion({
               className="flex cursor-pointer items-center gap-1"
               onClick={() => setDetalleAbierto((v) => !v)}
             >
-              <Badge variant={decisionVariant(detalle.data.decision.decision)}>
-                {detalle.data.decision.decision}
-              </Badge>
+              <DecisionBadge decision={detalle.data.decision.decision} compacto />
               <ChevronDownIcon
                 className={cn(
                   'size-4 text-muted-foreground transition-transform',

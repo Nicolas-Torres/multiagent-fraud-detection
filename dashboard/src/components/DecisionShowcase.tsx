@@ -3,7 +3,8 @@ import { Field } from '@/components/Field'
 import { GraphPanel } from '@/components/GraphPanel'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { decisionVariant, severityVariant } from '@/lib/badges'
+import { DecisionBadge } from '@/components/DecisionBadge'
+import { severityVariant } from '@/lib/badges'
 
 type DecisionRead = components['schemas']['DecisionRead']
 
@@ -47,7 +48,7 @@ export function DecisionDetail({ decision }: { decision: DecisionRead }) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             Decisión
-            <Badge variant={decisionVariant(decision.decision)}>{decision.decision}</Badge>
+            <DecisionBadge decision={decision.decision} />
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">

@@ -21,7 +21,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { decisionVariant } from '@/lib/badges'
+import { DecisionBadge } from '@/components/DecisionBadge'
+import { ETIQUETA_ESTADO } from '@/lib/etiquetas'
 import { formatAmount, formatDateTime } from '@/lib/format'
 
 type CaseStatus = components['schemas']['CaseStatus']
@@ -71,7 +72,7 @@ export function Queue() {
             <SelectItem value="ALL">Todos los estados</SelectItem>
             {STATUSES.map((s) => (
               <SelectItem key={s} value={s}>
-                {s}
+                {ETIQUETA_ESTADO[s]}
               </SelectItem>
             ))}
           </SelectContent>
@@ -117,11 +118,11 @@ export function Queue() {
                   )}
                 </TableCell>
                 <TableCell>
-                  <Badge variant="outline">{item.status}</Badge>
+                  <Badge variant="outline">{ETIQUETA_ESTADO[item.status]}</Badge>
                 </TableCell>
                 <TableCell>
                   {item.decision ? (
-                    <Badge variant={decisionVariant(item.decision)}>{item.decision}</Badge>
+                    <DecisionBadge decision={item.decision} compacto />
                   ) : (
                     <span className="text-muted-foreground">—</span>
                   )}

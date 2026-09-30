@@ -6,6 +6,7 @@ import { DecisionShowcase } from '@/components/DecisionShowcase'
 import { Field } from '@/components/Field'
 import { ResolutionForm } from '@/components/ResolutionForm'
 import { Badge } from '@/components/ui/badge'
+import { ETIQUETA_ESTADO } from '@/lib/etiquetas'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatAmount, formatDateTime } from '@/lib/format'
@@ -45,7 +46,7 @@ export function CaseDetail() {
           </Link>
           <h1 className="text-xl font-semibold">Caso {caso.case_id}</h1>
         </div>
-        <Badge variant="outline">{caso.status}</Badge>
+        <Badge variant="outline">{ETIQUETA_ESTADO[caso.status]}</Badge>
       </div>
 
       <Card>
