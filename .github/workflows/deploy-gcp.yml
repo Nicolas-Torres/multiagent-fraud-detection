@@ -27,12 +27,13 @@ concurrency:
 permissions:
   id-token: write # Workload Identity Federation - sin clave de Service Account
   contents: read
+  packages: read # leer la imagen de GHCR para promoverla (sirve igual si fuera privada)
 
 env:
   REGION: us-central1
-  # El espejo de Artifact Registry (ADR-0022) — no ghcr.io directo, Cloud
-  # Run no puede pull-ear un registro externo.
-  IMAGE_BASE: us-central1-docker.pkg.dev/fraud-detection-portafolio/ghcr-mirror/nicolas-torres/multiagent-fraud-detection
+  # Origen único (ADR-0008) y destino de la promoción por digest (ADR-0028).
+  GHCR_IMAGE: ghcr.io/nicolas-torres/multiagent-fraud-detection
+  IMAGE_BASE: us-central1-docker.pkg.dev/fraud-detection-portafolio/images/nicolas-torres/multiagent-fraud-detection
 
 jobs:
   deploy:
@@ -72,6 +73,33 @@ jobs:
             echo "::notice::La nube ya corre sha-$actual, más nuevo que sha-${sha:0:7}: se salta el deploy."
           else
             echo "deploy=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Instalar crane
+        if: steps.vigente.outputs.deploy == 'true'
+        uses: imjasonh/setup-crane@v0.4
+
+      # ADR-0028: la imagen se copia a Artifact Registry antes de que la use
+      # nada. `crane copy` copia el manifiesto byte a byte, así que el digest
+      # es el que publicó CI. Sin credenciales guardadas: GHCR se lee con el
+      # GITHUB_TOKEN del workflow y Artifact Registry se escribe con la
+      # identidad OIDC de este job.
+      - name: "Promover la imagen por digest a Artifact Registry (ADR-0028)"
+        if: steps.vigente.outputs.deploy == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="${{ steps.image.outputs.tag }}"
+          echo "$GH_TOKEN" | crane auth login ghcr.io -u "${{ github.actor }}" --password-stdin
+          gcloud auth configure-docker "${{ env.REGION }}-docker.pkg.dev" --quiet
+          crane copy "${{ env.GHCR_IMAGE }}:${tag}" "${{ env.IMAGE_BASE }}:${tag}"
+          origen=$(crane digest "${{ env.GHCR_IMAGE }}:${tag}")
+          destino=$(crane digest "${{ env.IMAGE_BASE }}:${tag}")
+          echo "digest GHCR: $origen · digest Artifact Registry: $destino"
+          if [ "$origen" != "$destino" ]; then
+            echo "::error::El digest promovido no coincide con el de GHCR: la imagen no es la que publicó CI."
+            exit 1
           fi
 
       - name: "Migrar (ADR-0009: si falla, aborta el deploy sin tocar la app que sirve)"

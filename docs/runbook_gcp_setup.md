@@ -415,3 +415,10 @@ cuando algo *realmente* intenta usarla**, nunca en `validate` ni en
 
 <!-- Sigue con: acta de cierre de Fase 6, una vez que el re-run
 confirme el deploy completo. -->
+
+---
+
+> **Nota (ADR-0028):** el espejo `ghcr-mirror` y su token de GHCR de este
+> runbook son históricos. Desde el ADR-0028 la imagen se promueve por digest al
+> repositorio estándar `images` de Artifact Registry desde `deploy-gcp.yml`, con
+> OIDC, y ninguna credencial de GitHub se guarda en GCP.

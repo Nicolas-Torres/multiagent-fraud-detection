@@ -98,3 +98,11 @@ incidente 0002 en el momento pero que puede desincronizar el
 - Sigue sin resolver la rotación en sí: cambiar la clave en la consola
   de cada proveedor (Anthropic, Google AI Studio, GitHub, Neon) sigue
   siendo manual — este ADR resuelve la propagación, no la emisión.
+
+## Nota (2026-09-29): el archivo compartido pasa de 6 a 5 valores
+
+Desde el [ADR-0028](0028-sin-credenciales-personales-en-el-camino-de-la-imagen.md)
+ninguna nube guarda credenciales de GHCR: `ghcr_username` y `ghcr_token`
+desaparecen de `shared.secrets.tfvars` y de las dos configuraciones de
+Terraform. `rotate-secrets.sh` vuelve a poder aplicarse con los valores que se
+conocen.

@@ -42,8 +42,6 @@ az role assignment create --assignee <appId> --role "Contributor" \
 cd infra/azure
 terraform init
 terraform plan \
-  -var="ghcr_username=<usuario de GitHub>" \
-  -var="ghcr_token=<PAT con read:packages>" \
   -var="database_url=<connection string de Neon>" \
   -var="anthropic_api_key=<...>" \
   -var="gemini_api_key=<...>"

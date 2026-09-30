@@ -133,3 +133,11 @@ informe.
   mantenimiento** (dos módulos Terraform, dos workflows de CD, dos
   identidades OIDC/Workload Identity a rotar/auditar) a cambio de la
   evidencia de aprendizaje que se buscaba desde el principio.
+
+## Nota (2026-09-29): el espejo se reemplaza por promoción por digest
+
+El [ADR-0028](0028-sin-credenciales-personales-en-el-camino-de-la-imagen.md)
+reemplaza el espejo remoto `ghcr-mirror`, que necesitaba un token personal de
+GitHub, por un repositorio estándar (`images`). `deploy-gcp.yml` promueve ahí
+cada imagen por digest. GHCR sigue siendo el único origen, y Cloud Run ya no
+depende de él para arrancar.

@@ -19,10 +19,8 @@
 # (`az containerapp show --name ca-fraud-detection-api --resource-group
 # rg-fraud-detection --query "properties.template.containers[0].image"`):
 image         = "ghcr.io/nicolas-torres/multiagent-fraud-detection:sha-64dac1a"
-ghcr_username = "Nicolas-Torres"
 
 # Sensibles — completar a mano, nunca pegarlos en el chat:
-ghcr_token         = ""
 database_url       = ""
 anthropic_api_key  = ""
 gemini_api_key     = ""

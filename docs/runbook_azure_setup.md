@@ -663,3 +663,10 @@ punta, sin intervención manual, primera vez.
 parte del pipeline de build, no manual — el próximo deploy real va a
 volver a romper la vitrina si no se resuelve antes), 2) Fase 5 —
 verificación end-to-end + cierre de README/acta. -->
+
+---
+
+> **Nota (ADR-0028):** los `-var="ghcr_username=…"`/`ghcr_token=…` y el bloque
+> `registry` de este runbook son históricos. Desde el ADR-0028 la Container App
+> y sus jobs bajan la imagen pública de GHCR sin credenciales, y Terraform ya no
+> declara esas variables.

@@ -1,6 +1,6 @@
 # Enmiendas pendientes — Contrato de Interfaz
 
-**Estado**: 4 enmiendas acumuladas. Vigente: v0.14.
+**Estado**: 5 enmiendas acumuladas. Vigente: v0.14.
 
 > Documento de trabajo: se **vacía** al publicar una versión, no se archiva.
 > Nunca hay dos.
@@ -37,6 +37,14 @@
   ser liveness **y** readiness probe de Azure. `GET /ready` sigue chequeando
   que Postgres responda, sin caché, y su uso pasa a ser "diagnóstico, smoke y
   startup probe de GCP", nunca un probe periódico.
+- **Acceso a la imagen** (ADR-0028): §1.5 "Acceso a GHCR" dice que el paquete
+  es privado y que el CD se autentica con un token `read:packages`. Pasa a:
+  - el paquete es **público** (el código es open source), y `ci.yml` verifica
+    en cada push que se puede bajar sin credenciales;
+  - Azure lo baja sin credenciales;
+  - GCP lo promueve por digest a Artifact Registry con OIDC, y Cloud Run lo
+    baja con su cuenta de servicio;
+  - ninguna nube guarda un token de GitHub.
 
 ---
 

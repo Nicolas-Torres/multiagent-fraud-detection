@@ -7,7 +7,7 @@ output "project_id" {
   value = var.project_id
 }
 
-output "ghcr_mirror_repository" {
-  description = "Nombre completo del espejo de Artifact Registry, para referenciar la imagen en el CD."
-  value       = google_artifact_registry_repository.ghcr_mirror.name
+output "images_repository" {
+  description = "Nombre completo del repositorio de Artifact Registry adonde el CD promueve la imagen por digest (ADR-0028)."
+  value       = google_artifact_registry_repository.images.name
 }

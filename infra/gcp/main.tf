@@ -24,7 +24,6 @@ resource "google_service_account" "runtime" {
 # sensible en `secret_values`.
 locals {
   secret_ids = compact([
-    "ghcr-token",
     "database-url",
     "anthropic-api-key",
     "gemini-api-key",
@@ -32,7 +31,6 @@ locals {
   ])
 
   secret_values = {
-    "ghcr-token"        = var.ghcr_token
     "database-url"      = var.database_url
     "anthropic-api-key" = var.anthropic_api_key
     "gemini-api-key"    = var.gemini_api_key
@@ -53,11 +51,10 @@ locals {
     "gemini-api-key"    = "GEMINI_API_KEY"
     "langsmith-api-key" = "LANGSMITH_API_KEY"
   }
-  # sólo los que la app consume como env var (ghcr-token es sólo para el
-  # espejo de Artifact Registry, la app nunca lo ve)
-  app_secret_ids = [for id in local.secret_ids : id if id != "ghcr-token"]
+  # Todos los secrets son de la app desde ADR-0028 (ya no hay token de GHCR).
+  app_secret_ids = local.secret_ids
 
-  full_image = "${var.region}-docker.pkg.dev/${var.project_id}/ghcr-mirror/${var.image_repository}:${var.image_tag}"
+  full_image = "${var.region}-docker.pkg.dev/${var.project_id}/images/${var.image_repository}:${var.image_tag}"
 }
 
 resource "google_secret_manager_secret" "this" {
@@ -81,59 +78,55 @@ resource "google_secret_manager_secret_iam_member" "runtime_access" {
   member    = "serviceAccount:${google_service_account.runtime.email}"
 }
 
-# --- Espejo de Artifact Registry hacia GHCR ------------------------------
-# Cloud Run no puede pull-ear un registro externo directo (a diferencia de
-# Azure Container Apps, que sí toma credenciales de un registry cualquiera)
-# — un remote repository de Artifact Registry actúa de proxy autenticado
-# hacia GHCR (ADR-0022 §Alternativas descartadas). Sigue apuntando a GHCR
-# como fuente real, no una copia manual: la imagen real la sigue publicando
-# sólo el job `build` de ci.yml (ADR-0008).
-data "google_project" "current" {}
-
-# Artifact Registry lee las credenciales del upstream con su propia
-# identidad de servicio gestionada por Google (`service-<projectNumber>
-# @gcp-sa-artifactregistry.iam.gserviceaccount.com`), no con la mía —
-# bug real encontrado en el primer `apply` (ver docs/runbook_gcp_setup.md):
-# sin este permiso, crear el repository falla con "does not have
-# permission to access the secret version".
-resource "google_secret_manager_secret_iam_member" "artifact_registry_ghcr_pull" {
-  secret_id = google_secret_manager_secret.this["ghcr-token"].secret_id
-  role      = "roles/secretmanager.secretAccessor"
-  member    = "serviceAccount:service-${data.google_project.current.number}@gcp-sa-artifactregistry.iam.gserviceaccount.com"
-}
-
-resource "google_artifact_registry_repository" "ghcr_mirror" {
+# --- Registro propio de la imagen (ADR-0028) ------------------------------
+# Repositorio estándar, no un espejo remoto: `deploy-gcp.yml` promueve cada
+# imagen **por digest** desde GHCR (`crane copy`, manifiesto byte a byte) antes
+# de actualizar Cloud Run. GHCR sigue siendo el único origen (ADR-0008) y GCP
+# no depende de él para arrancar una instancia. Ninguna credencial guardada:
+# el deploy escribe con su identidad OIDC y el runtime lee con la suya.
+resource "google_artifact_registry_repository" "images" {
   location      = var.region
-  repository_id = "ghcr-mirror"
+  repository_id = "images"
   format        = "DOCKER"
-  mode          = "REMOTE_REPOSITORY"
+  description   = "Imágenes promovidas por digest desde GHCR (ADR-0028)"
 
-  remote_repository_config {
-    description                 = "Espejo de solo lectura hacia ghcr.io (ADR-0022)"
-    disable_upstream_validation = true
-
-    docker_repository {
-      custom_repository {
-        uri = "https://ghcr.io"
-      }
-    }
-
-    upstream_credentials {
-      username_password_credentials {
-        username                = var.ghcr_username
-        password_secret_version = google_secret_manager_secret_version.this["ghcr-token"].name
-      }
+  # Cada deploy agrega una versión: se conservan las 3 últimas (margen para
+  # un rollback manual) y el resto se borra, para quedar dentro de los 0.5 GB
+  # gratuitos.
+  cleanup_policy_dry_run = false
+  cleanup_policies {
+    id     = "conservar-las-3-recientes"
+    action = "KEEP"
+    most_recent_versions {
+      keep_count = 3
     }
   }
-
-  depends_on = [google_secret_manager_secret_iam_member.artifact_registry_ghcr_pull]
+  cleanup_policies {
+    id     = "borrar-el-resto"
+    action = "DELETE"
+    condition {
+      tag_state = "ANY"
+    }
+  }
 }
 
-resource "google_artifact_registry_repository_iam_member" "runtime_pull" {
-  location   = google_artifact_registry_repository.ghcr_mirror.location
-  repository = google_artifact_registry_repository.ghcr_mirror.name
+# Nombre distinto del `runtime_pull` del espejo viejo a propósito: durante la
+# migración conviven los dos, y reutilizar el nombre habría reemplazado el
+# permiso sobre el espejo mientras Cloud Run todavía bajaba de ahí.
+resource "google_artifact_registry_repository_iam_member" "runtime_pull_images" {
+  location   = google_artifact_registry_repository.images.location
+  repository = google_artifact_registry_repository.images.name
   role       = "roles/artifactregistry.reader"
   member     = "serviceAccount:${google_service_account.runtime.email}"
+}
+
+# La cuenta del deploy (Workload Identity Federation, creada a mano en el
+# bootstrap) escribe sólo en este repositorio, no en todo el proyecto.
+resource "google_artifact_registry_repository_iam_member" "deployer_push" {
+  location   = google_artifact_registry_repository.images.location
+  repository = google_artifact_registry_repository.images.name
+  role       = "roles/artifactregistry.writer"
+  member     = "serviceAccount:${var.deployer_service_account}"
 }
 
 # --- Modo servir: el Cloud Run service, escala a cero (ADR-0022) --------
@@ -220,7 +213,7 @@ resource "google_cloud_run_v2_service" "api" {
     }
   }
 
-  depends_on = [google_artifact_registry_repository_iam_member.runtime_pull]
+  depends_on = [google_artifact_registry_repository_iam_member.runtime_pull_images]
 
   # `image` sólo fija el punto de partida (var.image_tag por defecto).
   # deploy-gcp.yml lo actualiza en cada push con
@@ -283,7 +276,7 @@ resource "google_cloud_run_v2_job" "migrate" {
     }
   }
 
-  depends_on = [google_artifact_registry_repository_iam_member.runtime_pull]
+  depends_on = [google_artifact_registry_repository_iam_member.runtime_pull_images]
 }
 
 resource "google_cloud_run_v2_job" "seed" {
@@ -332,7 +325,7 @@ resource "google_cloud_run_v2_job" "seed" {
     }
   }
 
-  depends_on = [google_artifact_registry_repository_iam_member.runtime_pull]
+  depends_on = [google_artifact_registry_repository_iam_member.runtime_pull_images]
 }
 
 resource "google_cloud_run_v2_job" "fetch_intel" {
@@ -380,7 +373,7 @@ resource "google_cloud_run_v2_job" "fetch_intel" {
     }
   }
 
-  depends_on = [google_artifact_registry_repository_iam_member.runtime_pull]
+  depends_on = [google_artifact_registry_repository_iam_member.runtime_pull_images]
 }
 
 # --- Cron de fetch-intel: Cloud Scheduler --------------------------------
