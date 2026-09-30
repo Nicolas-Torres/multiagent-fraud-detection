@@ -33,6 +33,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
+from multiagent_fraud_detection.api import casos_interrumpidos
 from multiagent_fraud_detection.api.deps import get_session
 from multiagent_fraud_detection.api.routers import metrics as metrics_router
 from multiagent_fraud_detection.config.observability import instrumentar_observabilidad
@@ -55,6 +56,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     # visitante después de cada deploy paga el costo completo de la consulta
     # a LangSmith que `precalentar` deja resuelto de antemano.
     app.state.metrics_prewarm_task = asyncio.create_task(metrics_router.precalentar())
+    # Casos que un reinicio dejó en `ANALYZING` para siempre. De fondo y sólo
+    # en producción, mismo criterio que `precalentar`: en tests no hay base,
+    # y en local se corre a mano (`python -m ...casos_interrumpidos`).
+    if settings.environment == "production":
+        app.state.cierre_interrumpidos_task = asyncio.create_task(
+            casos_interrumpidos.cerrar_interrumpidos(AsyncSessionLocal)
+        )
     yield
 
 
