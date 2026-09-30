@@ -1,5 +1,5 @@
 # Contrato de Interfaz — Sistema Multi-Agente de Detección de Fraude
-**Versión 0.14 — La vitrina se resuelve en vivo, no en el build**
+**Versión 0.15 — La demo pública, lista para visitas**
 
 > Define las **fronteras** entre el motor de agentes, la infraestructura y el
 > dashboard del analista — hoy las tres las cubro yo
@@ -54,7 +54,7 @@ alembic upgrade head
 # si falla, NO aborta el rollout)
 python scripts/seed.py
 
-# Modo fetch-intel (Job periódico, idempotente;
+# Modo fetch-intel (Job semanal, lunes 06:00 UTC, idempotente;
 # si falla, NO aborta el rollout)
 python scripts/fetch_threat_intel.py
 ```
@@ -105,11 +105,23 @@ réplicas que todavía no se reemplazaron.
 
 | Endpoint | Chequea | Uso |
 |---|---|---|
-| `GET /health` | El proceso vive | liveness probe |
-| `GET /ready` | Postgres responde | readiness probe |
+| `GET /health` | El proceso vive | liveness **y** readiness probe de Azure 🆕 (ADR-0027) |
+| `GET /ready` | Postgres responde, en cada llamada | diagnóstico, `smoke_api.py` y startup probe de GCP; **nunca** un probe periódico 🆕 (ADR-0027) |
 | `GET /metrics` 🆕 | — | scrape de métricas HTTP en formato Prometheus (ADR-0024) |
 
 Los tres sin autenticación, `200` cuando OK.
+
+🆕 **El readiness no consulta Postgres** (ADR-0027). Un probe cada 10 s sobre
+`/ready` despertaba a Neon (serverless) todo el día (incidente 0005), y cuando
+despertarlo superaba el timeout del probe dejaba la réplica sin tráfico. Si la
+base cae, los endpoints que la usan responden `5xx`; marcar la réplica como no
+disponible no arreglaría nada. `/ready` no tiene caché: cada llamada dice el
+estado real de la base.
+
+🆕 **En producción no existen `/docs`, `/redoc` ni `/openapi.json`**
+(ADR-0025): Swagger le serviría a cualquiera un formulario para disparar el
+grafo. Los tipos del dashboard se generan con `app.openapi()` en proceso
+(`scripts/export_openapi.py`), no por URL.
 
 ### 1.4 Configuración: 100% por variables de entorno
 
@@ -140,12 +152,12 @@ Los tres sin autenticación, `200` cuando OK.
 > en `decisions`, y los cinco sellos de §2.5 mentirían a la vez.
 > El allowlist de búsqueda web **no** es env var → tabla gobernada (§4).
 >
-> 🆕 `ANTHROPIC_API_KEY` alimenta ahora **dos** puertos: `Narrator` (explicación
+> `ANTHROPIC_API_KEY` alimenta ahora **dos** puertos: `Narrator` (explicación
 > al cliente) y `Searcher` (inteligencia externa, consumido por el Job
 > `fetch-intel`, nunca por el grafo). Misma regla: sólo la clave es variable de
 > entorno; el modelo y la plantilla de búsqueda viven en código.
 >
-> 🆕 **Techo organizacional de dominios.** El proveedor de búsqueda admite
+> **Techo organizacional de dominios.** El proveedor de búsqueda admite
 > restringir por dominio a nivel de la organización, en su consola —fuera de
 > este repo—. Esa lista sólo puede **acotar**, nunca **expandir**, lo que
 > `allowed_domains` pide por request: es un segundo filtro invisible desde el
@@ -158,7 +170,7 @@ Los tres sin autenticación, `200` cuando OK.
 |---|---|---|---|
 | **Local** | contenedor de `compose.yml` | iterar migraciones, smoke tests | cada uno la suya |
 | **Compartido** | RDS, base `fraud` | integración: el motor y el dashboard | los dos |
-| **Producción** | no existe todavía | el despliegue final | el CD |
+| **Producción** 🆕 | Neon (Postgres serverless), una sola base para Azure y GCP | la demo pública | el CD (Jobs de migrate y seed) |
 
 El local no desaparece al existir el compartido: se **itera** en local, se
 **integra** en compartido.
@@ -218,11 +230,24 @@ Los tags siguen existiendo porque un humano necesita leer qué es cada imagen.
 ser autoridad sobre el número: uno solo puede quedar desactualizado, y el que se
 puede firmar es el de git.
 
-#### Acceso a GHCR
+#### Acceso a la imagen 🆕
 
-El paquete queda **privado**; el CD se autentica con un token con
-`read:packages`. Se escribe porque GHCR es privado por defecto y el `docker pull`
-falla con un error de autenticación que se lee como *"la imagen no existe"*.
+**Ninguna credencial personal en el camino de la imagen**
+([ADR-0028](adr/0028-sin-credenciales-personales-en-el-camino-de-la-imagen.md)).
+
+| Tramo | Cómo se autentica |
+|---|---|
+| CI → GHCR (push) | `GITHUB_TOKEN` del workflow, temporal |
+| GitHub Actions → Azure y GCP (deploy) | OIDC, sin secretos guardados |
+| GCP: GHCR → Artifact Registry | el deploy **promueve por digest** (`crane copy`, mismo digest) con su identidad OIDC |
+| Cloud Run → Artifact Registry | cuenta de servicio de runtime (IAM) |
+| Azure → GHCR | ninguna: el paquete es **público** (el código es open source) |
+
+El paquete es público a propósito y CI lo verifica después de cada push con un
+pull anónimo del tag recién publicado. Si alguien lo pasa a privado, CI falla
+con un mensaje que remite al ADR-0028, antes de que falle un deploy de Azure
+con un error que se lee como *"la imagen no existe"*. Con un paquete privado,
+Azure necesitaría ACR con Managed Identity.
 
 ### 1.6 Pipeline de CI
 
@@ -304,19 +329,33 @@ mediría la discrepancia de reglas en vez de la calidad del sistema.
 
 | Método | Ruta | Propósito | Body | Respuesta | Código |
 |---|---|---|---|---|---|
-| `POST` | `/api/v1/cases` | Ingresar transacción | `Transaction` | `CaseCreated` | `202` nuevo / `200` reintento |
+| `POST` | `/api/v1/cases` | Ingresar transacción | `Transaction` | `CaseCreated` | `202` nuevo / `200` reintento / `429` techo de la demo 🆕 |
 | `GET` | `/api/v1/cases` | Listar/filtrar cola (HITL) | query: `status`, `limit`, `offset` | `Page[CaseSummary]` | `200` |
 | `GET` | `/api/v1/cases/{case_id}` | Detalle completo | — | `CaseDetail` | `200` |
-| `GET` | `/api/v1/cases/showcase` | 🆕 `case_id` reales de los 5 casos curados de la vitrina, resueltos en vivo | — | `list[CaseShowcaseItem]` | `200` |
-| `POST` | `/api/v1/cases/{case_id}/resolution` | Acción del analista | `HumanResolutionIn` | `CaseDetail` | `200` |
-| `GET` | `/api/v1/policies` | 🆕 Catálogo con estado de cada política | — | `list[PolicyRead]` | `200` |
-| `POST` | `/api/v1/policies` | 🆕 Alta de política (norma + vinculación opcional) | `PolicyIn` | `PolicyRead` | `201` |
-| `GET` | `/api/v1/predicates` | 🆕 La biblioteca, para el compositor del dashboard | — | `list[PredicateSpec]` | `200` |
-| `GET` | `/api/v1/cases/{case_id}/stream` | 🆕 Progreso en vivo del grafo, por SSE (ADR-0018) | — | `text/event-stream` | `200` |
-| `GET` | `/api/v1/metrics/llm` | 🆕 Costo y latencia del grafo, leídos de LangSmith (ADR-0019) | — | `LlmMetricsRead` | `200` |
+| `GET` | `/api/v1/cases/showcase` | `case_id` reales de los 5 casos curados de la vitrina, resueltos en vivo | — | `list[CaseShowcaseItem]` | `200` |
+| `POST` | `/api/v1/cases/{case_id}/resolution` | Acción del analista | `HumanResolutionIn` | `CaseDetail` | `200` / `429` techo de la demo 🆕 |
+| `GET` | `/api/v1/policies` | Catálogo con estado de cada política | — | `list[PolicyRead]` | `200` |
+| `POST` | `/api/v1/policies` | Alta de política (norma + vinculación opcional) | `PolicyIn` | `PolicyRead` | `201` |
+| `GET` | `/api/v1/predicates` | La biblioteca, para el compositor del dashboard | — | `list[PredicateSpec]` | `200` |
+| `GET` | `/api/v1/cases/{case_id}/stream` | Progreso en vivo del grafo, por SSE (ADR-0018) | — | `text/event-stream` | `200` |
+| `GET` | `/api/v1/metrics/llm` | Costo y latencia del grafo, leídos de LangSmith (ADR-0019) | — | `LlmMetricsRead` | `200` |
 | `GET` | `/health` | Liveness | — | `{status}` | `200` |
-| `GET` | `/ready` | Readiness (Postgres) | — | `{status}` | `200` |
+| `GET` | `/ready` | Postgres responde (diagnóstico, no probe) | — | `{status}` | `200` |
 | `GET` | `/metrics` | 🆕 Métricas HTTP (latencia, conteo) en formato Prometheus, para scrape (ADR-0024) | — | `text/plain` (Prometheus) | `200` |
+
+🆕 **Techo de la demo pública** (ADR-0025). Sólo con `ENVIRONMENT=production`,
+y contado en la base, así que es uno solo para las dos nubes:
+
+| Endpoint | Techo | Al superarlo |
+|---|---|---|
+| `POST /api/v1/cases` | 40 ejecuciones del grafo por hora y 200 por día | `429`, con el motivo en `detail` (texto para el visitante) |
+| `POST /api/v1/cases/{case_id}/resolution` | 20 por hora | `429`, con el motivo en `detail` |
+
+El techo corre **después** de la idempotencia: repetir un `transaction_id`
+existente devuelve `200` sin contar. Es un techo blando: dos pedidos
+simultáneos pueden pasarlo por uno. El cooldown por escenario de la demo
+(`LIVE-*`, 5 minutos) también responde `429`, pero queda fuera de este
+contrato (acta 10 §3.5): ningún llamador real usa ese prefijo.
 
 `GET /api/v1/cases/{case_id}/stream` emite eventos `node`
 (`{"node": "<nombre>"}`, uno por nodo del grafo que termina, incluidos los
@@ -346,7 +385,7 @@ la va a haber: sería una segunda fuente de verdad para algo que LangSmith ya
 mide mejor. `available: false` (con `summary`/`nodes` en `null`) si
 `LANGSMITH_TRACING`/`LANGSMITH_API_KEY` no están configurados o LangSmith no
 responde — **nunca** un `4xx`/`5xx` por esto. Cacheado en proceso (30s):
-no es un dato que necesite ser instantáneo. `?force=true` 🆕 (ADR-0020)
+no es un dato que necesite ser instantáneo. `?force=true` (ADR-0020)
 salta ese caché para una llamada puntual y lo actualiza con el resultado
 fresco — lo usa el dashboard cuando el progreso en vivo de un caso
 (`/cases/{id}/stream`) avisa que terminó, para no esperar hasta 30s; no es
@@ -379,7 +418,7 @@ un endpoint distinto, es el mismo con una bandera opcional.
 | `device_id` | `str` | `min_length=1` |
 | `timestamp` | `datetime` | aware, UTC |
 | `merchant_id` | `str` | `min_length=1` |
-| **`issuer_bank`** | `str \| null` | 🆕 código del banco emisor, **normalizado a mayúsculas**; insumo de FP-10 (alerta externa). Nullable: no todo emisor del dataset está en el corpus de amenazas |
+| **`issuer_bank`** | `str \| null` | código del banco emisor, **normalizado a mayúsculas**; insumo de FP-10 (alerta externa). Nullable: no todo emisor del dataset está en el corpus de amenazas |
 
 #### `CustomerBehavior` — *NO viene en el request*
 
@@ -395,13 +434,13 @@ el análisis (§7.4).
 | `usual_hour_end` | `int` | `0–23`; `"08-20"` → `20` |
 | `usual_countries` | `list[str]` | cada elemento ISO α2, mayúsculas; **lista vacía permitida** |
 | `usual_devices` | `list[str]` | **lista vacía permitida** |
-| **`usual_channel`** | `Channel` | 🆕 singular, no lista |
-| **`account_creation_date`** | `date` | 🆕 |
-| **`last_profile_update`** | `datetime` | 🆕 aware, UTC |
-| **`daily_limit`** | `Decimal` | 🆕 `> 0`, misma moneda |
-| **`currency`** | `str` | 🆕 ISO 4217, mayúsculas |
-| **`timezone`** | `str` | 🆕 IANA; se **rechaza** lo que `ZoneInfo` no resuelva |
-| **`segment`** | `Segment` | 🆕 `retail`, `premium`, `business` |
+| **`usual_channel`** | `Channel` | singular, no lista |
+| **`account_creation_date`** | `date` | |
+| **`last_profile_update`** | `datetime` | aware, UTC |
+| **`daily_limit`** | `Decimal` | `> 0`, misma moneda |
+| **`currency`** | `str` | ISO 4217, mayúsculas |
+| **`timezone`** | `str` | IANA; se **rechaza** lo que `ZoneInfo` no resuelva |
+| **`segment`** | `Segment` | `retail`, `premium`, `business` |
 
 > **La moneda es atributo de la cuenta**, no del país donde ocurre la compra: una
 > tarjeta liquida en la moneda de su cuenta. Es lo que hace comparable `amount`
@@ -439,22 +478,22 @@ el análisis (§7.4).
 | Campo | Tipo | Notas |
 |---|---|---|
 | `decision` | `DecisionType` | |
-| **`risk_score`** | `float \| null` (0.0–1.0) | 🆕 **sospecha**, determinístico. Ordena la cola y vigila el drift; **no** decide |
+| **`risk_score`** | `float \| null` (0.0–1.0) | **sospecha**, determinístico. Ordena la cola y vigila el drift; **no** decide |
 | `confidence` | `float` (0.0–1.0) | **seguridad en el veredicto autónomo** — ver nota |
-| **`base_confidence`** | `float \| null` (0.0–1.0) | 🆕 la confianza antes del ajuste del Arbiter |
-| **`confidence_rationale`** | `str \| null` | 🆕 justificación del ajuste; `null` = no hubo ajuste |
-| **`scoring_version`** | `str \| null` | 🆕 versión de la fórmula que produjo los scores |
-| **`matched_policies`** | `list[str]` | 🆕 políticas que dispararon **completas**. El vocabulario del ground truth |
+| **`base_confidence`** | `float \| null` (0.0–1.0) | la confianza antes del ajuste del Arbiter |
+| **`confidence_rationale`** | `str \| null` | justificación del ajuste; `null` = no hubo ajuste |
+| **`scoring_version`** | `str \| null` | versión de la fórmula que produjo los scores |
+| **`matched_policies`** | `list[str]` | políticas que dispararon **completas**. El vocabulario del ground truth |
 | **`policy_catalog_version`** | `str \| null` | qué versión del catálogo se evaluó (ej. `2025.1-b1`) |
-| **`retrieval_index_version`** | `str \| null` | 🆕 con qué generación del índice se recuperó (`gemini-embedding-2:1536:doc:1`). `null` = **no hubo recuperación** |
-| **`explanation_prompt_version`** | `str \| null` | 🆕 con qué modelo y prompt se redactó `explanation_customer`. `null` = **ningún modelo participó** |
-| **`threat_intel_version`** | `str \| null` | 🆕 quinto eje: con qué generación del snapshot externo se consultó (`claude-sonnet-4-6:issuer-alert:v1`). `null` = **no se consultó snapshot** — nunca "no había alertas": un corpus vacío consultado igual sella versión |
+| **`retrieval_index_version`** | `str \| null` | con qué generación del índice se recuperó (`gemini-embedding-2:1536:doc:1`). `null` = **no hubo recuperación** |
+| **`explanation_prompt_version`** | `str \| null` | con qué modelo y prompt se redactó `explanation_customer`. `null` = **ningún modelo participó** |
+| **`threat_intel_version`** | `str \| null` | quinto eje: con qué generación del snapshot externo se consultó (`claude-haiku-4-5-20251001:issuer-alert:v2` 🆕, ADR-0026). `null` = **no se consultó snapshot** — nunca "no había alertas": un corpus vacío consultado igual sella versión |
 | `signals` | `list[Signal]` | orden determinístico fijado por Evidence Aggregation |
 | `citations_internal` | `list[InternalCitation]` | políticas (RAG) |
 | `citations_external` | `list[ExternalCitation]` | alertas web (gobernada) |
 | `debate` | `DebateSummary` | pro-fraude / pro-cliente |
 | `agent_route` | `list[str]` | rastro de **agentes**, agrupado por superstep |
-| **`degraded_agents`** | `list[str]` | 🆕 agentes que fallaron; vacío = evidencia completa |
+| **`degraded_agents`** | `list[str]` | agentes que fallaron; vacío = evidencia completa |
 | `explanation_customer` | `str` | |
 | `explanation_audit` | `str` | |
 | `decided_at` | `datetime` | lo acuña el servidor |
@@ -627,7 +666,7 @@ Los tres campos anteriores **más `resolved_at`** (`datetime`, lo acuña el serv
 | `limit` | `int` |
 | `offset` | `int` |
 
-#### `PolicyRead` — respuesta de `GET /api/v1/policies` 🆕
+#### `PolicyRead` — respuesta de `GET /api/v1/policies`
 
 | Campo | Tipo | Notas |
 |---|---|---|
@@ -646,7 +685,7 @@ una política en runtime necesita un destino seguro para escrituras
 concurrentes que un archivo no da. El día que la Fase 3 (tablas) se
 implemente, este esquema no cambia — sólo su fuente.
 
-#### `PredicateSpec` — respuesta de `GET /api/v1/predicates` 🆕
+#### `PredicateSpec` — respuesta de `GET /api/v1/predicates`
 
 | Campo | Tipo | Notas |
 |---|---|---|
@@ -667,7 +706,7 @@ más de lo que informa. Es la biblioteca completa —quince predicados—, la mi
 que usa el motor para evaluar: no hay una segunda lista mantenida a mano para
 el compositor del dashboard.
 
-#### `LlmMetricsRead` — respuesta de `GET /api/v1/metrics/llm` 🆕
+#### `LlmMetricsRead` — respuesta de `GET /api/v1/metrics/llm`
 
 | Campo | Tipo | Notas |
 |---|---|---|
@@ -737,7 +776,7 @@ confianza + explicación de auditoría · explicación al cliente · **acciones*
 
 ---
 
-### 3.3 Vista de políticas 🆕
+### 3.3 Vista de políticas
 
 **Lista**: cada política con su estado —`activa`, `excluida`, `pendiente de
 vinculación`, `vinculación obsoleta`— desde `GET /api/v1/policies`.
@@ -761,7 +800,7 @@ indexado es **citable por identidad e invisible por similitud**: si dispara, se
 cita igual —esa vía no consulta el índice—; si no dispara, no hay forma de que
 aparezca. Estado legítimo y **silencioso**: nada falla.
 
-**Cuarta métrica 🆕: antigüedad del snapshot de inteligencia externa vigente**
+**Cuarta métrica: antigüedad del snapshot de inteligencia externa vigente**
 —`now() - max(retrieved_at)` sobre `threat_indicators` en la generación activa.
 Un snapshot viejo es **citable y silenciosamente obsoleto**: el mismo estado
 legítimo que motivó la primera métrica, del otro lado del puerto
@@ -784,13 +823,13 @@ auditoría), no config de infraestructura. Vive en Postgres, no en env var.
 **Tabla `web_search_allowlist`**: `domain`, `added_by`, `added_at`, `active`, `reason`.
 
 - Se **siembra** con el seed; se administra como `merchant_blacklist`.
-- **🆕 Gobierna el camino de escritura, no el de lectura**
+- **Gobierna el camino de escritura, no el de lectura**
   ([ADR-0014](adr/0014-la-inteligencia-externa-se-recoge-en-build-y-se-consulta-congelada.md)).
   v0.2–v0.7 la describían filtrando el *fetch* en runtime; con el snapshot
   congelado el enforcement ocurre **una vez, en el Job `fetch-intel`**: lo que
   no pasa la lista no llega a `threat_indicators`, y en runtime el grafo no
   tiene nada que filtrar —hace *lookup*, nunca búsqueda—.
-- **🆕 Sin caché.** A diferencia de `merchant_blacklist`, la lee un Job de build
+- **Sin caché.** A diferencia de `merchant_blacklist`, la lee un Job de build
   una vez por corrida, no el grafo una vez por transacción: no hay lectura
   repetida en runtime que justifique TTL ni invalidación (§4.2).
 - Lo rechazado por el *enforcement* se registra en el **informe del Job**, no en
@@ -800,7 +839,7 @@ auditoría), no config de infraestructura. Vive en Postgres, no en env var.
 **Regla general reutilizable**: *¿es config de infraestructura (estática, por deploy)
 o dato de gobernanza (mutable, con audit trail)?* Lo primero → env var. Lo segundo → tabla.
 
-### 4.1 Las políticas también son dato de gobernanza 🆕
+### 4.1 Las políticas también son dato de gobernanza
 
 Por la misma regla, y es el caso más claro de los tres. Se modelan como **dos
 tablas con dueños y ciclos de vida distintos** ([ADR-0007](adr/0007-la-forma-ejecutable-de-una-politica-es-una-vinculacion.md)):
@@ -818,7 +857,7 @@ aplicar un umbral distinto del que cita.
 > Entran con su consumidor, el RAG. Hasta entonces el catálogo vive en archivos
 > versionados bajo `data/policies/`.
 
-### 4.2 Cachear con TTL, no solo con invalidación 🆕
+### 4.2 Cachear con TTL, no solo con invalidación
 
 La versión anterior decía *"se cachea en memoria con invalidación al escribir"*,
 y eso asume **un proceso**. Con N réplicas, invalidar limpia la que recibió la
@@ -829,7 +868,7 @@ todas las réplicas sin coordinación; el `invalidate()` se conserva para que la
 réplica que atiende un alta desde el dashboard la vea al instante.
 
 Aplica a las cachés que el **grafo** lee por transacción: `merchant_blacklist` y
-**🆕 `threat_indicators`** (el índice `(tipo, valor) → observaciones` que arma
+**`threat_indicators`** (el índice `(tipo, valor) → observaciones` que arma
 el Threat Intel Agent). **No** aplica a `web_search_allowlist`: esa la lee el
 Job `fetch-intel` una vez por corrida de build, no el grafo (§4).
 
@@ -841,23 +880,23 @@ Job `fetch-intel` una vez por corrida de build, no el grafo (§4).
 |---|---|---|
 | 1 | Cálculo de confianza | **Híbrida**: determinístico (`base_confidence`) + ajuste acotado del Arbiter con justificación |
 | 2 | Payload del `POST /cases` | **Solo `Transaction`**; el grafo recupera el perfil |
-| 3 | Notificación al dashboard | **Polling** como fuente de verdad; 🆕 progreso en vivo por **SSE** (ADR-0018, no WebSocket literal — ver §2.3) como agregado visual, nunca reemplazo |
+| 3 | Notificación al dashboard | **Polling** como fuente de verdad; progreso en vivo por **SSE** (ADR-0018, no WebSocket literal — ver §2.3) como agregado visual, nunca reemplazo |
 | 4 | Allowlist de búsqueda web | **Tabla gobernada** con audit trail |
 | 5 | Duplicados | **Idempotencia** por `transaction_id` |
 | 6 | `signals` | **Tabla relacional** (unidad de evaluación) |
 | 7 | `citations_*` | **JSONB** (narrativa de auditoría) |
 | 8 | Perfil del cliente en el caso | **Snapshot congelado** en JSONB, sin FK |
 | 9 | `Decision` | **Tabla propia** con PK compartida con `cases` |
-| 10 | 🆕 HITL | **Sin `interrupt()`**: `PENDING_HUMAN` es terminal para el grafo; la resolución es flujo HTTP |
-| 11 | 🆕 Riesgo vs confianza | **Dos números distintos**, con formas distintas |
-| 12 | 🆕 Falla de un agente | **Degrada** la decisión, no la aborta; `FAILED` solo por excepción no capturada |
-| 13 | 🆕 Errores de agente | **Tabla** `agent_errors` (el sistema los mide); la frontera expone solo `degraded_agents` |
-| 14 | 🆕 Escritura del grafo | **Un solo punto**, con semántica de reemplazo del agregado |
-| 15 | 🆕 Forma ejecutable de una política | **Vinculación** al documento normativo, con huella. El documento es del banco |
-| 16 | 🆕 `NO_CUSTOMER_PROFILE` en el riesgo | **No suma**. "No pude comparar" no es "esto es sospechoso" |
-| 17 | 🆕 Caché de datos de gobernanza | **TTL + invalidación**, no solo invalidación (§4.2) |
-| 18 | 🆕 Búsqueda de inteligencia externa | **Se recoge en build, se consulta congelada** — nunca en vivo dentro del grafo (ADR-0014) |
-| 19 | 🆕 Evidencia externa en el veredicto | **Entra por política del catálogo** (FP-10 vinculada), no por señal con código propio fuera de su vocabulario (ADR-0015) |
+| 10 | HITL | **Sin `interrupt()`**: `PENDING_HUMAN` es terminal para el grafo; la resolución es flujo HTTP |
+| 11 | Riesgo vs confianza | **Dos números distintos**, con formas distintas |
+| 12 | Falla de un agente | **Degrada** la decisión, no la aborta; `FAILED` solo por excepción no capturada |
+| 13 | Errores de agente | **Tabla** `agent_errors` (el sistema los mide); la frontera expone solo `degraded_agents` |
+| 14 | Escritura del grafo | **Un solo punto**, con semántica de reemplazo del agregado |
+| 15 | Forma ejecutable de una política | **Vinculación** al documento normativo, con huella. El documento es del banco |
+| 16 | `NO_CUSTOMER_PROFILE` en el riesgo | **No suma**. "No pude comparar" no es "esto es sospechoso" |
+| 17 | Caché de datos de gobernanza | **TTL + invalidación**, no solo invalidación (§4.2) |
+| 18 | Búsqueda de inteligencia externa | **Se recoge en build, se consulta congelada** — nunca en vivo dentro del grafo (ADR-0014) |
+| 19 | Evidencia externa en el veredicto | **Entra por política del catálogo** (FP-10 vinculada), no por señal con código propio fuera de su vocabulario (ADR-0015) |
 
 
 ---
@@ -890,17 +929,17 @@ documentadas:
 | `transactions` | `transaction_id` (natural) | índices compuestos `(customer_id, timestamp)` y `(device_id, timestamp)` |
 | `customer_behaviors` | `customer_id` (natural) | `varchar(2)[]` y `varchar[]` para las listas |
 | `cases` | `case_id` (UUID, surrogate) | FK + **UNIQUE** en `transaction_id`; índice compuesto `(status, created_at)` |
-| `decisions` | `case_id` (**PK = FK** a `cases`) | `matched_policies varchar[]` y `policy_catalog_version` 🆕 —`ARRAY` por la regla de §7.2: escalares homogéneos, se leen completos, no existen sin su dueño—. 1:1 implícito, sin constraint extra |
+| `decisions` | `case_id` (**PK = FK** a `cases`) | `matched_policies varchar[]` y `policy_catalog_version` —`ARRAY` por la regla de §7.2: escalares homogéneos, se leen completos, no existen sin su dueño—. 1:1 implícito, sin constraint extra |
 | `signals` | `id` (BIGSERIAL) | FK a `decisions.case_id`; índice en `code` |
-| **`agent_errors`** | `id` (BIGSERIAL) | 🆕 FK a `decisions.case_id`; índice en `agent` |
+| **`agent_errors`** | `id` (BIGSERIAL) | FK a `decisions.case_id`; índice en `agent` |
 | `human_resolutions` | `case_id` (**PK = FK** a `cases`) | 1:1 implícito |
 | `merchant_blacklist` | `merchant_id` (natural) | gobernanza; baja lógica con `active` |
-| **`fraud_policies`** | `(policy_id, version)` compuesta | 🆕 documento normativo; append-only por versión. **Sin `active`**: el estado se deriva |
-| **`binding_sets`** | `version` (`2025.1-b1`) | 🆕 encabezado del set de vinculaciones; a lo sumo uno activo, por **índice parcial único** |
-| **`policy_bindings`** | `(binding_set_version, policy_id)` | 🆕 FK **compuesta** a `fraud_policies(policy_id, version)`; `condition` JSONB nullable |
-| **`policy_chunks`** | `(index_version, chunk_id)` | 🆕 `embedding vector(1536)`; **ningún índice extra**: la PK ya sirve el filtro por generación |
-| **`threat_indicators`** | `id` (BIGSERIAL) | 🆕 gobernanza; UNIQUE `(indicator_type, value, observed_at, snapshot_version)` — hace idempotente el fetch; **sin índice de lectura**: decenas de filas, se cachean (§4.2) |
-| **`web_search_allowlist`** | `domain` (natural) | 🆕 gobernanza; baja lógica con `active`, igual forma que `merchant_blacklist` (§4) |
+| **`fraud_policies`** | `(policy_id, version)` compuesta | documento normativo; append-only por versión. **Sin `active`**: el estado se deriva |
+| **`binding_sets`** | `version` (`2025.1-b1`) | encabezado del set de vinculaciones; a lo sumo uno activo, por **índice parcial único** |
+| **`policy_bindings`** | `(binding_set_version, policy_id)` | FK **compuesta** a `fraud_policies(policy_id, version)`; `condition` JSONB nullable |
+| **`policy_chunks`** | `(index_version, chunk_id)` | `embedding vector(1536)`; **ningún índice extra**: la PK ya sirve el filtro por generación |
+| **`threat_indicators`** | `id` (BIGSERIAL) | gobernanza; UNIQUE `(indicator_type, value, observed_at, snapshot_version)` — hace idempotente el fetch; **sin índice de lectura**: decenas de filas, se cachean (§4.2) |
+| **`web_search_allowlist`** | `domain` (natural) | gobernanza; baja lógica con `active`, igual forma que `merchant_blacklist` (§4) |
 
 Los hijos llevan `ON DELETE CASCADE` a nivel BD.
 
@@ -921,7 +960,7 @@ Los hijos llevan `ON DELETE CASCADE` a nivel BD.
 > corrección** —sin él la búsqueda mezcla generaciones y devuelve vecinos de otro
 > modelo, sin fallar— ([ADR-0012](adr/0012-el-indice-vectorial-es-dato-derivado-y-versionado.md)).
 >
-> 🆕 **`threat_indicators` tiene el mismo invariante**, con `snapshot_version` en
+> **`threat_indicators` tiene el mismo invariante**, con `snapshot_version` en
 > vez de `index_version`: sin el filtro, un veredicto podría consultar dos
 > generaciones a la vez y `threat_intel_version` sellaría una sola
 > ([ADR-0014](adr/0014-la-inteligencia-externa-se-recoge-en-build-y-se-consulta-congelada.md)).

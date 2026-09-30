@@ -1,6 +1,6 @@
 # Enmiendas pendientes — Contrato de Interfaz
 
-**Estado**: 5 enmiendas acumuladas. Vigente: v0.14.
+**Estado**: sin enmiendas acumuladas. Vigente: v0.15.
 
 > Documento de trabajo: se **vacía** al publicar una versión, no se archiva.
 > Nunca hay dos.
@@ -8,43 +8,14 @@
 > Para recuperar el texto anterior:
 >
 > ```bash
-> git show contrato-v0.11:docs/contrato_de_interfaz.md
+> git show contrato-v0.15:docs/contrato_de_interfaz.md
 > ```
 
 ---
 
 ## 1. Decididas — listas para redactar
 
-- **`GET /metrics`** (ADR-0024): endpoint operacional nuevo, expone métricas
-  HTTP en formato Prometheus (`prometheus-fastapi-instrumentator`), sin
-  autenticación, para scrape del collector de observabilidad (Alloy, sólo
-  local por ahora). Agregado ya a las tablas de §1.3 y §2.3 con 🆕; falta
-  sólo el bump de versión y el `CHANGELOG.md` al cerrar esta etapa.
-  Trae consigo dos variables de entorno nuevas en §1.4:
-  `OTEL_EXPORTER_OTLP_ENDPOINT` y `OTEL_SERVICE_NAME`.
-- **Techo de la demo pública** (ADR-0025): en producción, `POST /cases` y
-  `POST /cases/{case_id}/resolution` pueden responder `429` con el motivo en
-  `detail` cuando se supera el techo global (40 ejecuciones por hora y 200 por
-  día; 20 resoluciones por hora). `/docs`, `/redoc` y `/openapi.json` no existen
-  en producción. Falta reflejarlo en las tablas de respuestas de §2.3 y en la
-  lista de endpoints de §1.3.
-- **Modelos por llamada** (ADR-0026):
-  - La inteligencia externa pasa a Haiku con prompt de sistema:
-    `threat_intel_version` pasa a `claude-haiku-4-5-20251001:issuer-alert:v2`.
-    El ejemplo de §2.3 (`claude-sonnet-4-6:issuer-alert:v1`) queda viejo.
-  - El fetch pasa a ser semanal.
-- **Readiness de Azure** (ADR-0027): en la tabla de §1.3, `GET /health` pasa a
-  ser liveness **y** readiness probe de Azure. `GET /ready` sigue chequeando
-  que Postgres responda, sin caché, y su uso pasa a ser "diagnóstico, smoke y
-  startup probe de GCP", nunca un probe periódico.
-- **Acceso a la imagen** (ADR-0028): §1.5 "Acceso a GHCR" dice que el paquete
-  es privado y que el CD se autentica con un token `read:packages`. Pasa a:
-  - el paquete es **público** (el código es open source), y `ci.yml` verifica
-    en cada push que se puede bajar sin credenciales;
-  - Azure lo baja sin credenciales;
-  - GCP lo promueve por digest a Artifact Registry con OIDC, y Cloud Run lo
-    baja con su cuenta de servicio;
-  - ninguna nube guarda un token de GitHub.
+*(ninguna)*
 
 ---
 
