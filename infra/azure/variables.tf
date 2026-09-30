@@ -14,17 +14,6 @@ variable "image" {
   default     = "ghcr.io/nicolas-torres/multiagent-fraud-detection:sha-b642e85"
 }
 
-variable "ghcr_username" {
-  description = "Usuario de GitHub para autenticar el pull desde GHCR (el registry es privado, contrato §1.5)."
-  type        = string
-}
-
-variable "ghcr_token" {
-  description = "Personal Access Token de GitHub con permiso read:packages — nunca el GITHUB_TOKEN de un workflow, ese vive sólo en CI."
-  type        = string
-  sensitive   = true
-}
-
 variable "database_url" {
   description = "Connection string de Neon (Postgres + pgvector). Se aprovisiona aparte, no es un recurso de este módulo — ver ADR-0021."
   type        = string

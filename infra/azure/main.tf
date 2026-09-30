@@ -20,9 +20,14 @@ resource "azurerm_container_app_environment" "main" {
   log_analytics_workspace_id = azurerm_log_analytics_workspace.main.id
 }
 
-# Los secrets y el registro de GHCR se repiten igual en la Container App y
-# en los tres Jobs -misma imagen, mismos insumos-, así que se arman una
-# sola vez acá y se referencian desde cada recurso con `dynamic`.
+# Los secrets se repiten igual en la Container App y en los tres Jobs
+# -misma imagen, mismos insumos-, así que se arman una sola vez acá y se
+# referencian desde cada recurso con `dynamic`.
+#
+# Sin bloque `registry` (ADR-0028): la imagen de GHCR es pública y se baja sin
+# credenciales. El estándar con una imagen privada sería ACR con Managed
+# Identity y `AcrPull` (~USD 5/mes); `ci.yml` falla si la imagen deja de ser
+# pública, antes de que falle un deploy de acá.
 #
 # LangSmith es opcional (ADR-0013: sin clave, o con LANGSMITH_TRACING=false,
 # el sistema funciona igual sin trazar). Azure Container Apps rechaza un
@@ -32,7 +37,6 @@ resource "azurerm_container_app_environment" "main" {
 locals {
   container_secrets = concat(
     [
-      { name = "ghcr-token", value = var.ghcr_token },
       { name = "database-url", value = var.database_url },
       { name = "anthropic-api-key", value = var.anthropic_api_key },
       { name = "gemini-api-key", value = var.gemini_api_key },
@@ -74,12 +78,6 @@ resource "azurerm_container_app" "api" {
       name  = secret.value.name
       value = secret.value.value
     }
-  }
-
-  registry {
-    server               = "ghcr.io"
-    username             = var.ghcr_username
-    password_secret_name = "ghcr-token"
   }
 
   ingress {
@@ -171,12 +169,6 @@ resource "azurerm_container_app_job" "migrate" {
     }
   }
 
-  registry {
-    server               = "ghcr.io"
-    username             = var.ghcr_username
-    password_secret_name = "ghcr-token"
-  }
-
   template {
     container {
       name    = "migrate"
@@ -225,12 +217,6 @@ resource "azurerm_container_app_job" "seed" {
       name  = secret.value.name
       value = secret.value.value
     }
-  }
-
-  registry {
-    server               = "ghcr.io"
-    username             = var.ghcr_username
-    password_secret_name = "ghcr-token"
   }
 
   template {
@@ -283,12 +269,6 @@ resource "azurerm_container_app_job" "fetch_intel" {
       name  = secret.value.name
       value = secret.value.value
     }
-  }
-
-  registry {
-    server               = "ghcr.io"
-    username             = var.ghcr_username
-    password_secret_name = "ghcr-token"
   }
 
   template {
