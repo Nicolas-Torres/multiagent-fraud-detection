@@ -1,5 +1,7 @@
 import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Table,
@@ -130,93 +132,125 @@ function DiagramaC4() {
   )
 }
 
-export function Architecture() {
+/** Los pasos de una transacción por el sistema. Exportado: la pestaña Inicio
+ * lo reutiliza para dar contexto a quien entra por primera vez. */
+export function RecorridoTransaccion() {
   return (
-    <div className="space-y-10">
+    <ol className="list-decimal space-y-1.5 pl-5 text-sm text-muted-foreground marker:text-foreground">
+      {RECORRIDO.map((paso) => (
+        <li key={paso}>{paso}</li>
+      ))}
+    </ol>
+  )
+}
+
+function Evaluacion() {
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Qué se mide</TableHead>
+          <TableHead>Método</TableHead>
+          <TableHead>Resultado</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {EVALUACION.map((e) => (
+          <TableRow key={e.que}>
+            <TableCell className="whitespace-normal font-medium">{e.que}</TableCell>
+            <TableCell className="whitespace-normal text-muted-foreground">{e.metodo}</TableCell>
+            <TableCell className="whitespace-normal">{e.resultado}</TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  )
+}
+
+function Tecnologias() {
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Tecnología</TableHead>
+          <TableHead>Dónde se usa</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {TECNOLOGIAS.map((t) => (
+          <TableRow key={t.nombre}>
+            <TableCell className="whitespace-normal font-medium">{t.nombre}</TableCell>
+            <TableCell className="whitespace-normal text-muted-foreground">{t.uso}</TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  )
+}
+
+function Decisiones() {
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      {DECISIONES.map((d) => (
+        <Card key={d.archivo}>
+          <CardHeader>
+            <CardTitle className="text-base">{d.pregunta}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">{d.respuesta}</p>
+            <a
+              href={`${GITHUB_DOCS_BASE}${d.archivo}`}
+              target="_blank"
+              rel="noreferrer"
+              className="text-sm text-primary hover:underline"
+            >
+              Ver {d.fuente} →
+            </a>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  )
+}
+
+/**
+ * Una sección a la vez, elegida con chips (mejoras2): como lista, llegar a la
+ * última pedía un scroll largo, sobre todo en mobile. La elegida queda en la
+ * URL (`?seccion=`), así un link puede apuntar directo a una sección.
+ */
+const SECCIONES = [
+  { id: 'recorrido', chip: 'Transacción', titulo: 'Recorrido de una transacción', Contenido: RecorridoTransaccion },
+  { id: 'evaluacion', chip: 'Evaluación', titulo: 'Cómo se evalúa', Contenido: Evaluacion },
+  { id: 'tecnologias', chip: 'Tecnologías', titulo: 'Tecnologías', Contenido: Tecnologias },
+  { id: 'arquitectura', chip: 'Arquitectura', titulo: 'Arquitectura de contenedores', Contenido: DiagramaC4 },
+  { id: 'decisiones', chip: 'Decisiones de diseño', titulo: 'Decisiones de diseño', Contenido: Decisiones },
+] as const
+
+export function Architecture() {
+  const [params, setParams] = useSearchParams()
+  const actual = SECCIONES.find((s) => s.id === params.get('seccion')) ?? SECCIONES[0]
+
+  return (
+    <div className="space-y-6">
+      <nav aria-label="Secciones" className="flex flex-wrap gap-2">
+        {SECCIONES.map((s) => (
+          <Button
+            key={s.id}
+            size="sm"
+            variant={s.id === actual.id ? 'default' : 'outline'}
+            className="cursor-pointer"
+            aria-current={s.id === actual.id ? 'page' : undefined}
+            onClick={() => setParams({ seccion: s.id }, { replace: true })}
+          >
+            {s.chip}
+          </Button>
+        ))}
+      </nav>
 
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Recorrido de una transacción</h2>
-        <ol className="list-decimal space-y-1.5 pl-5 text-sm text-muted-foreground marker:text-foreground">
-          {RECORRIDO.map((paso) => (
-            <li key={paso}>{paso}</li>
-          ))}
-        </ol>
+        <h2 className="text-lg font-semibold">{actual.titulo}</h2>
+        <actual.Contenido />
       </section>
-
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Cómo se evalúa</h2>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Qué se mide</TableHead>
-              <TableHead>Método</TableHead>
-              <TableHead>Resultado</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {EVALUACION.map((e) => (
-              <TableRow key={e.que}>
-                <TableCell className="whitespace-normal font-medium">{e.que}</TableCell>
-                <TableCell className="whitespace-normal text-muted-foreground">{e.metodo}</TableCell>
-                <TableCell className="whitespace-normal">{e.resultado}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </section>
-
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Tecnologías</h2>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Tecnología</TableHead>
-              <TableHead>Dónde se usa</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {TECNOLOGIAS.map((t) => (
-              <TableRow key={t.nombre}>
-                <TableCell className="whitespace-normal font-medium">{t.nombre}</TableCell>
-                <TableCell className="whitespace-normal text-muted-foreground">{t.uso}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </section>
-
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Arquitectura de contenedores</h2>
-        <DiagramaC4 />
-      </section>
-
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Decisiones de diseño</h2>
-        <div className="grid gap-4 sm:grid-cols-2">
-          {DECISIONES.map((d) => (
-            <Card key={d.archivo}>
-              <CardHeader>
-                <CardTitle className="text-base">{d.pregunta}</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <p className="text-sm text-muted-foreground">{d.respuesta}</p>
-                <a
-                  href={`${GITHUB_DOCS_BASE}${d.archivo}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-sm text-primary hover:underline"
-                >
-                  Ver {d.fuente} →
-                </a>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </section>
-
-
-
-
     </div>
   )
 }
