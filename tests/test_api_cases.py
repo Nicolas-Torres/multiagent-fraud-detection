@@ -35,6 +35,7 @@ def _sin_cooldown_previo():
     yield
     cases_router._ultima_corrida_por_escenario.clear()
 
+
 PAYLOAD = {
     "transaction_id": "T-API-TEST",
     "customer_id": "CU-API-TEST",
@@ -53,7 +54,9 @@ class _SesionFake:
     `add`/`commit` que aplican los defaults que Postgres aplicaría, y
     `rollback`/`refresh` como no-ops."""
 
-    def __init__(self, existente: Case | None = None, conteos: tuple[int, int] = (0, 0)):
+    def __init__(
+        self, existente: Case | None = None, conteos: tuple[int, int] = (0, 0)
+    ):
         self._existente = existente
         self._conteos = conteos
         self.consultas_de_conteo = 0
@@ -245,7 +248,7 @@ def test_segundo_disparo_del_mismo_escenario_da_429():
     assert segunda.status_code == 429
     # El dashboard muestra este texto tal cual: tiene que ser para el visitante.
     assert segunda.json()["detail"] == (
-        "Este escenario se corrió hace poco. Probá de nuevo en 60 segundos."
+        "Este escenario se corrió hace poco. Probá de nuevo en 5 minutos."
     )
     # El grafo sólo corrió una vez: la segunda ni siquiera llegó a agendarse.
     assert grafo.invocado
@@ -299,7 +302,9 @@ def test_transaction_id_sin_prefijo_live_nunca_tiene_cooldown():
 # --- Techo de la demo (ADR-0025) ---
 
 
-def _postear_en_produccion(sesion: _SesionFake, monkeypatch, transaction_id: str = "T-TECHO"):
+def _postear_en_produccion(
+    sesion: _SesionFake, monkeypatch, transaction_id: str = "T-TECHO"
+):
     """El techo sólo existe en producción. El entorno se cambia recién dentro
     del `TestClient`, después del `lifespan`: en producción, el arranque
     precalienta las métricas contra LangSmith, que acá no interesa."""
@@ -376,3 +381,41 @@ def test_fuera_de_produccion_no_consulta_el_techo():
 
     assert respuesta.status_code == 202
     assert sesion.consultas_de_conteo == 0
+
+
+@pytest.mark.parametrize(
+    ("segundos", "texto"),
+    [
+        (1, "1 segundo"),
+        (45.2, "46 segundos"),
+        (60, "60 segundos"),
+        (61, "2 minutos"),
+        (299.9, "5 minutos"),
+    ],
+)
+def test_texto_espera_nunca_promete_menos_de_lo_que_falta(segundos, texto):
+    from datetime import timedelta
+
+    assert cases_router.texto_espera(timedelta(seconds=segundos)) == texto
+
+
+def test_el_cooldown_del_dashboard_es_el_mismo_que_el_de_la_api():
+    """Ya se desalinearon dos veces (1 min en la API y 10 en el dashboard, y
+    después al revés). El dashboard sólo lo muestra; si difieren, el visitante
+    ve el botón habilitado y recibe un 429, o bloqueado sin motivo."""
+    import re
+    from pathlib import Path
+
+    tsx = (
+        Path(__file__).resolve().parents[1]
+        / "dashboard"
+        / "src"
+        / "routes"
+        / "Transactions.tsx"
+    ).read_text(encoding="utf-8")
+    expresion = re.search(r"const COOLDOWN_MS = ([\d_\s*]+)\n", tsx).group(1)
+    milisegundos = 1
+    for factor in expresion.replace("_", "").split("*"):
+        milisegundos *= int(factor)
+
+    assert milisegundos == cases_router.LIVE_COOLDOWN.total_seconds() * 1000
