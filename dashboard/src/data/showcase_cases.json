@@ -1,18 +1,18 @@
 [
   {
-    "transaction_id": "T-2579",
+    "transaction_id": "T-1031",
     "label": "Aprobación limpia",
-    "id": "t2579",
+    "id": "t1031",
     "payload": {
-      "customer_id": "CU-0643",
-      "amount": "864.07",
-      "currency": "EUR",
+      "customer_id": "CU-0115",
+      "amount": "4941.30",
+      "currency": "PEN",
       "country": "PE",
       "channel": "web",
-      "device_id": "D-0643",
-      "timestamp": "2025-12-01T01:45:00Z",
-      "merchant_id": "M-038",
-      "issuer_bank": "CABK"
+      "device_id": "D-0115",
+      "timestamp": "2025-12-03T17:31:00Z",
+      "merchant_id": "M-035",
+      "issuer_bank": "IBK"
     }
   },
   {

@@ -9,7 +9,7 @@ un entorno con una base distinta a la que sembró en local daba 404).
 """
 
 CASOS_VITRINA: dict[str, str] = {
-    "T-2579": "Aprobación limpia",
+    "T-1031": "Aprobación limpia",
     "T-1809": "Monto y horario inusual (FP-01)",
     "T-4445": "Perfil modificado antes de operar (FP-09)",
     "T-1313": "Cuenta nueva, monto grande (FP-08)",

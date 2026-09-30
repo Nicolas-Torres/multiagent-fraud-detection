@@ -28,7 +28,7 @@ export const LIVE_SCENARIOS: LiveScenario[] = [
     label: 'Aprobación limpia',
     description: 'Monto y horario dentro de lo habitual del cliente — sin señales.',
     payload: {
-      // No CU-0643/T-2579 (el de la vitrina precalculada): ese cliente ya
+      // No CU-0643/T-2579 (la vitrina hasta el incidente 0011): ese cliente ya
       // tiene una transacción real sembrada a las 01:45 en PE, y el país
       // habitual del cliente es ES — cualquier corrida en vivo con un país
       // distinto de PE dispara FP-05 (geolocalización imposible) contra esa

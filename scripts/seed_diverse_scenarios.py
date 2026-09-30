@@ -42,7 +42,11 @@ JSON_PATH = (
 # clientes evita que una corrida en vivo choque con una fila ya sembrada
 # (la lección de FP-02/FP-05 de la etapa anterior: colisionar con una fila
 # real ya existente dispara señales que no tienen que ver con el escenario).
-CLIENTES_EN_USO = {"CU-0643", "CU-0543", "CU-0364", "CU-0054", "CU-0587", "CU-0426"}
+# CU-0643 ya no es de la vitrina (incidente 0011), pero su fila T-2579 sigue
+# sembrada en las bases desplegadas.
+CLIENTES_EN_USO = {
+    "CU-0643", "CU-0115", "CU-0543", "CU-0364", "CU-0054", "CU-0587", "CU-0426",
+}
 
 VENTANA_COLISION = timedelta(hours=3)
 

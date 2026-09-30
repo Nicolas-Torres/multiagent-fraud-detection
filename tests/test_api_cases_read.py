@@ -150,14 +150,14 @@ def test_caso_inexistente_da_404():
 
 def test_vitrina_ordena_por_casos_vitrina_no_por_orden_de_llegada():
     """`GET /cases/showcase`: el orden de salida es el de `CASOS_VITRINA`
-    (T-2579 antes que T-5816), no el orden en que la sesión los devuelve —
+    (T-1031 antes que T-5816), no el orden en que la sesión los devuelve —
     acá deliberadamente al revés, para que el test falle si el endpoint
     dejara de reordenar."""
     caso_5816 = _caso(CaseStatus.RESOLVED)
     caso_5816.transaction_id = "T-5816"
-    caso_2579 = _caso(CaseStatus.DECIDED)
-    caso_2579.transaction_id = "T-2579"
-    _override_sesion([caso_5816, caso_2579])
+    caso_1031 = _caso(CaseStatus.DECIDED)
+    caso_1031.transaction_id = "T-1031"
+    _override_sesion([caso_5816, caso_1031])
     try:
         with TestClient(app) as client:
             respuesta = client.get("/api/v1/cases/showcase")
@@ -166,8 +166,8 @@ def test_vitrina_ordena_por_casos_vitrina_no_por_orden_de_llegada():
 
     assert respuesta.status_code == 200
     cuerpo = respuesta.json()
-    assert [item["transaction_id"] for item in cuerpo] == ["T-2579", "T-5816"]
-    assert cuerpo[0]["case_id"] == str(caso_2579.case_id)
+    assert [item["transaction_id"] for item in cuerpo] == ["T-1031", "T-5816"]
+    assert cuerpo[0]["case_id"] == str(caso_1031.case_id)
 
 
 def test_vitrina_sin_sembrar_da_lista_vacia_no_error():
