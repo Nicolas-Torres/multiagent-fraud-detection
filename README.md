@@ -53,6 +53,9 @@ GCP se sumó como segunda prueba de multi-nube, a modo de aprendizaje
 | API FastAPI + HITL | ✅ |
 | Dashboard del analista (frontend) | ✅ |
 | CI, imagen y despliegue | ✅ |
+| Observabilidad: LangSmith por nodo, OpenTelemetry + Grafana local | ✅ |
+| Operación en producción: techos de uso y gasto, 10 incidentes documentados | ✅ |
+| Despliegue sin credenciales personales: OIDC y promoción por digest | ✅ |
 
 ---
 
