@@ -251,6 +251,7 @@ export function Transactions() {
       <section>
         {panelDetalle.isLoading && <Skeleton className="h-96 w-full" />}
         {panelDetalle.isError && <p className="text-destructive">No se pudo cargar el caso.</p>}
+        {panelDetalle.data?.decision && <GraphSection decision={panelDetalle.data.decision} />}
         {panelDetalle.data && !panelDetalle.data.decision && (
           <AnalyzingPanel
             identificador={`${formatTransactionId(panelDetalle.data.transaction.transaction_id)} · ${panelDetalle.data.transaction.customer_id}`}
@@ -259,7 +260,6 @@ export function Transactions() {
             connected={progreso.connected}
           />
         )}
-        {panelDetalle.data?.decision && <GraphSection decision={panelDetalle.data.decision} />}
       </section>
 
       <section className="space-y-3">

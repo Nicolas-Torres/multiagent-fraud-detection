@@ -60,8 +60,9 @@ const RECORRIDO: string[] = [
   'RAG de políticas: cita las que dispararon y busca otras relacionadas.',
   'Agregación: puntaje de riesgo y confianza, sin LLM.',
   'Debate: dos agentes LLM argumentan a favor y en contra, en paralelo.',
-  'Árbitro: el LLM decide sin bajar el piso de las reglas; se redacta la explicación y se sellan las versiones usadas.',
-  'Si el veredicto es escalar, el caso entra a la cola Human-in-the-loop.',
+  'Árbitro: el LLM decide sin bajar el piso de las reglas.',
+  'Explicación: el LLM redacta una explicación adecuada para el usuario y la decisión se persiste en BD.',
+  'Si el veredicto necesita revisión de un humano, el caso entra a la cola Human-in-the-loop (HITL).',
 ]
 
 const EVALUACION: { que: string; metodo: string; resultado: string }[] = [
@@ -71,7 +72,7 @@ const EVALUACION: { que: string; metodo: string; resultado: string }[] = [
     resultado: '7000/7000',
   },
   {
-    que: 'Recuperación semántica (ablación)',
+    que: 'Recuperación semántica',
     metodo: 'recall@1 y MRR sobre las 653 transacciones con política esperada',
     resultado: '0.79 / 0.88',
   },
@@ -84,12 +85,12 @@ const EVALUACION: { que: string; metodo: string; resultado: string }[] = [
 
 const TECNOLOGIAS: { nombre: string; uso: string }[] = [
   { nombre: 'Python + FastAPI', uso: 'API async: ingesta de casos, progreso en vivo por SSE, cola HITL' },
-  { nombre: 'LangGraph', uso: 'Orquestación del grafo de 10 nodos con ramas en paralelo' },
+  { nombre: 'LangGraph', uso: 'Orquestación del grafo de 10 nodos' },
   {
     nombre: 'Claude Sonnet 5 (Anthropic)',
     uso: 'Debate, árbitro con salida estructurada y explicación al cliente',
   },
-  { nombre: 'Claude Haiku + web search', uso: 'Recolección semanal de inteligencia externa, en build, no en cada caso' },
+  { nombre: 'Claude Haiku + web search', uso: 'Recolección semanal de inteligencia externa, en build y cada semana, no en cada caso' },
   { nombre: 'Gemini Embedding 2', uso: 'Índice vectorial de las políticas para el RAG' },
   {
     nombre: 'PostgreSQL + pgvector (Neon)',
@@ -132,15 +133,6 @@ function DiagramaC4() {
 export function Architecture() {
   return (
     <div className="space-y-10">
-      <p className="text-muted-foreground">
-        Veinticuatro decisiones de diseño respaldan este sistema. Estas cuatro son
-        las que mejor explican por qué el resultado se ve como se ve.
-      </p>
-
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Arquitectura de contenedores</h2>
-        <DiagramaC4 />
-      </section>
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">Recorrido de una transacción</h2>
@@ -149,30 +141,6 @@ export function Architecture() {
             <li key={paso}>{paso}</li>
           ))}
         </ol>
-      </section>
-
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Decisiones de diseño</h2>
-        <div className="grid gap-4 sm:grid-cols-2">
-          {DECISIONES.map((d) => (
-            <Card key={d.archivo}>
-              <CardHeader>
-                <CardTitle className="text-base">{d.pregunta}</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <p className="text-sm text-muted-foreground">{d.respuesta}</p>
-                <a
-                  href={`${GITHUB_DOCS_BASE}${d.archivo}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-sm text-primary hover:underline"
-                >
-                  Ver {d.fuente} →
-                </a>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
       </section>
 
       <section className="space-y-3">
@@ -216,6 +184,39 @@ export function Architecture() {
           </TableBody>
         </Table>
       </section>
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold">Arquitectura de contenedores</h2>
+        <DiagramaC4 />
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold">Decisiones de diseño</h2>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {DECISIONES.map((d) => (
+            <Card key={d.archivo}>
+              <CardHeader>
+                <CardTitle className="text-base">{d.pregunta}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-sm text-muted-foreground">{d.respuesta}</p>
+                <a
+                  href={`${GITHUB_DOCS_BASE}${d.archivo}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-sm text-primary hover:underline"
+                >
+                  Ver {d.fuente} →
+                </a>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </section>
+
+
+
+
     </div>
   )
 }
