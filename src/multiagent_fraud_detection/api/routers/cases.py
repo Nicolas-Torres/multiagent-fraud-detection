@@ -62,8 +62,12 @@ router = APIRouter(tags=["cases"])
 # Global por escenario, no por IP: sin sesiones ni autenticación no hay con
 # qué identificar visitantes, y global es más simple y ya cubre el riesgo
 # real (gasto de API, no abuso dirigido a una persona).
+#
+# 5 minutos, el mismo valor que `COOLDOWN_MS` en `Transactions.tsx`: el
+# frontend sólo lo muestra, el que manda es éste. Si se cambia uno, se cambia
+# el otro.
 LIVE_PREFIX = "LIVE-"
-LIVE_COOLDOWN = timedelta(minutes=1)
+LIVE_COOLDOWN = timedelta(minutes=5)
 _ultima_corrida_por_escenario: dict[str, datetime] = {}
 
 
@@ -82,6 +86,17 @@ def _cooldown_restante(transaction_id: str) -> timedelta | None:
         return None
     restante = LIVE_COOLDOWN - (datetime.now(UTC) - ultima)
     return restante if restante > timedelta(0) else None
+
+
+def texto_espera(restante: timedelta) -> str:
+    """Cuánto falta, en la unidad que se lee: segundos hasta un minuto,
+    minutos redondeados hacia arriba después. Nunca promete menos espera de la
+    que queda."""
+    segundos = math.ceil(restante.total_seconds())
+    if segundos <= 60:
+        return "1 segundo" if segundos == 1 else f"{segundos} segundos"
+    minutos = math.ceil(segundos / 60)
+    return f"{minutos} minutos"
 
 
 def _marcar_corrida(transaction_id: str) -> None:
@@ -166,7 +181,7 @@ async def crear_caso(
             # El dashboard muestra este texto tal cual al visitante.
             detail=(
                 "Este escenario se corrió hace poco. "
-                f"Probá de nuevo en {math.ceil(restante.total_seconds())} segundos."
+                f"Probá de nuevo en {texto_espera(restante)}."
             ),
         )
 
