@@ -131,8 +131,11 @@ promoción ya lee con el `GITHUB_TOKEN`.
    la guarda en `ci.yml`, y quitar `ghcr_*` del script, la plantilla y los
    runbooks.
 2. **Antes del merge**, `terraform apply -target` en GCP, sólo para el
-   repositorio nuevo y sus permisos. El deploy que dispara el merge necesita que
-   existan.
+   repositorio nuevo y sus dos permisos (`runtime_pull_images` y
+   `deployer_push`). El deploy que dispara el merge necesita que existan. El
+   permiso de lectura tiene un nombre nuevo a propósito: reutilizar
+   `runtime_pull` habría quitado el acceso al espejo viejo mientras Cloud Run
+   todavía bajaba de ahí.
 3. **Merge**: el deploy de GCP promueve la imagen y apunta Cloud Run al
    repositorio nuevo. Azure todavía usa el PAT.
 4. **`rotate-secrets.sh plan`** con los 5 valores, revisado a mano: en Azure se
