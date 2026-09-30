@@ -49,6 +49,15 @@
 }
 
 :root {
+    /* Decisiones (mejoras2): fondo claro y texto oscuro del mismo tono. */
+    --decision-approve-bg: #dcfce7;
+    --decision-approve-fg: #15803d;
+    --decision-challenge-bg: #fef9c3;
+    --decision-challenge-fg: #a16207;
+    --decision-escalate-bg: #dbeafe;
+    --decision-escalate-fg: #1e40af;
+    --decision-block-bg: #fee2e2;
+    --decision-block-fg: #b91c1c;
     --background: oklch(1 0 0);
     --foreground: oklch(0.145 0 0);
     --card: oklch(1 0 0);
@@ -84,6 +93,15 @@
 }
 
 .dark {
+    /* Decisiones en modo oscuro: fondo muy oscuro y texto brillante. */
+    --decision-approve-bg: #052e16;
+    --decision-approve-fg: #4ade80;
+    --decision-challenge-bg: #422006;
+    --decision-challenge-fg: #facc15;
+    --decision-escalate-bg: #1e3a8a;
+    --decision-escalate-fg: #60a5fa;
+    --decision-block-bg: #7f1d1d;
+    --decision-block-fg: #f87171;
     --background: oklch(0.145 0 0);
     --foreground: oklch(0.985 0 0);
     --card: oklch(0.205 0 0);

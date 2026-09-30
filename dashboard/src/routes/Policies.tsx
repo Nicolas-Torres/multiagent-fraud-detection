@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 
 import { api } from '@/api/client'
 import type { components } from '@/api/schema'
+import { DecisionBadge } from '@/components/DecisionBadge'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
@@ -17,10 +18,10 @@ type PolicyState = components['schemas']['PolicyState']
 type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'outline'
 
 const STATE_LABEL: Record<PolicyState, string> = {
-  active: 'activa',
-  excluded: 'excluida',
-  pending: 'pendiente de vinculación',
-  stale: 'vinculación obsoleta',
+  active: 'Activa',
+  excluded: 'Excluida',
+  pending: 'Pendiente de vinculación',
+  stale: 'Vinculación obsoleta',
 }
 
 const STATE_VARIANT: Record<PolicyState, BadgeVariant> = {
@@ -71,9 +72,25 @@ export function Policies() {
                   {p.version}
                 </TableCell>
                 <TableCell>
-                  <Badge variant={STATE_VARIANT[p.state]}>{STATE_LABEL[p.state]}</Badge>
+                  <Badge
+                    variant={STATE_VARIANT[p.state]}
+                    className={p.state === 'active' ? 'border' : undefined}
+                    style={
+                      p.state === 'active'
+                        ? {
+                            backgroundColor: 'var(--decision-approve-bg)',
+                            color: 'var(--decision-approve-fg)',
+                            borderColor: 'var(--decision-approve-fg)',
+                          }
+                        : undefined
+                    }
+                  >
+                    {STATE_LABEL[p.state]}
+                  </Badge>
                 </TableCell>
-                <TableCell className="hidden @3xl:table-cell">{p.action ?? '—'}</TableCell>
+                <TableCell className="hidden @3xl:table-cell">
+                  {p.action ? <DecisionBadge decision={p.action} compacto /> : '—'}
+                </TableCell>
                 <TableCell className="whitespace-normal text-sm text-muted-foreground">
                   {p.text}
                 </TableCell>

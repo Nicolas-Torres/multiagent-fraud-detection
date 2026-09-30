@@ -8,8 +8,10 @@ import { AppShell } from '@/components/AppShell'
 import { Architecture } from '@/routes/Architecture'
 import { CaseDetail } from '@/routes/CaseDetail'
 import { Dashboard } from '@/routes/Dashboard'
+import { Inicio } from '@/routes/Inicio'
 import { Policies } from '@/routes/Policies'
 import { Queue } from '@/routes/Queue'
+import { Observability } from '@/routes/Observability'
 import { Transactions } from '@/routes/Transactions'
 
 import './index.css'
@@ -29,9 +31,11 @@ const router = createBrowserRouter([
     path: '/',
     element: <AppShell />,
     children: [
-      { index: true, element: <Dashboard /> },
+      { index: true, element: <Inicio /> },
+      { path: 'dashboard', element: <Dashboard /> },
       { path: 'transactions', element: <Transactions /> },
       { path: 'queue', element: <Queue /> },
+      { path: 'observability', element: <Observability /> },
       { path: 'cases/:caseId', element: <CaseDetail /> },
       { path: 'policies', element: <Policies /> },
       { path: 'architecture', element: <Architecture /> },

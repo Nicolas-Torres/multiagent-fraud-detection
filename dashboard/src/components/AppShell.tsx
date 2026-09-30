@@ -15,11 +15,13 @@ import { useTheme } from '@/hooks/useTheme'
 import { cn } from '@/lib/utils'
 
 const LINKS = [
-  { to: '/', label: 'Dashboard', end: true },
+  { to: '/', label: 'Inicio', end: true },
+  { to: '/dashboard', label: 'Dashboard', end: false },
   { to: '/transactions', label: 'Transactions', end: false },
   { to: '/queue', label: 'Human-in-the-loop (HITL)', end: false },
+  { to: '/observability', label: 'Observability', end: false },
   { to: '/policies', label: 'Policies', end: false },
-  { to: '/architecture', label: 'Cómo se construyó', end: false },
+  { to: '/architecture', label: '¿ Cómo se construyó ?', end: false },
 ]
 
 // `/cases/:caseId` no está en `LINKS` -no es un link de nav, se llega
