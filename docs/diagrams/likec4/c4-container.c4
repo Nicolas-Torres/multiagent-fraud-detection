@@ -69,8 +69,8 @@ model {
   fraudSystem -> ghcr 'CI (mío): lint -> pytest -> check_policies -> diagrama --check -> alembic check -> build -> push' {
     #construido
   }
-  ghcr -> azure 'pull por digest, CD automático (deploy-azure.yml)' { #construido }
-  ghcr -> gcp 'pull por digest via espejo de Artifact Registry, CD automático (deploy-gcp.yml)' { #construido }
+  ghcr -> azure 'pull de la imagen pública, sin credenciales; CD automático (deploy-azure.yml, ADR-0028)' { #construido }
+  ghcr -> gcp 'promoción por digest a Artifact Registry con OIDC; Cloud Run baja con su cuenta de servicio (deploy-gcp.yml, ADR-0028)' { #construido }
 }
 
 views {
