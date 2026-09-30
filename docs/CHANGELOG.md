@@ -21,6 +21,26 @@ Sin enmiendas acumuladas. Las próximas se anotan en
 
 ---
 
+## [0.15] — La demo pública, lista para visitas
+
+Cinco enmiendas, todas de la etapa de operación y preparación para publicar
+([acta 13](reviews/13-operacion-y-publicacion.md)). Ninguna cambia un schema.
+
+| # | Enmienda | Toca | Por qué |
+|---|---|---|---|
+| 1 | 🆕 **`GET /metrics`** y las variables `OTEL_EXPORTER_OTLP_ENDPOINT` y `OTEL_SERVICE_NAME` | §1.3, §1.4, §2.3 | Métricas HTTP en formato Prometheus para el stack local de observabilidad ([ADR-0024](adr/0024-observabilidad-de-infra-con-opentelemetry-y-stack-grafana.md)) |
+| 2 | **`429` por el techo de la demo** en `POST /cases` (40/h, 200/día) y `POST /cases/{id}/resolution` (20/h); sin `/docs`, `/redoc` ni `/openapi.json` en producción | §1.3, §2.3 | La API es pública y sin autenticación: un script podía gastar ~USD 175/h en LLM y Swagger le mostraba cómo ([ADR-0025](adr/0025-la-demo-publica-se-protege-del-abuso-sin-autenticacion.md)) |
+| 3 | **`threat_intel_version`** pasa a `claude-haiku-4-5-20251001:issuer-alert:v2`; el fetch pasa a ser **semanal** | §1.2, §2.5 | fetch-intel costaba ~USD 1.1/día sin cambiar ninguna decisión de la demo (incidente 0010, [ADR-0026](adr/0026-cada-llamada-a-un-llm-usa-el-modelo-mas-chico-que-alcanza.md)). La explicación al cliente se probó en Haiku y volvió a Sonnet 5: `explanation_prompt_version` no cambia |
+| 4 | **`/health` es liveness y readiness de Azure**; `/ready` es diagnóstico, smoke y startup de GCP, sin caché | §1.3, §2.3 | El probe sobre `/ready` despertaba a Neon cada hora y, con la base dormida, dejaba la réplica sin tráfico ([ADR-0027](adr/0027-el-readiness-de-azure-responde-por-el-proceso-no-por-neon.md)) |
+| 5 | **"Acceso a la imagen"** reemplaza a "Acceso a GHCR": imagen pública, Azure sin credenciales, GCP promueve por digest con OIDC, CI verifica el pull anónimo | §1.5 | Las nubes bajaban la imagen con dos tokens personales que vencían ([ADR-0028](adr/0028-sin-credenciales-personales-en-el-camino-de-la-imagen.md)) |
+
+También se corrige la tabla de entornos (§1.4): **Producción** existe desde la
+etapa 11 y es una sola base de Neon para Azure y GCP. Y desde esta versión, 🆕
+marca sólo las novedades de la versión vigente: se quitaron las marcas
+acumuladas de las anteriores.
+
+---
+
 ## [0.14] — La vitrina se resuelve en vivo, no en el build
 
 Un endpoint nuevo.
