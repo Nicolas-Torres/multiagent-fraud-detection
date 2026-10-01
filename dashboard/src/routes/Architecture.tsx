@@ -92,7 +92,7 @@ const TECNOLOGIAS: { nombre: string; uso: string }[] = [
     nombre: 'Claude Sonnet 5 (Anthropic)',
     uso: 'Debate, árbitro con salida estructurada y explicación al cliente',
   },
-  { nombre: 'Claude Haiku + web search', uso: 'Recolección semanal de inteligencia externa, en build y cada semana, no en cada caso' },
+  { nombre: 'Claude Haiku + web search', uso: 'Recolección de inteligencia externa a demanda, fuera del análisis, no en cada caso' },
   { nombre: 'Gemini Embedding 2', uso: 'Índice vectorial de las políticas para el RAG' },
   {
     nombre: 'PostgreSQL + pgvector (Neon)',

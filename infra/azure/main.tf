@@ -257,8 +257,9 @@ resource "azurerm_container_app_job" "fetch_intel" {
   # claude-sonnet-4-6 + web_search) contra el mismo fallo determinista.
   replica_retry_limit = 0
 
-  schedule_trigger_config {
-    cron_expression          = var.fetch_intel_cron
+  # A demanda (ADR-0029): el snapshot no vence y la demo tiene fechas fijas.
+  # Se corre con `az containerapp job start` cuando cambia SNAPSHOT_VERSION.
+  manual_trigger_config {
     parallelism              = 1
     replica_completion_count = 1
   }

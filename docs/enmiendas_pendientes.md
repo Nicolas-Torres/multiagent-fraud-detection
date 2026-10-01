@@ -1,6 +1,6 @@
 # Enmiendas pendientes — Contrato de Interfaz
 
-**Estado**: sin enmiendas acumuladas. Vigente: v0.15.
+**Estado**: 1 enmienda decidida. Vigente: v0.15.
 
 > Documento de trabajo: se **vacía** al publicar una versión, no se archiva.
 > Nunca hay dos.
@@ -15,7 +15,9 @@
 
 ## 1. Decididas — listas para redactar
 
-*(ninguna)*
+- **§1, modo fetch-intel**: "Job semanal, lunes 06:00 UTC" pasa a "Job a demanda,
+  sin cron: se corre a mano cuando cambia `SNAPSHOT_VERSION`" (ADR-0029). El
+  resto del bloque no cambia.
 
 ---
 

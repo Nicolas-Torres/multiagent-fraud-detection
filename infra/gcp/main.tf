@@ -339,7 +339,8 @@ resource "google_cloud_run_v2_job" "fetch_intel" {
     template {
       service_account = google_service_account.runtime.email
       timeout         = "900s"
-      max_retries     = 1
+      # Incidente 0001: un reintento no arregla un bug, paga dos veces el loop.
+      max_retries = 0
 
       containers {
         name    = "fetch-intel"
@@ -394,18 +395,23 @@ resource "google_cloud_run_v2_job_iam_member" "scheduler_can_run" {
   member   = "serviceAccount:${google_service_account.scheduler_invoker.email}"
 }
 
+# En pausa (ADR-0029): se dispara a mano con `gcloud scheduler jobs run` cuando
+# cambia SNAPSHOT_VERSION. Hasta el 2026-10-01 nunca corrió: llamaba a
+# `cloudrun.googleapis.com` (no existe) con un token OIDC; una API de Google
+# (`*.googleapis.com`) pide OAuth.
 resource "google_cloud_scheduler_job" "fetch_intel" {
   name      = "fraud-detection-fetch-intel-cron"
   schedule  = var.fetch_intel_cron
   time_zone = "UTC"
+  paused    = true
 
   http_target {
     http_method = "POST"
-    uri         = "https://cloudrun.googleapis.com/v2/projects/${var.project_id}/locations/${var.region}/jobs/${google_cloud_run_v2_job.fetch_intel.name}:run"
+    uri         = "https://run.googleapis.com/v2/projects/${var.project_id}/locations/${var.region}/jobs/${google_cloud_run_v2_job.fetch_intel.name}:run"
 
-    oidc_token {
+    oauth_token {
       service_account_email = google_service_account.scheduler_invoker.email
-      audience              = "https://cloudrun.googleapis.com/v2/projects/${var.project_id}/locations/${var.region}/jobs/${google_cloud_run_v2_job.fetch_intel.name}"
+      scope                 = "https://www.googleapis.com/auth/cloud-platform"
     }
   }
 }

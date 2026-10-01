@@ -59,7 +59,7 @@ variable "langsmith_project" {
 }
 
 variable "fetch_intel_cron" {
-  description = "Cadencia del Job fetch-intel, UTC. Semanal, lunes 06:00 (ADR-0026): diaria costaba ~USD 33/mes sin cambiar ninguna decisión de la demo, cuyas transacciones tienen fecha fija. Igual en Azure y GCP."
+  description = "Cadencia del scheduler de fetch-intel, UTC. El scheduler está en pausa (ADR-0029): sólo cuenta si se reanuda."
   type        = string
   default     = "0 6 * * 1"
 }

@@ -282,7 +282,8 @@ que pasarlos con `-var`/`TF_VAR_*`. Nunca en el `.tf` ni commiteados.
   - `seed`: Manual, `replica_retry_limit = 1` (ADR-0010: idempotente, un
     reintento no rompe nada).
   - `fetch-intel`: Schedule, `cron_expression = var.fetch_intel_cron`
-    (`0 6 * * *` UTC de arranque).
+    (`0 6 * * *` UTC de arranque). Desde ADR-0029, Manual: se corre con
+    `az containerapp job start` cuando cambia `SNAPSHOT_VERSION`.
 
 ### `outputs.tf`
 
