@@ -118,4 +118,6 @@ el chat ni en un comando `!`.
   de que alguien note el saldo agotado — no se abordó en este incidente,
   queda para una mejora aparte.
 - Aplicar el mismo `replica_retry_limit = 0` al lado GCP cuando se
-  resuelva el bug de Cloud Scheduler (`NOT_FOUND`, código 5).
+  resuelva el bug de Cloud Scheduler (`NOT_FOUND`, código 5). **Resuelto el
+  2026-10-01** (ADR-0029): URI y token corregidos, `max_retries = 0`, y el
+  scheduler en pausa.

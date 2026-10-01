@@ -2,6 +2,7 @@
 
 - **Estado**: aceptado
 - **Fecha**: 2026-09-26
+- **Actualizado por**: ADR-0029 (la cadencia semanal de `fetch-intel` pasa a "a demanda")
 
 ## Contexto
 
