@@ -32,7 +32,7 @@ const LINKS = [
 function tituloDe(pathname: string): string {
   if (pathname.startsWith('/cases/')) return 'Detalle del caso'
   const link = LINKS.find((l) => (l.end ? pathname === l.to : pathname.startsWith(l.to)))
-  return link?.label ?? 'Detección de Fraude'
+  return link?.label ?? 'Página no encontrada'
 }
 
 export function AppShell() {

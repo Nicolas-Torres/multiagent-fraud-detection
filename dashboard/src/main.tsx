@@ -9,6 +9,7 @@ import { Architecture } from '@/routes/Architecture'
 import { CaseDetail } from '@/routes/CaseDetail'
 import { Dashboard } from '@/routes/Dashboard'
 import { Inicio } from '@/routes/Inicio'
+import { NoEncontrada } from '@/routes/NoEncontrada'
 import { Policies } from '@/routes/Policies'
 import { Queue } from '@/routes/Queue'
 import { Observability } from '@/routes/Observability'
@@ -39,6 +40,7 @@ const router = createBrowserRouter([
       { path: 'cases/:caseId', element: <CaseDetail /> },
       { path: 'policies', element: <Policies /> },
       { path: 'architecture', element: <Architecture /> },
+      { path: '*', element: <NoEncontrada /> },
     ],
   },
 ])

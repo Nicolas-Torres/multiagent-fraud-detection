@@ -306,7 +306,7 @@ regenerar es una guarda válida de CI.
 ├── .github/workflows/            # ci.yml, deploy-azure.yml, deploy-gcp.yml
 ├── tests/
 ├── docs/
-│   ├── contrato_de_interfaz.md  # documento vivo (v0.14)
+│   ├── contrato_de_interfaz.md  # documento vivo (v0.15)
 │   ├── CHANGELOG.md
 │   ├── enmiendas_pendientes.md  # staging de la próxima versión
 │   ├── trazabilidad.md          # rúbrica ↔ evidencia, se revisa al cerrar etapa
