@@ -23,7 +23,7 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from prometheus_fastapi_instrumentator import Instrumentator
@@ -46,6 +46,22 @@ from multiagent_fraud_detection.graph.context import GraphContext
 # artefacto de build de `dashboard/` —gitignored—, así que no existe hasta
 # que alguien corre `npm run build` o el Dockerfile multi-etapa lo genera.
 DASHBOARD_DIST = Path(__file__).resolve().parents[3] / "dashboard" / "dist"
+
+
+def archivo_del_spa(dist: Path, full_path: str) -> Path:
+    """Qué archivo de `dist/` responde a `full_path`.
+
+    Un archivo real del root de `dist/` (p.ej. `favicon.svg`) se sirve por su
+    nombre exacto; cualquier otra ruta es del router del lado del cliente y cae
+    a `index.html`. La ruta se resuelve y tiene que quedar dentro de `dist/`:
+    `full_path` llega decodificado, así que `/..%2F..%2F.env` es `../../.env`,
+    y sin este control servía cualquier archivo del contenedor.
+    """
+    base = dist.resolve()
+    candidato = (base / full_path).resolve()
+    if full_path and candidato.is_relative_to(base) and candidato.is_file():
+        return candidato
+    return base / "index.html"
 
 
 @asynccontextmanager
@@ -137,15 +153,13 @@ def create_app() -> FastAPI:
 
         @app.get("/{full_path:path}")
         async def dashboard_spa(full_path: str) -> FileResponse:
-            """Sirve el SPA. Un archivo real del root de `dist/` (p.ej.
-            `favicon.svg`) se sirve por su nombre exacto; cualquier otra ruta
-            es del router del lado del cliente (React Router) y cae a
-            `index.html` — `StaticFiles(html=True)` sólo resuelve URLs de
-            directorio, no rutas profundas como `/cases/{id}`."""
-            candidato = DASHBOARD_DIST / full_path
-            if full_path and candidato.is_file():
-                return FileResponse(candidato)
-            return FileResponse(DASHBOARD_DIST / "index.html")
+            """Sirve el SPA (`archivo_del_spa`). `StaticFiles(html=True)` sólo
+            resuelve URLs de directorio, no rutas profundas como `/cases/{id}`.
+            Una ruta de la API que no existe es un 404, no la página: si no,
+            un cliente que se equivoca de endpoint recibe HTML con 200."""
+            if full_path.startswith("api/"):
+                raise HTTPException(status_code=404)
+            return FileResponse(archivo_del_spa(DASHBOARD_DIST, full_path))
 
     return app
 
