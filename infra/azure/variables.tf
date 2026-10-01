@@ -46,8 +46,3 @@ variable "langsmith_project" {
   default = "fraud-detection"
 }
 
-variable "fetch_intel_cron" {
-  description = "Cadencia del Job fetch-intel, UTC. Semanal, lunes 06:00 (ADR-0026): diaria costaba ~USD 33/mes sin cambiar ninguna decisión de la demo, cuyas transacciones tienen fecha fija. Igual en Azure y GCP."
-  type        = string
-  default     = "0 6 * * 1"
-}
