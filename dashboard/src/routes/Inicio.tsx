@@ -10,7 +10,7 @@ const ACCESOS = [
   {
     to: '/transactions',
     titulo: 'Probar una transacción',
-    texto: 'Ejecutá un escenario y mirá cómo el grafo de agentes lo analiza en vivo, nodo por nodo.',
+    texto: 'Ejecuta un escenario y mira cómo el grafo de agentes lo analiza en vivo, nodo por nodo.',
   },
   {
     to: '/queue',
