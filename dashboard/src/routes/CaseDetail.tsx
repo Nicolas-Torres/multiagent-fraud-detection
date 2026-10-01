@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 
-import { api } from '@/api/client'
+import { CasoNoEncontrado, consultarCaso } from '@/api/cases'
+import type { components } from '@/api/schema'
 import { DecisionShowcase } from '@/components/DecisionShowcase'
 import { Field } from '@/components/Field'
 import { ResolutionForm } from '@/components/ResolutionForm'
@@ -11,25 +12,40 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatAmount, formatDateTime } from '@/lib/format'
 
+type CaseStatus = components['schemas']['CaseStatus']
+
+/** Estados de los que el caso ya no sale solo. */
+const SIN_CAMBIOS: readonly CaseStatus[] = ['DECIDED', 'RESOLVED', 'FAILED']
+
 export function CaseDetail() {
   const { caseId } = useParams<{ caseId: string }>()
 
   const query = useQuery({
     queryKey: ['case', caseId],
-    queryFn: async () => {
-      const { data, error } = await api.GET('/api/v1/cases/{case_id}', {
-        params: { path: { case_id: caseId! } },
-      })
-      if (error) throw error
-      return data
-    },
+    queryFn: () => consultarCaso(caseId!),
     enabled: !!caseId,
     // El caso puede seguir avanzando (RECEIVED → ANALYZING → DECIDED) — la
     // misma razón de polling que la Cola (§4.2, ya decidido: nunca WebSocket).
-    refetchInterval: 8_000,
+    // Sin condición de salida, un link a un caso borrado o ya decidido
+    // consultaba la base cada 8 s mientras la pestaña siguiera abierta.
+    // `PENDING_HUMAN` sigue: otro analista puede resolverlo.
+    refetchInterval: (q) =>
+      q.state.status === 'error' || SIN_CAMBIOS.includes(q.state.data?.status ?? 'RECEIVED')
+        ? false
+        : 8_000,
   })
 
   if (query.isLoading) return <Skeleton className="h-96 w-full" />
+  if (query.error instanceof CasoNoEncontrado) {
+    return (
+      <div className="space-y-2">
+        <p>Este caso no existe o ya no está disponible.</p>
+        <Link to="/transactions" className="text-sm text-muted-foreground hover:underline">
+          ← Probar una transacción
+        </Link>
+      </div>
+    )
+  }
   if (query.isError || !query.data) {
     return <p className="text-destructive">No se pudo cargar el caso.</p>
   }
