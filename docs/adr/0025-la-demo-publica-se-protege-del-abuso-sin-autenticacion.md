@@ -2,6 +2,7 @@
 
 - **Estado**: aceptado
 - **Fecha**: 2026-09-25
+- **Actualizado por**: ADR-0030 (la espera por escenario de la API se quita; queda la del navegador, por visitante)
 
 ## Contexto
 
