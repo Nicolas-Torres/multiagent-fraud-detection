@@ -62,11 +62,11 @@ async def exceso(
     if en_la_hora >= techo.por_hora:
         return (
             f"La demo alcanzó su límite de {techo.por_hora} {techo.que} por hora. "
-            "Probá de nuevo más tarde."
+            "Prueba de nuevo más tarde."
         )
     if techo.por_dia is not None and en_el_dia >= techo.por_dia:
         return (
             f"La demo alcanzó su límite de {techo.por_dia} {techo.que} por día. "
-            "Probá de nuevo mañana."
+            "Prueba de nuevo mañana."
         )
     return None

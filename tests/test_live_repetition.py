@@ -21,8 +21,7 @@ from pathlib import Path
 
 import pytest
 
-RAIZ = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(RAIZ / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 from _dataset import BLACKLIST, leer_perfiles, leer_transacciones
 from check_policies import elegir_fuente
@@ -33,7 +32,7 @@ from multiagent_fraud_detection.domain.engine import evaluate, prescribed_action
 from multiagent_fraud_detection.domain.predicates import EvalContext
 from multiagent_fraud_detection.schemas.transaction import TransactionIn
 
-DATOS = RAIZ / "dashboard" / "src" / "data"
+DATOS = Path(__file__).resolve().parents[1] / "dashboard" / "src" / "data"
 #: La misma ventana que `transaction_history.DEFAULT_WINDOW`, con `<=` inclusivo.
 VENTANA = timedelta(hours=26)
 
@@ -48,9 +47,9 @@ for _t in leer_transacciones():
 def _escenarios_de_la_tabla() -> list[tuple[str, dict]]:
     """Los tres escritos a mano en `liveScenarios.ts`, leídos del fuente."""
     fuente = (DATOS / "liveScenarios.ts").read_text(encoding="utf-8")
-    bloques = re.finditer(r"id: '([^']+)'.*?payload: \{(.*?)\n    \}", fuente, re.S)
+    bloques = re.finditer(r"id: '([^']+)'.*?payload: \{(.*?)\n    \}", fuente, re.DOTALL)
     return [
-        (f"tabla:{b.group(1)}", dict(re.findall(r"^\s+(\w+): '([^']*)'", b.group(2), re.M)))
+        (f"tabla:{b.group(1)}", dict(re.findall(r"^\s+(\w+): '([^']*)'", b.group(2), re.MULTILINE)))
         for b in bloques
     ]
 

@@ -63,11 +63,10 @@ const diverseScenarios = diverseScenariosRaw as LiveScenario[]
 // visible.
 const escenariosEnVivo: LiveScenario[] = [...LIVE_SCENARIOS, ...diverseScenarios]
 
-// Espejo, sólo para la UI, del cooldown real del backend (`LIVE_COOLDOWN` en
-// `api/routers/cases.py`) — ese es el que manda, esto sólo evita el
-// silencio confuso de clickear "Ejecutar" y que no pase nada visible.
-// Cubre las tres fuentes de fila (vitrina, escenarios fijos, diversos): las
-// tres comparten el mismo backend y el mismo prefijo `LIVE-`.
+// La espera entre corridas de una misma fila, por visitante: vive sólo en este
+// navegador (ADR-0030). La API ya no tiene una espera global por escenario;
+// el costo lo acota el techo de la demo (ADR-0025), que responde 429.
+// Cubre las tres fuentes de fila (vitrina, escenarios fijos, diversos).
 const COOLDOWN_MS = 5 * 60 * 1000
 const STORAGE_KEY = 'ultima-corrida-en-vivo'
 
@@ -189,12 +188,11 @@ export function Transactions() {
         body: transaccionParaCorridaEnVivo(escenario),
       })
       if (error) {
-        // Dos límites dan 429: el cooldown del escenario y el techo global de
-        // la demo (ADR-0025). El motivo lo explica la API.
+        // El único 429 es el techo de la demo (ADR-0025). El motivo lo
+        // explica la API.
         if (response.status === 429) {
           throw new Error(
-            motivoDelError(error) ??
-              'Este escenario se corrió hace poco. Probá de nuevo en unos minutos.',
+            motivoDelError(error) ?? 'La demo alcanzó su límite de uso. Prueba de nuevo más tarde.',
           )
         }
         throw new Error('No se pudo iniciar el análisis.')

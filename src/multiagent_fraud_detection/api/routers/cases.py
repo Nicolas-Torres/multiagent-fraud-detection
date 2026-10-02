@@ -7,9 +7,7 @@ from __future__ import annotations
 
 import json
 import logging
-import math
 from collections.abc import AsyncIterator
-from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
@@ -51,58 +49,11 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["cases"])
 
-# Cooldown de la demo pública del dashboard (portafolio, sin autenticación):
-# protege el costo de LLM de un visitante que clickea "ejecutar" repetido,
-# no es dato de negocio ni parte del contrato documentado de `POST /cases`
-# — por eso vive en memoria del proceso, y por eso sólo mira
-# `transaction_id` con el prefijo `LIVE-` que arma el frontend para los
-# escenarios ejecutables. Cualquier otro llamador de este endpoint (el
-# real, el que describe el contrato) nunca pasa por acá.
-#
-# Global por escenario, no por IP: sin sesiones ni autenticación no hay con
-# qué identificar visitantes, y global es más simple y ya cubre el riesgo
-# real (gasto de API, no abuso dirigido a una persona).
-#
-# 5 minutos, el mismo valor que `COOLDOWN_MS` en `Transactions.tsx`: el
-# frontend sólo lo muestra, el que manda es éste. Si se cambia uno, se cambia
-# el otro.
-LIVE_PREFIX = "LIVE-"
-LIVE_COOLDOWN = timedelta(minutes=5)
-_ultima_corrida_por_escenario: dict[str, datetime] = {}
-
-
-def _escenario_de(transaction_id: str) -> str | None:
-    if not transaction_id.startswith(LIVE_PREFIX):
-        return None
-    return transaction_id.removeprefix(LIVE_PREFIX).split("-", 1)[0]
-
-
-def _cooldown_restante(transaction_id: str) -> timedelta | None:
-    escenario = _escenario_de(transaction_id)
-    if escenario is None:
-        return None
-    ultima = _ultima_corrida_por_escenario.get(escenario)
-    if ultima is None:
-        return None
-    restante = LIVE_COOLDOWN - (datetime.now(UTC) - ultima)
-    return restante if restante > timedelta(0) else None
-
-
-def texto_espera(restante: timedelta) -> str:
-    """Cuánto falta, en la unidad que se lee: segundos hasta un minuto,
-    minutos redondeados hacia arriba después. Nunca promete menos espera de la
-    que queda."""
-    segundos = math.ceil(restante.total_seconds())
-    if segundos <= 60:
-        return "1 segundo" if segundos == 1 else f"{segundos} segundos"
-    minutos = math.ceil(segundos / 60)
-    return f"{minutos} minutos"
-
-
-def _marcar_corrida(transaction_id: str) -> None:
-    escenario = _escenario_de(transaction_id)
-    if escenario is not None:
-        _ultima_corrida_por_escenario[escenario] = datetime.now(UTC)
+# La espera entre corridas de una misma fila vive sólo en el navegador de cada
+# visitante (`COOLDOWN_MS` en `Transactions.tsx`, ADR-0030). Hasta entonces
+# había además una espera global por escenario, en memoria del proceso, que
+# compartían todos los visitantes. El costo lo acota el techo de la demo,
+# contado en la base (`limites_demo`, ADR-0025).
 
 
 async def _marcar(contexto: GraphContext, case_id: UUID, status_: CaseStatus) -> None:
@@ -174,17 +125,6 @@ async def crear_caso(
     base (`cases_transaction_id_key`), no este chequeo, que sólo evita la
     vuelta al grafo en el caso común.
     """
-    restante = _cooldown_restante(transaction.transaction_id)
-    if restante is not None:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            # El dashboard muestra este texto tal cual al visitante.
-            detail=(
-                "Este escenario se corrió hace poco. "
-                f"Probá de nuevo en {texto_espera(restante)}."
-            ),
-        )
-
     existente = await _caso_existente(session, transaction.transaction_id)
     if existente is not None:
         response.status_code = status.HTTP_200_OK
@@ -214,7 +154,6 @@ async def crear_caso(
 
     await session.refresh(caso)
 
-    _marcar_corrida(transaction.transaction_id)
     background_tasks.add_task(
         _correr_grafo, graph, contexto, caso.case_id, transaction
     )
