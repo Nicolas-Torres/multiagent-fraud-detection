@@ -11,7 +11,6 @@ de punta a punta, con el grafo corriendo de verdad, lo verifica
 from datetime import UTC, datetime
 from uuid import uuid4
 
-import pytest
 from fastapi.testclient import TestClient
 
 from multiagent_fraud_detection.api.app import app
@@ -20,21 +19,9 @@ from multiagent_fraud_detection.api.deps import (
     get_graph_context,
     get_session,
 )
-from multiagent_fraud_detection.api.routers import cases as cases_router
 from multiagent_fraud_detection.config.settings import settings
 from multiagent_fraud_detection.db.models import Case
 from multiagent_fraud_detection.enums import CaseStatus
-
-
-@pytest.fixture(autouse=True)
-def _sin_cooldown_previo():
-    """El cooldown de la demo vive en un dict a nivel de módulo — sin
-    limpiarlo, el orden de los tests decidiría cuál ve un escenario "usado"
-    por otro test, no el código bajo prueba."""
-    cases_router._ultima_corrida_por_escenario.clear()
-    yield
-    cases_router._ultima_corrida_por_escenario.clear()
-
 
 PAYLOAD = {
     "transaction_id": "T-API-TEST",
@@ -232,7 +219,10 @@ def _payload_live(transaction_id: str) -> dict:
     return {**PAYLOAD, "transaction_id": transaction_id}
 
 
-def test_segundo_disparo_del_mismo_escenario_da_429():
+def test_dos_visitantes_pueden_correr_el_mismo_escenario_seguido():
+    """Sin espera global por escenario (ADR-0030): la de cada visitante vive
+    en su navegador. Antes, el segundo recibía un 429 por una corrida que no
+    veía en su tabla."""
     sesion = _SesionFake(existente=None)
     grafo = _GrafoFake()
     contexto = _ContextoFake()
@@ -245,58 +235,8 @@ def test_segundo_disparo_del_mismo_escenario_da_429():
         app.dependency_overrides.clear()
 
     assert primera.status_code == 202
-    assert segunda.status_code == 429
-    # El dashboard muestra este texto tal cual: tiene que ser para el visitante.
-    assert segunda.json()["detail"] == (
-        "Este escenario se corrió hace poco. Probá de nuevo en 5 minutos."
-    )
-    # El grafo sólo corrió una vez: la segunda ni siquiera llegó a agendarse.
-    assert grafo.invocado
-    assert len(contexto.marcas) == 1
-
-
-def test_otro_escenario_no_se_ve_afectado_por_el_cooldown_del_primero():
-    sesion = _SesionFake(existente=None)
-    grafo = _GrafoFake()
-    contexto = _ContextoFake()
-    _override(sesion, grafo, contexto)
-    try:
-        with TestClient(app) as client:
-            client.post("/api/v1/cases", json=_payload_live("LIVE-approve-1"))
-            otro = client.post("/api/v1/cases", json=_payload_live("LIVE-challenge-1"))
-    finally:
-        app.dependency_overrides.clear()
-
-    assert otro.status_code == 202
-
-
-def test_transaction_id_sin_prefijo_live_nunca_tiene_cooldown():
-    """El contrato documentado de `POST /cases` no sabe que este cooldown
-    existe — sólo lo ven los `transaction_id` que arma el propio frontend
-    de la demo."""
-    sesion = _SesionFake(existente=None)
-    grafo = _GrafoFake()
-    contexto = _ContextoFake()
-    _override(sesion, grafo, contexto)
-    try:
-        with TestClient(app) as client:
-            primera = client.post("/api/v1/cases", json=_payload_live("T-REAL-1"))
-    finally:
-        app.dependency_overrides.clear()
-
-    assert primera.status_code == 202
-
-    sesion2 = _SesionFake(existente=None)
-    grafo2 = _GrafoFake()
-    contexto2 = _ContextoFake()
-    _override(sesion2, grafo2, contexto2)
-    try:
-        with TestClient(app) as client:
-            segunda = client.post("/api/v1/cases", json=_payload_live("T-REAL-2"))
-    finally:
-        app.dependency_overrides.clear()
-
     assert segunda.status_code == 202
+    assert len(contexto.marcas) == 2
 
 
 # --- Techo de la demo (ADR-0025) ---
@@ -381,41 +321,3 @@ def test_fuera_de_produccion_no_consulta_el_techo():
 
     assert respuesta.status_code == 202
     assert sesion.consultas_de_conteo == 0
-
-
-@pytest.mark.parametrize(
-    ("segundos", "texto"),
-    [
-        (1, "1 segundo"),
-        (45.2, "46 segundos"),
-        (60, "60 segundos"),
-        (61, "2 minutos"),
-        (299.9, "5 minutos"),
-    ],
-)
-def test_texto_espera_nunca_promete_menos_de_lo_que_falta(segundos, texto):
-    from datetime import timedelta
-
-    assert cases_router.texto_espera(timedelta(seconds=segundos)) == texto
-
-
-def test_el_cooldown_del_dashboard_es_el_mismo_que_el_de_la_api():
-    """Ya se desalinearon dos veces (1 min en la API y 10 en el dashboard, y
-    después al revés). El dashboard sólo lo muestra; si difieren, el visitante
-    ve el botón habilitado y recibe un 429, o bloqueado sin motivo."""
-    import re
-    from pathlib import Path
-
-    tsx = (
-        Path(__file__).resolve().parents[1]
-        / "dashboard"
-        / "src"
-        / "routes"
-        / "Transactions.tsx"
-    ).read_text(encoding="utf-8")
-    expresion = re.search(r"const COOLDOWN_MS = ([\d_\s*]+)\n", tsx).group(1)
-    milisegundos = 1
-    for factor in expresion.replace("_", "").split("*"):
-        milisegundos *= int(factor)
-
-    assert milisegundos == cases_router.LIVE_COOLDOWN.total_seconds() * 1000
