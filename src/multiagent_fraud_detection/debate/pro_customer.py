@@ -13,14 +13,15 @@ from multiagent_fraud_detection.graph.state import WorkingSignal
 
 MODEL = "claude-sonnet-5"
 TEMPLATE_TAG = "debate-pro-customer"
-GENERATION = 1
+GENERATION = 2
 
 PROMPT_VERSION = f"{MODEL}:{TEMPLATE_TAG}:{GENERATION}"
 
-# 400, no 300: hasta ADR-0026 este valor no se aplicaba y el debate corría con el
-# tope de la explicación (400), con salidas de hasta 378 tokens. Bajarlo ahora
-# cortaría argumentos a mitad de frase.
-MAX_TOKENS = 400
+# Sin razonamiento, explícito (ADR-0031): un argumento es prosa a partir de la
+# evidencia, y en modo adaptativo no razonó ni en los casos difíciles. 600 y no
+# 400: en producción un argumento llegó a 343 tokens, el 86 % del tope anterior.
+THINKING = "disabled"
+MAX_TOKENS = 600
 
 SYSTEM_PROMPT = """\
 Eres el analista que argumenta a favor de tratar una operación como

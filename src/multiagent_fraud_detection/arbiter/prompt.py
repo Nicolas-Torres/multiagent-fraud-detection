@@ -40,11 +40,16 @@ from multiagent_fraud_detection.graph.state import WorkingSignal
 
 MODEL = "claude-sonnet-5"
 TEMPLATE_TAG = "arbiter-verdict"
-GENERATION = 1
+GENERATION = 2
 
 PROMPT_VERSION = f"{MODEL}:{TEMPLATE_TAG}:{GENERATION}"
 
-MAX_TOKENS = 500
+# Razonamiento adaptativo, explícito (ADR-0031): sin él, el árbitro omitió 3 de
+# 7 escaladas en los casos difíciles. El razonamiento cuenta dentro de
+# `MAX_TOKENS`: con 500, un caso difícil (hasta 950 tokens medidos) cortaba el
+# veredicto. Los casos simples no razonan y no gastan más.
+THINKING = "adaptive"
+MAX_TOKENS = 2000
 
 SYSTEM_PROMPT = """\
 Eres el Arbiter de un sistema antifraude: el componente que decide el

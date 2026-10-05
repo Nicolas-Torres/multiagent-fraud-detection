@@ -1,4 +1,5 @@
-"""Cada llamada a un LLM usa el modelo que declara su sello (ADR-0026).
+"""Cada llamada a un LLM usa el modelo que declara su sello (ADR-0026) y declara
+su modo de razonamiento (ADR-0031).
 
 Hasta ADR-0026 el debate llamaba al narrador compartido sin modelo ni tope, y
 corría con los de la explicación mientras su `PROMPT_VERSION` decía otra cosa.
@@ -23,8 +24,8 @@ class NarradorEspia:
     def __init__(self):
         self.llamadas: list[tuple[str, int]] = []
 
-    def narrate(self, system, user, *, model, max_tokens):
-        self.llamadas.append((model, max_tokens))
+    def narrate(self, system, user, *, model, max_tokens, thinking):
+        self.llamadas.append((model, max_tokens, thinking))
         return "[texto]"
 
 
@@ -50,21 +51,21 @@ async def _llamada_de(nodo, estado):
     return llamada
 
 
-async def test_el_debate_usa_su_propio_modelo_y_tope():
+async def test_el_debate_usa_su_propio_modelo_tope_y_razonamiento():
     for nodo, modulo in (
         (debate_pro_fraud, pro_fraud),
         (debate_pro_customer, pro_customer),
     ):
-        modelo, tope = await _llamada_de(nodo, {})
-        assert (modelo, tope) == (modulo.MODEL, modulo.MAX_TOKENS)
+        modelo, tope, razonamiento = await _llamada_de(nodo, {})
+        assert (modelo, tope, razonamiento) == (modulo.MODEL, modulo.MAX_TOKENS, modulo.THINKING)
         assert modelo == _modelo_sellado(modulo.PROMPT_VERSION)
 
 
-async def test_la_explicacion_usa_su_propio_modelo_y_tope():
-    modelo, tope = await _llamada_de(
+async def test_la_explicacion_usa_su_propio_modelo_tope_y_razonamiento():
+    modelo, tope, razonamiento = await _llamada_de(
         explainability, {"decision": DecisionType.APPROVE, "signals": []}
     )
-    assert (modelo, tope) == (customer.MODEL, customer.MAX_TOKENS)
+    assert (modelo, tope, razonamiento) == (customer.MODEL, customer.MAX_TOKENS, customer.THINKING)
     assert modelo == _modelo_sellado(customer.PROMPT_VERSION)
 
 

@@ -45,6 +45,7 @@ from multiagent_fraud_detection.explain.customer import (
     MODEL,
     PROMPT_VERSION,
     SYSTEM_PROMPT,
+    THINKING,
     build_prompt,
     fallback_explanation,
     safe_themes,
@@ -517,6 +518,7 @@ async def debate_pro_fraud(
             pro_fraud.build_prompt(evidencia, politicas, riesgo),
             model=pro_fraud.MODEL,
             max_tokens=pro_fraud.MAX_TOKENS,
+            thinking=pro_fraud.THINKING,
         )
     except Exception as exc:
         logger.exception("argumento pro-fraude degradado; se usa el respaldo")
@@ -551,6 +553,7 @@ async def debate_pro_customer(
             pro_customer.build_prompt(evidencia, politicas, riesgo),
             model=pro_customer.MODEL,
             max_tokens=pro_customer.MAX_TOKENS,
+            thinking=pro_customer.THINKING,
         )
     except Exception as exc:
         logger.exception("argumento pro-cliente degradado; se usa el respaldo")
@@ -721,6 +724,7 @@ async def explainability(
             build_prompt(decision, temas),
             model=MODEL,
             max_tokens=MAX_TOKENS,
+            thinking=THINKING,
         )
         salida["explanation_prompt_version"] = PROMPT_VERSION
     except Exception as exc:

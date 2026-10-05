@@ -58,10 +58,14 @@ from multiagent_fraud_detection.enums import DecisionType
 # ~USD 0.003 por decisión.
 MODEL = "claude-sonnet-5"
 TEMPLATE_TAG = "customer"
-GENERATION = 1
+GENERATION = 2
 
 PROMPT_VERSION = f"{MODEL}:{TEMPLATE_TAG}:{GENERATION}"
 
+# Sin razonamiento, explícito (ADR-0031): en modo adaptativo, la explicación de
+# un BLOCK razonó 306 tokens y llegó a 425, por encima de este tope. El texto en
+# sí no pasa de ~180 tokens.
+THINKING = "disabled"
 MAX_TOKENS = 400
 
 TEMA_GENERICO = "un patrón inusual respecto de tu actividad habitual"

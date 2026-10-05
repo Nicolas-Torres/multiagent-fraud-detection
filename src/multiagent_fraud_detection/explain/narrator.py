@@ -66,7 +66,7 @@ class Narrator(Protocol):
     """
 
     def narrate(
-        self, system: str, user: str, *, model: str, max_tokens: int
+        self, system: str, user: str, *, model: str, max_tokens: int, thinking: str
     ) -> str: ...
 
 
@@ -109,13 +109,24 @@ class AnthropicNarrator:
                 self._client = wrap_anthropic(Anthropic(api_key=clave))
         return self._client
 
-    def narrate(self, system: str, user: str, *, model: str, max_tokens: int) -> str:
+    def narrate(
+        self, system: str, user: str, *, model: str, max_tokens: int, thinking: str
+    ) -> str:
         respuesta = self._cliente().messages.create(
             model=model,
             max_tokens=max_tokens,
+            thinking={"type": thinking},
             system=system,
             messages=[{"role": "user", "content": user}],
         )
+
+        # Un texto cortado (`max_tokens`) o rechazado (`refusal`) no es una
+        # explicación ni un argumento: falla, y cada nodo usa su respaldo, en vez
+        # de persistir una frase a medias como si estuviera completa (ADR-0031).
+        if respuesta.stop_reason != "end_turn":
+            raise NarrationError(
+                f"respuesta incompleta del proveedor (stop_reason={respuesta.stop_reason})"
+            )
 
         texto = "".join(
             bloque.text for bloque in respuesta.content if bloque.type == "text"
@@ -139,5 +150,7 @@ class FakeNarrator:
 
     texto: str = "[explicación de prueba]"
 
-    def narrate(self, system: str, user: str, *, model: str, max_tokens: int) -> str:
+    def narrate(
+        self, system: str, user: str, *, model: str, max_tokens: int, thinking: str
+    ) -> str:
         return self.texto
