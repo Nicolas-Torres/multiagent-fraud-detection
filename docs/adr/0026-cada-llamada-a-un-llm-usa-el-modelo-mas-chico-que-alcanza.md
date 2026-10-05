@@ -2,7 +2,7 @@
 
 - **Estado**: aceptado
 - **Fecha**: 2026-09-26
-- **Actualizado por**: ADR-0029 (la cadencia semanal de `fetch-intel` pasa a "a demanda")
+- **Actualizado por**: ADR-0029 (la cadencia semanal de `fetch-intel` pasa a "a demanda") y ADR-0031 (el debate pasa a 600 tokens y cada llamada declara su modo de razonamiento)
 
 ## Contexto
 
