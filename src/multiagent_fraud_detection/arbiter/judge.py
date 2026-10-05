@@ -25,9 +25,9 @@ import threading
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
-from multiagent_fraud_detection.arbiter.prompt import MAX_TOKENS, MODEL
+from multiagent_fraud_detection.arbiter.prompt import MAX_TOKENS, MODEL, THINKING
 from multiagent_fraud_detection.config.settings import settings
 from multiagent_fraud_detection.enums import DecisionType
 
@@ -56,8 +56,8 @@ class Judge(Protocol):
 
 @dataclass
 class AnthropicJudge:
-    """Adaptador de la API de Mensajes, con salida estructurada
-    (`messages.parse`, contra `ArbiterVerdict`).
+    """Adaptador de la API de Mensajes, con salida estructurada contra
+    `ArbiterVerdict`.
 
     Import perezoso, igual que `AnthropicNarrator`: el módulo se importa —y
     las constantes se leen, y los tests corren— sin la dependencia instalada
@@ -67,6 +67,7 @@ class AnthropicJudge:
     api_key: str | None = None
     model: str = MODEL
     max_tokens: int = MAX_TOKENS
+    thinking: str = THINKING
     _client: Any = field(default=None, init=False, repr=False)
     # Incidente 0007: el grafo comparte el adaptador entre hilos. Sin lock, dos
     # hilos en frío crean dos clientes y el recolector cierra el huérfano con
@@ -95,53 +96,39 @@ class AnthropicJudge:
         return self._client
 
     def judge(self, system: str, user: str) -> ArbiterVerdict:
-        # `wrap_anthropic` no alcanza acá: sólo parchea `messages.create` y
-        # `beta.messages.parse`, y `messages.parse` (el estable, el que
-        # usamos) llama a `self._post` directo por debajo — quedaría sin
-        # trazar en silencio. `traceable` envuelve la llamada puntual en vez
-        # de migrar a la rama beta sólo por observabilidad. Importado acá
-        # adentro, no arriba del módulo: mismo criterio de import perezoso
-        # que `anthropic`.
-        #
-        # `process_outputs=_message_to_outputs` reusa el mismo serializador
-        # que ya usa `wrap_anthropic` para las llamadas que sí intercepta:
-        # sin esto, LangSmith intenta volcar el `ParsedMessage` crudo -dispara
-        # el warning de Pydantic (`content` trae `ParsedTextBlock`, que no
-        # calza con la unión de bloques que declara el SDK) y, más grave,
-        # nunca extrae `usage` -el costo del Arbiter queda en $0 en LangSmith
-        # pese a generar tokens reales, verificado en vivo. Es una función
-        # privada del wrapper oficial (`_anthropic.py`), no pública: revisar
-        # si una futura versión de `langsmith` la reubica.
-        #
-        # `metadata={"ls_provider": ..., "ls_model_name": ...}` es lo que
-        # `wrap_anthropic` infiere solo del `model=` de cada llamada
-        # (`_infer_ls_params`) -acá se declara a mano porque `traceable` no
-        # ve los kwargs de la llamada real hasta que corre-. Sin esto,
-        # `usage_metadata` ya cuenta tokens bien pero LangSmith no sabe con
-        # qué tarifa convertirlos a costo: verificado en vivo, sin esta
-        # metadata el costo queda en $0 aunque los tokens ya sean correctos.
-        from langsmith import traceable
-        from langsmith.wrappers._anthropic import _message_to_outputs
+        # `messages.create` con el esquema de `ArbiterVerdict`, y la validación
+        # acá, no `messages.parse`: `parse` valida dentro del SDK, y una
+        # respuesta cortada fallaba como JSON inválido antes de que se pudiera
+        # mirar `stop_reason` (ADR-0031). `create` además lo traza
+        # `wrap_anthropic`, con tokens y costo, igual que al narrador.
+        from anthropic import transform_schema
 
-        parse = traceable(
-            run_type="llm",
-            name="AnthropicJudge.judge",
-            process_outputs=_message_to_outputs,
-            metadata={"ls_provider": "anthropic", "ls_model_name": self.model},
-        )(self._cliente().messages.parse)
-        respuesta = parse(
+        respuesta = self._cliente().messages.create(
             model=self.model,
             max_tokens=self.max_tokens,
+            thinking={"type": self.thinking},
             system=system,
             messages=[{"role": "user", "content": user}],
-            output_format=ArbiterVerdict,
+            output_config={
+                "format": {
+                    "type": "json_schema",
+                    "schema": transform_schema(ArbiterVerdict.model_json_schema()),
+                }
+            },
         )
 
-        veredicto = respuesta.parsed_output
-        if veredicto is None:
-            raise JudgeError("el proveedor no devolvió un veredicto estructurado")
+        # Cualquier otro motivo de corte (`max_tokens`, `refusal`) deja un
+        # veredicto incompleto o ausente: se nombra, no se adivina.
+        if respuesta.stop_reason != "end_turn":
+            raise JudgeError(
+                f"respuesta incompleta del proveedor (stop_reason={respuesta.stop_reason})"
+            )
 
-        return veredicto
+        texto = "".join(b.text for b in respuesta.content if b.type == "text")
+        try:
+            return ArbiterVerdict.model_validate_json(texto)
+        except ValidationError as exc:
+            raise JudgeError("el proveedor no devolvió un veredicto estructurado válido") from exc
 
 
 @dataclass(frozen=True, slots=True)
