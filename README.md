@@ -110,7 +110,8 @@ El diagrama se genera desde el grafo compilado
 > `decision_arbiter` es el Arbiter con LLM: decide el veredicto final sobre un
 > **piso** determinístico —lo que el catálogo prescribe por precedencia
 > (`prescribed_action`, el mismo cálculo que sigue siendo el brazo de control
-> del entregable 7)—. Puede escalar ese piso con justificación auditable en
+> del entregable 7), que nunca es APPROVE si cayó un agente que produce señales
+> ([ADR-0032](docs/adr/0032-con-evidencia-incompleta-el-piso-no-es-approve.md))—. Puede escalar ese piso con justificación auditable en
 > `confidence_rationale`; no puede bajarlo — lo hace cumplir una cuarta guarda
 > estructural en `persist_decision`
 > ([ADR-0006](docs/adr/0006-reparto-deterministico-y-llm.md),

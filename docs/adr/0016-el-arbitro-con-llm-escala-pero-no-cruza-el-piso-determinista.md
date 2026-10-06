@@ -2,6 +2,7 @@
 
 - **Estado**: aceptado
 - **Fecha**: 2026-08-06
+- **Actualizado por**: ADR-0032 (el piso es `piso_efectivo`: con un agente de señales caído, nunca APPROVE)
 
 ## Contexto
 

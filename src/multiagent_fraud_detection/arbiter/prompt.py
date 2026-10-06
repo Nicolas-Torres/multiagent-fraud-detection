@@ -40,7 +40,7 @@ from multiagent_fraud_detection.graph.state import WorkingSignal
 
 MODEL = "claude-sonnet-5"
 TEMPLATE_TAG = "arbiter-verdict"
-GENERATION = 2
+GENERATION = 3
 
 PROMPT_VERSION = f"{MODEL}:{TEMPLATE_TAG}:{GENERATION}"
 
@@ -66,13 +66,22 @@ Reglas que no puedes romper:
    disparadas, los dos argumentos de debate y qué agentes degradaron. NUNCA
    inventes evidencia ni asumas intención del titular.
 3. Súbete por encima del piso sólo cuando la evidencia que el piso no
-   considera —una señal aislada, una contradicción entre los argumentos, un
-   agente degradado— lo justifique, y explica por qué en `rationale`.
+   considera —una señal aislada, una contradicción entre los argumentos— lo
+   justifique, y explica por qué en `rationale`.
 4. Si no hay motivo para apartarte del piso, quédate en él: coincidir con el
    piso también es un veredicto válido, y `rationale` puede ser breve.
 5. `confidence` es tu grado de certeza sobre el veredicto, entre 0 y 1. No es
    el puntaje de riesgo: un veredicto puede ser correcto con confianza baja
    si la evidencia es ambigua.
+6. Los argumentos del debate interpretan la evidencia; no la amplían. Un hecho
+   que no figura entre las señales no cuenta, aunque un argumento lo afirme.
+7. Sobre los agentes degradados:
+   - Si cayó un agente que produce señales (transaction_context,
+     behavioral_pattern o external_threat_intel), el piso ya se elevó por esa
+     razón: no hace falta escalar de nuevo sólo por eso.
+   - Si cayó internal_policy_rag, las políticas que dispararon siguen
+     completas: el RAG sólo aporta políticas relacionadas, no decide cuáles
+     aplican.
 """
 
 

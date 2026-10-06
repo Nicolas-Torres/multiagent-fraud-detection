@@ -28,7 +28,7 @@ from multiagent_fraud_detection.db.repositories.transaction_history import (
 )
 from multiagent_fraud_detection.debate import pro_customer, pro_fraud
 from multiagent_fraud_detection.domain.catalog import Owner, PolicyCatalog
-from multiagent_fraud_detection.domain.engine import evaluate, prescribed_action
+from multiagent_fraud_detection.domain.engine import evaluate, piso_efectivo
 from multiagent_fraud_detection.domain.params import precedencia
 from multiagent_fraud_detection.domain.predicates import SOURCES_KEY, EvalContext
 from multiagent_fraud_detection.domain.scoring import (
@@ -580,7 +580,8 @@ async def decision_arbiter(
     `prescribed_action(catalog, matched_policies)` -el mismo calculo con el
     que se construyo `expected_decision`, que sigue siendo el brazo de
     control del entregable 7- deja de ser el veredicto y pasa a ser el
-    **piso**. El Arbiter LLM (ADR-0016) elige la decision final con la
+    **piso**; con un agente de senales caido, nunca APPROVE (`piso_efectivo`,
+    ADR-0032). El Arbiter LLM (ADR-0016) elige la decision final con la
     restriccion `precedencia(decision) >= precedencia(piso)`: puede subir de
     nivel con justificacion, nunca bajar uno que una politica ya gano. La
     cuarta guarda de W2 (`_verificar_invariantes`) es lo que hace cumplir esa
@@ -637,8 +638,8 @@ async def _decision_arbiter_impl(
             "confidence_rationale": "sin score deterministico: no hubo consolidacion",
         }
 
-    piso = prescribed_action(runtime.context.catalog, tuple(politicas))
     degradados = sorted({e.agent for e in state.get("agent_errors", [])})
+    piso = piso_efectivo(runtime.context.catalog, tuple(politicas), tuple(degradados))
 
     try:
         veredicto: ArbiterVerdict = await asyncio.to_thread(
@@ -794,7 +795,11 @@ def _verificar_invariantes(state: GraphState, catalog: PolicyCatalog) -> None:
         # Arbiter: el caso pasa a FAILED en vez de DECIDED, que es el costo
         # que el ADR ya asumio a cambio de que el piso sea estructural y no
         # una convencion que el nodo podria romper en silencio.
-        piso = prescribed_action(catalog, tuple(state.get("policies", [])))
+        piso = piso_efectivo(
+            catalog,
+            tuple(state.get("policies", [])),
+            tuple(sorted({e.agent for e in state.get("agent_errors", [])})),
+        )
         if precedencia(decision) < precedencia(piso):
             raise ValueError(
                 f"veredicto {decision.value} por debajo del piso {piso.value}"
