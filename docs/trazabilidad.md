@@ -18,14 +18,14 @@ evidencia que lo cubre en el repo, y declara los desvíos frente a
 | # | Ítem | Evidencia | Estado |
 |---|---|---|---|
 | 1 | Descripción del caso de uso | `README.md`, `requisitos/reto_de_aplicacion.md` | 🟡 falta el informe |
-| 2 | Selección de modelo y datos | ADR-0003 (dataset sintético), ADR-0012 (índice versionado), `data/README.md`, tres proveedores tras puerto (`Embedder`, `Narrator`, `Searcher`) | ✅ |
+| 2 | Selección de modelo y datos | ADR-0003 (dataset sintético), ADR-0012 (índice versionado), `data/README.md`, tres proveedores tras puerto (`Embedder`, `Narrator`, `Searcher`), elección del modelo del árbitro con alternativas evaluadas (`evaluaciones/jev-como-arbitro.md`, `evaluaciones/sonnet-5-5.md`, ADR-0031) | ✅ |
 | 3 | Ingeniería de prompts y adaptación | `explain/customer.py` (`PROMPT_VERSION`), `intel/snapshot.py` (`QUERY_TEMPLATE`), `debate/pro_fraud.py`, `debate/pro_customer.py`, `arbiter/prompt.py` (ADR-0016), `retrieval/` (RAG sobre pgvector), ADR-0011, ADR-0012, ADR-0014 | 🟡 ver desvío D-04 |
 | 4 | Implementación de la aplicación | `graph/`, `domain/`, `db/`, `api/`, `dashboard/`, `diagrams/likec4/c4-container.c4`, `contrato_de_interfaz.md` (v0.13) | ✅ |
 | 5 | Orquestación y despliegue | ADR-0008 (digest), ADR-0009 (migraciones), ADR-0010 (seed), ADR-0021 (Azure), ADR-0022 (GCP), ADR-0023 (secretos compartidos), ADR-0027 (readiness), ADR-0028 (imagen sin credenciales personales, promoción por digest), ADR-0029 (fetch-intel a demanda), `infra/azure/`, `infra/gcp/`, `.github/workflows/`, contrato §1 | ✅ |
 | 6 | Monitoreo y mantenimiento | LangSmith, contrato §3.3 (cuatro métricas operativas), cinco sellos de auditoría en `decisions`, tarjeta de costo/latencia en vivo (ADR-0019/0020), cola HITL en `dashboard/`, observabilidad de infra OTel + Grafana (ADR-0024), control de costo (ADR-0025, ADR-0026), 12 incidentes documentados en `docs/incidentes/` (acta 13) | ✅ |
-| 7 | Evaluación de la aplicación | `check_policies.py` 7000/7000, ADR-0006 + ADR-0016 (brazo de control determinístico, ya en producción — no sólo planeado), ADR-0013 (métricas duras vs LLM-as-judge), `ground_truth.csv` | 🟡 ver desvío D-07 |
+| 7 | Evaluación de la aplicación | `check_policies.py` 7000/7000, ADR-0006 + ADR-0016 (brazo de control determinístico, ya en producción — no sólo planeado), ADR-0013 (métricas duras vs LLM-as-judge), `ground_truth.csv`, comparación de enfoques: prueba en sombra de un modelo de decisión contra el árbitro LLM y consistencia del árbitro con varias corridas (`evaluaciones/`, ADR-0032) | 🟡 ver desvío D-07 |
 | 8 | Resultados y demostración | `smoke_decision.py`, `smoke_retrieval.py`, `smoke_api.py`, `smoke_agents.py`, demo en vivo (Azure + GCP, ver README) | 🟡 falta el video |
-| 9 | Conclusiones | `docs/reviews/` (trece actas) — la materia prima ya está escrita | ⬜ |
+| 9 | Conclusiones | `docs/reviews/` (catorce actas) — la materia prima ya está escrita | ⬜ |
 | 10 | Recomendaciones | deudas declaradas: event-driven, feed en streaming, consolidación de listas de gobernanza, retry propio con backoff en el proveedor de embeddings (Gemini, ver acta 11), alertas de 4xx, de consumo de Neon y de agentes degradados (incidente 0006, acta 13 §5), ACR con Managed Identity si la imagen pasa a privada (ADR-0028) | ⬜ |
 | 11 | Referencias (≥5, APA) | — | ⬜ **nadie las está juntando** |
 | 12 | Video de exposición | — | ⬜ |
