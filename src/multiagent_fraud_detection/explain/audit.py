@@ -26,6 +26,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
+from multiagent_fraud_detection.domain.engine import AGENTES_DE_SENALES
 from multiagent_fraud_detection.enums import DecisionType
 
 SIN_POLITICAS = "ninguna política del catálogo se cumplió por completo"
@@ -127,6 +128,11 @@ def build_audit_explanation(state: dict[str, Any]) -> str:
             f"Evidencia incompleta: {_lista(degradados)} no pudo completar su "
             f"análisis; la confianza refleja esa degradación."
         )
+        if AGENTES_DE_SENALES.intersection(degradados):
+            lineas.append(
+                "Con un agente de señales caído el piso no puede ser APPROVE: "
+                "se exige al menos CHALLENGE."
+            )
 
     lineas.append(f"Ruta de agentes: {' → '.join(ruta) if ruta else 'ninguna'}.")
 

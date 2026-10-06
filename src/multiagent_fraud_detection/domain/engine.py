@@ -175,3 +175,37 @@ def prescribed_action(
         if catalog[pid].action is not None
     }
     return DecisionType(next((a for a in PRECEDENCE if a in acciones), "APPROVE"))
+
+
+#: Los agentes cuyas señales alimentan las políticas. Si uno cae, faltan señales
+#: y pueden faltar políticas: 9 de las 11 dependen de `behavioral_pattern`. No
+#: incluye `internal_policy_rag`: las políticas que dispararon no dependen del
+#: índice (ADR-0011), el RAG sólo aporta descubrimiento. Son los nombres de los
+#: nodos del grafo; un test los ata a esas constantes.
+AGENTES_DE_SENALES = frozenset(
+    {"transaction_context", "behavioral_pattern", "external_threat_intel"}
+)
+
+
+def piso_efectivo(
+    catalog: PolicyCatalog,
+    matched_policies: tuple[str, ...],
+    degraded_agents: tuple[str, ...] = (),
+) -> DecisionType:
+    """El piso del veredicto: `prescribed_action`, y nunca APPROVE con la
+    evidencia incompleta (ADR-0032).
+
+    Si cayó un agente que produce señales, "ninguna política disparó" puede ser
+    "no se pudo evaluar": aprobar sería decidir sin haber mirado. El piso sube a
+    CHALLENGE (verificar con el cliente); si ya era más cauteloso, no cambia. Es
+    una regla, no un juicio del LLM: con la misma evidencia, el árbitro aprobaba
+    en un caso y pedía verificación en otro.
+
+    Lo usan el árbitro y la cuarta guarda de `persist_decision`, y nadie más:
+    calcularlo en dos lugares permitiría que la guarda rechace lo que el árbitro
+    decidió. `prescribed_action` sigue siendo la línea base del harness.
+    """
+    piso = prescribed_action(catalog, matched_policies)
+    if piso is DecisionType.APPROVE and AGENTES_DE_SENALES.intersection(degraded_agents):
+        return DecisionType.CHALLENGE
+    return piso
