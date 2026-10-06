@@ -2,6 +2,7 @@
 
 - **Estado**: aceptado
 - **Fecha**: 2026-09-16
+- **Actualizado por**: ADR-0034 (`/metrics` sólo fuera de producción)
 
 ## Contexto
 
