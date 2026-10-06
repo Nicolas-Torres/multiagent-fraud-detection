@@ -87,6 +87,17 @@ class Decision(Base):
     # sella version, porque consultar y no encontrar nada es haber consultado.
     threat_intel_version: Mapped[str | None] = mapped_column(String(64))
 
+    # Con que modelo y prompt se produjo cada una de las otras salidas de un LLM
+    # que se guardan aca (ADR-0033): el veredicto del Arbiter con su
+    # `confidence_rationale`, y los dos argumentos del debate. Mismo formato y
+    # misma semantica de nulo que `explanation_prompt_version`: `null` dice que
+    # ningun modelo produjo esa salida (el Arbiter degrado, o el argumento salio
+    # del respaldo). Las decisiones anteriores a ADR-0033 quedan en `null`: un
+    # sello adivinado por la fecha podria ser falso.
+    arbiter_prompt_version: Mapped[str | None] = mapped_column(String(64))
+    debate_pro_fraud_prompt_version: Mapped[str | None] = mapped_column(String(64))
+    debate_pro_customer_prompt_version: Mapped[str | None] = mapped_column(String(64))
+
     citations_internal: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
 
     citations_external: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
