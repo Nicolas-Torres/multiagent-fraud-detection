@@ -56,6 +56,7 @@ GCP se sumó como segunda prueba de multi-nube, a modo de aprendizaje
 | Observabilidad: LangSmith por nodo, OpenTelemetry + Grafana local | ✅ |
 | Operación en producción: techos de uso y gasto, 12 incidentes documentados | ✅ |
 | Despliegue sin credenciales personales: OIDC y promoción por digest | ✅ |
+| Criterio sobre modelos: alternativas evaluadas y consistencia del árbitro | ✅ |
 
 ---
 
@@ -307,7 +308,7 @@ regenerar es una guarda válida de CI.
 ├── .github/workflows/            # ci.yml, deploy-azure.yml, deploy-gcp.yml
 ├── tests/
 ├── docs/
-│   ├── contrato_de_interfaz.md  # documento vivo (v0.15)
+│   ├── contrato_de_interfaz.md  # documento vivo (v0.16)
 │   ├── CHANGELOG.md
 │   ├── enmiendas_pendientes.md  # staging de la próxima versión
 │   ├── trazabilidad.md          # rúbrica ↔ evidencia, se revisa al cerrar etapa
@@ -316,6 +317,7 @@ regenerar es una guarda válida de CI.
 │   ├── runbook_gcp_setup.md
 │   ├── adr/                     # decisiones de arquitectura
 │   ├── reviews/                 # cierres de etapa
+│   ├── evaluaciones/            # modelos alternativos y consistencia del árbitro
 │   └── diagrams/
 └── src/multiagent_fraud_detection/
     ├── enums.py
@@ -352,6 +354,8 @@ regenerar es una guarda válida de CI.
 - **[ADR](docs/adr/)** — decisiones de arquitectura, cada una con la alternativa
   que se descartó.
 - **[Reviews](docs/reviews/)** — cierres de etapa, en orden cronológico.
+- **[Evaluaciones](docs/evaluaciones/)** — modelos alternativos para el árbitro
+  (Jev, Sonnet 5.5) y la consistencia del árbitro, con sus mediciones.
 - **[Enmiendas pendientes](docs/enmiendas_pendientes.md)** — lo que va hacia la
   próxima versión del contrato.
 - **[Runbook de base nueva](docs/runbook_base_nueva.md)** — poner en marcha una
