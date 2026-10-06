@@ -4,6 +4,7 @@
 - **Fecha**: 2026-10-05
 - **Actualiza**: ADR-0026 (el debate pasa de 400 a 600 tokens; cada llamada,
   además de su modelo, declara su modo de razonamiento).
+- **Actualizado por**: ADR-0032 (resuelve "No se resuelve": la evidencia incompleta pasa a ser regla del piso)
 
 ## Contexto
 
