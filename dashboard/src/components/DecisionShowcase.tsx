@@ -178,11 +178,14 @@ const SELLOS: { key: keyof DecisionRead; label: string }[] = [
   { key: 'retrieval_index_version', label: 'Índice de recuperación' },
   { key: 'explanation_prompt_version', label: 'Prompt de explicación' },
   { key: 'threat_intel_version', label: 'Snapshot de inteligencia externa' },
+  { key: 'arbiter_prompt_version', label: 'Prompt del árbitro' },
+  { key: 'debate_pro_fraud_prompt_version', label: 'Prompt del debate (cautela)' },
+  { key: 'debate_pro_customer_prompt_version', label: 'Prompt del debate (legitimidad)' },
 ]
 
 /**
  * La misma información que ya viaja al final de `explanation_audit`
- * —ruta de agentes y los cinco sellos de versión (contrato §2.5)—, pero
+ * —ruta de agentes y los sellos de versión (contrato §2.5, ADR-0033)—, pero
  * como campos tipados en vez de una oración corrida. `explanation_audit`
  * sigue mostrándose completo abajo: nada se oculta, esto sólo lo hace
  * legible de un vistazo antes del párrafo de auditoría.

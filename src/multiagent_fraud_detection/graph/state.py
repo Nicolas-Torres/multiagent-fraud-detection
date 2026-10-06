@@ -127,6 +127,13 @@ class GraphState(GraphInput, total=False):
     # completar el lookup—, no dato faltante. Un corpus vacio NO produce
     # ausencia: consultar y no encontrar nada es haber consultado.
     threat_intel_version: str
+    # Con que modelo y prompt se produjeron el veredicto del Arbiter y cada
+    # argumento del debate (ADR-0033). Misma semantica que
+    # `explanation_prompt_version`: ausente cuando ningun modelo produjo esa
+    # salida (degradacion o respaldo).
+    arbiter_prompt_version: str
+    debate_pro_fraud_prompt_version: str
+    debate_pro_customer_prompt_version: str
     decision: DecisionType
     confidence: float
     confidence_rationale: str

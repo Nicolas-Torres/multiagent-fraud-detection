@@ -216,6 +216,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Metrics
+         * @description Endpoint that serves Prometheus metrics.
+         */
+        get: operations["metrics_metrics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/ready": {
         parameters: {
             query?: never;
@@ -225,9 +245,15 @@ export interface paths {
         };
         /**
          * Ready
-         * @description Readiness: Postgres responde. Un `SELECT 1` sin éxito propaga la
-         *     excepción a un `500` — la señal correcta para un probe, no un caso a
-         *     degradar.
+         * @description Postgres responde. Un `SELECT 1` sin éxito propaga la excepción a un
+         *     `500`.
+         *
+         *     Lo consultan personas, `scripts/smoke_api.py` y el startup probe de
+         *     GCP, que corre una vez por arranque de instancia. **Nunca un probe
+         *     periódico** (ADR-0027): cada llamada despierta a Neon, y un probe cada
+         *     10 s lo mantendría encendido todo el día (incidente 0005). El readiness
+         *     de Azure apunta a `/health`. Por eso no hay caché: cada llamada dice
+         *     la verdad sobre la base en ese momento.
          *
          *     La sesión llega por `Depends`, no por `AsyncSessionLocal` directo:
          *     es lo que le permite a un test sobreescribirla con un doble sin
@@ -251,11 +277,10 @@ export interface paths {
         };
         /**
          * Dashboard Spa
-         * @description Sirve el SPA. Un archivo real del root de `dist/` (p.ej.
-         *     `favicon.svg`) se sirve por su nombre exacto; cualquier otra ruta
-         *     es del router del lado del cliente (React Router) y cae a
-         *     `index.html` — `StaticFiles(html=True)` sólo resuelve URLs de
-         *     directorio, no rutas profundas como `/cases/{id}`.
+         * @description Sirve el SPA (`archivo_del_spa`). `StaticFiles(html=True)` sólo
+         *     resuelve URLs de directorio, no rutas profundas como `/cases/{id}`.
+         *     Una ruta de la API que no existe es un 404, no la página: si no,
+         *     un cliente que se equivoca de endpoint recibe HTML con 200.
          */
         get: operations["dashboard_spa__full_path__get"];
         put?: never;
@@ -406,6 +431,8 @@ export interface components {
         DecisionRead: {
             /** Agent Route */
             agent_route: string[];
+            /** Arbiter Prompt Version */
+            arbiter_prompt_version?: string | null;
             /** Base Confidence */
             base_confidence?: number | null;
             /** Citations External */
@@ -417,6 +444,10 @@ export interface components {
             /** Confidence Rationale */
             confidence_rationale?: string | null;
             debate: components["schemas"]["DebateSummary"];
+            /** Debate Pro Customer Prompt Version */
+            debate_pro_customer_prompt_version?: string | null;
+            /** Debate Pro Fraud Prompt Version */
+            debate_pro_fraud_prompt_version?: string | null;
             /**
              * Decided At
              * Format: date-time
@@ -1002,6 +1033,26 @@ export interface operations {
                     "application/json": {
                         [key: string]: string;
                     };
+                };
+            };
+        };
+    };
+    metrics_metrics_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
         };

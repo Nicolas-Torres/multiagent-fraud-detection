@@ -520,6 +520,7 @@ async def debate_pro_fraud(
             max_tokens=pro_fraud.MAX_TOKENS,
             thinking=pro_fraud.THINKING,
         )
+        salida["debate_pro_fraud_prompt_version"] = pro_fraud.PROMPT_VERSION
     except Exception as exc:
         logger.exception("argumento pro-fraude degradado; se usa el respaldo")
         salida["pro_fraud_argument"] = pro_fraud.fallback_argument()
@@ -555,6 +556,7 @@ async def debate_pro_customer(
             max_tokens=pro_customer.MAX_TOKENS,
             thinking=pro_customer.THINKING,
         )
+        salida["debate_pro_customer_prompt_version"] = pro_customer.PROMPT_VERSION
     except Exception as exc:
         logger.exception("argumento pro-cliente degradado; se usa el respaldo")
         salida["pro_customer_argument"] = pro_customer.fallback_argument()
@@ -679,6 +681,9 @@ async def _decision_arbiter_impl(
         "agent_route": [ARBITER],
         "decision": veredicto.decision,
         "confidence": veredicto.confidence,
+        # Sólo cuando el LLM respondió (ADR-0033): las degradaciones de arriba
+        # no lo escriben, y su ausencia dice que ningún modelo decidió.
+        "arbiter_prompt_version": arbiter_prompt.PROMPT_VERSION,
     }
     # Rationale siempre que haya un desvio del piso -en decision o en
     # confianza-, no solo cuando la confianza numerica cambia: ADR-0016
@@ -884,6 +889,13 @@ async def _persist_decision_impl(
                     agent_route=state.get("agent_route", []),
                     explanation_prompt_version=state.get(
                         "explanation_prompt_version"
+                    ),
+                    arbiter_prompt_version=state.get("arbiter_prompt_version"),
+                    debate_pro_fraud_prompt_version=state.get(
+                        "debate_pro_fraud_prompt_version"
+                    ),
+                    debate_pro_customer_prompt_version=state.get(
+                        "debate_pro_customer_prompt_version"
                     ),
                     explanation_customer=state.get("explanation_customer", ""),
                     explanation_audit=state.get("explanation_audit", ""),

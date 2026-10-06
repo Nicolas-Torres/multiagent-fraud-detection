@@ -140,8 +140,11 @@ def build_audit_explanation(state: dict[str, Any]) -> str:
         ("catálogo", state.get("policy_catalog_version")),
         ("scoring", state.get("scoring_version")),
         ("índice", state.get("retrieval_index_version")),
-        ("prompt", state.get("explanation_prompt_version")),
+        ("explicación", state.get("explanation_prompt_version")),
         ("snapshot", state.get("threat_intel_version")),
+        ("árbitro", state.get("arbiter_prompt_version")),
+        ("debate pro-fraude", state.get("debate_pro_fraud_prompt_version")),
+        ("debate pro-cliente", state.get("debate_pro_customer_prompt_version")),
     ]
     lineas.append(
         "Versiones: "

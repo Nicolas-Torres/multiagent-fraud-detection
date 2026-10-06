@@ -193,16 +193,22 @@ def test_la_auditoria_dice_cuando_no_hubo_politicas():
     assert "ninguna política" in texto.lower()
 
 
-def test_la_auditoria_lista_los_cinco_sellos():
+def test_la_auditoria_lista_todos_los_sellos():
     texto = build_audit_explanation(
         estado(
             explanation_prompt_version=PROMPT_VERSION,
             threat_intel_version="claude-sonnet-4-6:issuer-alert:v1",
+            arbiter_prompt_version="claude-sonnet-5:arbiter-verdict:3",
         )
     )
-    for sello in ("catálogo", "scoring", "índice", "prompt", "snapshot"):
+    for sello in (
+        "catálogo", "scoring", "índice", "explicación", "snapshot",
+        "árbitro", "debate pro-fraude", "debate pro-cliente",
+    ):
         assert sello in texto
     assert "claude-sonnet-4-6:issuer-alert:v1" in texto
+    assert "árbitro claude-sonnet-5:arbiter-verdict:3" in texto
+    assert "debate pro-fraude n/a" in texto
 
 
 def test_la_auditoria_distingue_no_consultado_de_snapshot_vacio():
