@@ -21,6 +21,21 @@ Sin enmiendas acumuladas. Las próximas se anotan en
 
 ---
 
+## [0.16] — El piso conoce la evidencia incompleta
+
+Tres enmiendas y dos correcciones, de la etapa posterior a la publicación
+([acta 14](reviews/14-despues-de-publicar.md)). Ninguna cambia un schema.
+
+| # | Enmienda | Toca | Por qué |
+|---|---|---|---|
+| 1 | **fetch-intel a demanda**, sin cron | §1.2 | El snapshot no vence y la demo tiene fechas fijas: un cron semanal en cada nube pagaba por un corpus que no cambia ninguna decisión ([ADR-0029](adr/0029-fetch-intel-a-demanda.md)) |
+| 2 | **El único `429` de `POST /cases` es el techo de la demo**; se quita la nota del cooldown por escenario | §2.3 | La espera global hacía que un visitante recibiera `429` por la corrida de otro, que no veía en su tabla. Pasa a vivir en el navegador de cada visitante ([ADR-0030](adr/0030-la-espera-entre-corridas-es-por-visitante.md)) |
+| 3 | **El piso de la guarda 4 es `piso_efectivo`**: nunca APPROVE si cayó un agente que produce señales | §2.5 (`Decision`), §7.3 | Con la misma evidencia y un agente caído, el árbitro aprobaba en un caso y pedía verificación en otro ([ADR-0032](adr/0032-con-evidencia-incompleta-el-piso-no-es-approve.md)) |
+| 4 | **Una ruta inexistente bajo `/api/` responde `404` JSON**, no la página del dashboard | §2.3 | Hallazgo de la revisión de seguridad que encontró el incidente 0012: la ruta del dashboard se tragaba los errores de la API |
+| 5 | El pie del contrato decía "Estado: v0.14" | final | Corrección: no se había actualizado en la v0.15 |
+
+---
+
 ## [0.15] — La demo pública, lista para visitas
 
 Cinco enmiendas, todas de la etapa de operación y preparación para publicar

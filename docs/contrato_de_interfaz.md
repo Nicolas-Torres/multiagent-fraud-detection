@@ -1,5 +1,5 @@
 # Contrato de Interfaz — Sistema Multi-Agente de Detección de Fraude
-**Versión 0.15 — La demo pública, lista para visitas**
+**Versión 0.16 — El piso conoce la evidencia incompleta**
 
 > Define las **fronteras** entre el motor de agentes, la infraestructura y el
 > dashboard del analista — hoy las tres las cubro yo
@@ -54,8 +54,8 @@ alembic upgrade head
 # si falla, NO aborta el rollout)
 python scripts/seed.py
 
-# Modo fetch-intel (Job semanal, lunes 06:00 UTC, idempotente;
-# si falla, NO aborta el rollout)
+# Modo fetch-intel 🆕 (Job a demanda, sin cron, ADR-0029: se corre a mano
+# cuando cambia SNAPSHOT_VERSION; idempotente; si falla, no afecta al servicio)
 python scripts/fetch_threat_intel.py
 ```
 
@@ -105,20 +105,20 @@ réplicas que todavía no se reemplazaron.
 
 | Endpoint | Chequea | Uso |
 |---|---|---|
-| `GET /health` | El proceso vive | liveness **y** readiness probe de Azure 🆕 (ADR-0027) |
-| `GET /ready` | Postgres responde, en cada llamada | diagnóstico, `smoke_api.py` y startup probe de GCP; **nunca** un probe periódico 🆕 (ADR-0027) |
-| `GET /metrics` 🆕 | — | scrape de métricas HTTP en formato Prometheus (ADR-0024) |
+| `GET /health` | El proceso vive | liveness **y** readiness probe de Azure (ADR-0027) |
+| `GET /ready` | Postgres responde, en cada llamada | diagnóstico, `smoke_api.py` y startup probe de GCP; **nunca** un probe periódico (ADR-0027) |
+| `GET /metrics` | — | scrape de métricas HTTP en formato Prometheus (ADR-0024) |
 
 Los tres sin autenticación, `200` cuando OK.
 
-🆕 **El readiness no consulta Postgres** (ADR-0027). Un probe cada 10 s sobre
+**El readiness no consulta Postgres** (ADR-0027). Un probe cada 10 s sobre
 `/ready` despertaba a Neon (serverless) todo el día (incidente 0005), y cuando
 despertarlo superaba el timeout del probe dejaba la réplica sin tráfico. Si la
 base cae, los endpoints que la usan responden `5xx`; marcar la réplica como no
 disponible no arreglaría nada. `/ready` no tiene caché: cada llamada dice el
 estado real de la base.
 
-🆕 **En producción no existen `/docs`, `/redoc` ni `/openapi.json`**
+**En producción no existen `/docs`, `/redoc` ni `/openapi.json`**
 (ADR-0025): Swagger le serviría a cualquiera un formulario para disparar el
 grafo. Los tipos del dashboard se generan con `app.openapi()` en proceso
 (`scripts/export_openapi.py`), no por URL.
@@ -135,8 +135,8 @@ grafo. Los tipos del dashboard se generan con `app.openapi()` en proceso
 | `LANGSMITH_TRACING` | `true` |
 | `LANGSMITH_PROJECT` | `fraud-detection` |
 | `LOG_LEVEL` | `INFO` |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` 🆕 | `http://localhost:4317` (vacío = instrumentación OTel deshabilitada, ADR-0024) |
-| `OTEL_SERVICE_NAME` 🆕 | `fraud-detection-api` |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://localhost:4317` (vacío = instrumentación OTel deshabilitada, ADR-0024) |
+| `OTEL_SERVICE_NAME` | `fraud-detection-api` |
 | **`ENVIRONMENT`** | `local` \| `staging` \| `production` |
 
 > `LOG_LEVEL` gobierna también el echo de SQL de SQLAlchemy: solo en `DEBUG`.
@@ -170,7 +170,7 @@ grafo. Los tipos del dashboard se generan con `app.openapi()` en proceso
 |---|---|---|---|
 | **Local** | contenedor de `compose.yml` | iterar migraciones, smoke tests | cada uno la suya |
 | **Compartido** | RDS, base `fraud` | integración: el motor y el dashboard | los dos |
-| **Producción** 🆕 | Neon (Postgres serverless), una sola base para Azure y GCP | la demo pública | el CD (Jobs de migrate y seed) |
+| **Producción** | Neon (Postgres serverless), una sola base para Azure y GCP | la demo pública | el CD (Jobs de migrate y seed) |
 
 El local no desaparece al existir el compartido: se **itera** en local, se
 **integra** en compartido.
@@ -230,7 +230,7 @@ Los tags siguen existiendo porque un humano necesita leer qué es cada imagen.
 ser autoridad sobre el número: uno solo puede quedar desactualizado, y el que se
 puede firmar es el de git.
 
-#### Acceso a la imagen 🆕
+#### Acceso a la imagen
 
 **Ninguna credencial personal en el camino de la imagen**
 ([ADR-0028](adr/0028-sin-credenciales-personales-en-el-camino-de-la-imagen.md)).
@@ -329,11 +329,11 @@ mediría la discrepancia de reglas en vez de la calidad del sistema.
 
 | Método | Ruta | Propósito | Body | Respuesta | Código |
 |---|---|---|---|---|---|
-| `POST` | `/api/v1/cases` | Ingresar transacción | `Transaction` | `CaseCreated` | `202` nuevo / `200` reintento / `429` techo de la demo 🆕 |
+| `POST` | `/api/v1/cases` | Ingresar transacción | `Transaction` | `CaseCreated` | `202` nuevo / `200` reintento / `429` techo de la demo |
 | `GET` | `/api/v1/cases` | Listar/filtrar cola (HITL) | query: `status`, `limit`, `offset` | `Page[CaseSummary]` | `200` |
 | `GET` | `/api/v1/cases/{case_id}` | Detalle completo | — | `CaseDetail` | `200` |
 | `GET` | `/api/v1/cases/showcase` | `case_id` reales de los 5 casos curados de la vitrina, resueltos en vivo | — | `list[CaseShowcaseItem]` | `200` |
-| `POST` | `/api/v1/cases/{case_id}/resolution` | Acción del analista | `HumanResolutionIn` | `CaseDetail` | `200` / `429` techo de la demo 🆕 |
+| `POST` | `/api/v1/cases/{case_id}/resolution` | Acción del analista | `HumanResolutionIn` | `CaseDetail` | `200` / `429` techo de la demo |
 | `GET` | `/api/v1/policies` | Catálogo con estado de cada política | — | `list[PolicyRead]` | `200` |
 | `POST` | `/api/v1/policies` | Alta de política (norma + vinculación opcional) | `PolicyIn` | `PolicyRead` | `201` |
 | `GET` | `/api/v1/predicates` | La biblioteca, para el compositor del dashboard | — | `list[PredicateSpec]` | `200` |
@@ -341,9 +341,9 @@ mediría la discrepancia de reglas en vez de la calidad del sistema.
 | `GET` | `/api/v1/metrics/llm` | Costo y latencia del grafo, leídos de LangSmith (ADR-0019) | — | `LlmMetricsRead` | `200` |
 | `GET` | `/health` | Liveness | — | `{status}` | `200` |
 | `GET` | `/ready` | Postgres responde (diagnóstico, no probe) | — | `{status}` | `200` |
-| `GET` | `/metrics` | 🆕 Métricas HTTP (latencia, conteo) en formato Prometheus, para scrape (ADR-0024) | — | `text/plain` (Prometheus) | `200` |
+| `GET` | `/metrics` | Métricas HTTP (latencia, conteo) en formato Prometheus, para scrape (ADR-0024) | — | `text/plain` (Prometheus) | `200` |
 
-🆕 **Techo de la demo pública** (ADR-0025). Sólo con `ENVIRONMENT=production`,
+**Techo de la demo pública** (ADR-0025). Sólo con `ENVIRONMENT=production`,
 y contado en la base, así que es uno solo para las dos nubes:
 
 | Endpoint | Techo | Al superarlo |
@@ -353,9 +353,14 @@ y contado en la base, así que es uno solo para las dos nubes:
 
 El techo corre **después** de la idempotencia: repetir un `transaction_id`
 existente devuelve `200` sin contar. Es un techo blando: dos pedidos
-simultáneos pueden pasarlo por uno. El cooldown por escenario de la demo
-(`LIVE-*`, 5 minutos) también responde `429`, pero queda fuera de este
-contrato (acta 10 §3.5): ningún llamador real usa ese prefijo.
+simultáneos pueden pasarlo por uno. 🆕 Es el único `429` de `POST /cases`: la
+espera entre corridas de una misma fila del dashboard vive en el navegador de
+cada visitante, no en la API (ADR-0030).
+
+🆕 **Una ruta inexistente bajo `/api/` responde `404` JSON**
+(`{"detail": "Not Found"}`), no la página del dashboard. Cualquier otra ruta es
+del dashboard, que sólo sirve archivos de su propio build y, si no existe, su
+`index.html` (incidente 0012).
 
 `GET /api/v1/cases/{case_id}/stream` emite eventos `node`
 (`{"node": "<nombre>"}`, uno por nodo del grafo que termina, incluidos los
@@ -487,7 +492,7 @@ el análisis (§7.4).
 | **`policy_catalog_version`** | `str \| null` | qué versión del catálogo se evaluó (ej. `2025.1-b1`) |
 | **`retrieval_index_version`** | `str \| null` | con qué generación del índice se recuperó (`gemini-embedding-2:1536:doc:1`). `null` = **no hubo recuperación** |
 | **`explanation_prompt_version`** | `str \| null` | con qué modelo y prompt se redactó `explanation_customer`. `null` = **ningún modelo participó** |
-| **`threat_intel_version`** | `str \| null` | quinto eje: con qué generación del snapshot externo se consultó (`claude-haiku-4-5-20251001:issuer-alert:v2` 🆕, ADR-0026). `null` = **no se consultó snapshot** — nunca "no había alertas": un corpus vacío consultado igual sella versión |
+| **`threat_intel_version`** | `str \| null` | quinto eje: con qué generación del snapshot externo se consultó (`claude-haiku-4-5-20251001:issuer-alert:v2`, ADR-0026). `null` = **no se consultó snapshot** — nunca "no había alertas": un corpus vacío consultado igual sella versión |
 | `signals` | `list[Signal]` | orden determinístico fijado por Evidence Aggregation |
 | `citations_internal` | `list[InternalCitation]` | políticas (RAG) |
 | `citations_external` | `list[ExternalCitation]` | alertas web (gobernada) |
@@ -533,8 +538,10 @@ el sistema (§7.3), no por convención.
 
 `risk_score` **no** es ajustable por el Arbiter: si un LLM pudiera moverlo,
 dejaría de servir para vigilar drift (entregable 6). Tampoco `decision` es libre
-del todo: el piso determinista (`prescribed_action`) es una cota mínima de
-cautela que el Arbiter puede subir con justificación y nunca bajar (§7.3, guarda 4).
+del todo: el piso determinista es una cota mínima de cautela que el Arbiter
+puede subir con justificación y nunca bajar (§7.3, guarda 4). 🆕 El piso es
+`piso_efectivo`: lo que prescribe el catálogo (`prescribed_action`), y nunca
+APPROVE si cayó un agente que produce señales (ADR-0032).
 
 ##### La cita autoriza el veredicto, no lo acompaña
 
@@ -1040,7 +1047,7 @@ entregable 7.
 1. `decision != ESCALATE_TO_HUMAN` ⟹ `citations_internal` **contiene una cita por cada** `policy_id` de `matched_policies`.
 2. `decision != ESCALATE_TO_HUMAN` ⟹ `base_confidence` no es `null`.
 3. `base_confidence` no `null` **y** `confidence != base_confidence` ⟹ hay `confidence_rationale`.
-4. `decision != ESCALATE_TO_HUMAN` ⟹ `precedencia(decision) >= precedencia(prescribed_action(catalog, matched_policies))` — el Arbiter con LLM puede escalar el piso determinista, nunca bajarlo (ADR-0016).
+4. `decision != ESCALATE_TO_HUMAN` ⟹ `precedencia(decision) >= precedencia(piso_efectivo(catalog, matched_policies, degraded_agents))` — el Arbiter con LLM puede escalar el piso determinista, nunca bajarlo (ADR-0016). 🆕 El piso es `piso_efectivo`, el mismo que recibe el Arbiter: `prescribed_action`, y nunca APPROVE con un agente de señales caído (ADR-0032).
 
 Las cuatro **levantan**, no reparan: si alguna dispara, el Arbiter tiene un bug, y
 una guarda que repara lo esconde. El Arbiter degrada a `ESCALATE_TO_HUMAN` antes
@@ -1143,7 +1150,8 @@ c558fd490ae6  (pgvector)
 
 ---
 
-**Estado**: v0.14 — el sistema corre de punta a punta, en producción real.
+**Estado**: v0.16 — el sistema corre de punta a punta, en producción real y
+publicado.
 Los cuatro puntos de escritura de §7.3 —W0 a W3— tienen cada uno su
 endpoint o su wrapper (`scripts/smoke_api.py`); el dashboard del analista
 está completo (grafo en vivo por SSE, cola HITL, costo y latencia desde
@@ -1151,7 +1159,8 @@ LangSmith, vitrina resuelta en vivo — `GET /cases/showcase`); y el
 despliegue es automático en dos nubes: Azure (oficial, ADR-0021) y GCP
 (aprendizaje, ADR-0022). Sin `POST /api/v1/policies` todavía (ADR-0017);
 sin autenticación, declarada como deuda explícita, no como omisión
-silenciosa.
+silenciosa: la demo pública se protege con un techo de uso contado en la base
+(ADR-0025).
 
 **§1 lo valido yo** (ver ADR-0021: el reparto de dos personas ya no aplica).
 ADR-0008 a ADR-0010 siguen **aceptados**. **Valido yo**: §2–§4, §7.
