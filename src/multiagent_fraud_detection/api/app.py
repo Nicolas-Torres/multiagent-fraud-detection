@@ -133,12 +133,13 @@ def create_app() -> FastAPI:
     app.include_router(policies.router, prefix="/api/v1")
     app.include_router(predicates.router, prefix="/api/v1")
 
-    # `/metrics` (ADR-0024), sin gate — a diferencia de las trazas/logs de
-    # arriba, esto no abre ninguna conexión de red: sólo agrega un endpoint
-    # in-process que sirve el registro de Prometheus en memoria. Tiene que
-    # quedar registrado antes del catch-all del SPA de abajo, igual que
-    # `/health`/`/ready`.
-    Instrumentator().instrument(app).expose(app)
+    # `/metrics` (ADR-0024) es del stack de observabilidad local: sólo fuera de
+    # producción (ADR-0034). En producción nadie lo lee y respondía público, así
+    # que ni se instrumenta: un contador que nadie consulta es estado sin dueño.
+    # Ahí `/metrics` cae al catch-all del SPA, como cualquier ruta desconocida.
+    # Tiene que quedar registrado antes de ese catch-all, igual que `/health`.
+    if not produccion:
+        Instrumentator().instrument(app).expose(app)
 
     # El dashboard, si está compilado. Va al final a propósito: un
     # catch-all registrado antes le robaría el matching a `/api/v1/*`. Sin
