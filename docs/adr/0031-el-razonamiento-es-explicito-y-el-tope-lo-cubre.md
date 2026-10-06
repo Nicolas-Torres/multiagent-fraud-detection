@@ -31,7 +31,7 @@ del debate y la explicación terminaron con `end_turn`, sin razonamiento. Los
 casos de la demo son simples. Por eso no es un incidente, sino un defecto latente:
 aparece justo en los casos difíciles, que es donde el árbitro tiene que aportar.
 
-Medición (`docs/temp/token-budget/`): sin razonamiento, el árbitro **omitió 3 de
+Medición ([`evaluaciones/sonnet-5-5.md`](../evaluaciones/sonnet-5-5.md)): sin razonamiento, el árbitro **omitió 3 de
 las 7 escaladas** que hace con razonamiento.
 
 ## Decisión
@@ -81,7 +81,7 @@ ya no lo acepta, y el adaptativo no gasta nada en los casos simples (0 de 40 en
 producción).
 
 **Migrar a `claude-sonnet-5-5`.** Evaluado sobre los mismos casos
-(`docs/temp/token-budget/evaluacion-sonnet-5-5.md`): decide igual (20/20 en
+([`evaluaciones/sonnet-5-5.md`](../evaluaciones/sonnet-5-5.md)): decide igual (20/20 en
 producción, 7/7 escaladas difíciles), pero no fue más rápido (árbitro 4,0 s
 contra 3,8 s) ni más barato, y en un caso tomó por evidencia lo que afirmaba un
 argumento del debate. `claude-sonnet-5` sigue activo hasta, como mínimo, el
