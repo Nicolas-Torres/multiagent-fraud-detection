@@ -48,6 +48,13 @@ jobs:
         uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
+          # Por defecto la acción poda de la caché los paquetes bajados de PyPI y
+          # guarda ~0 MB: cada corrida descargaba las 92 dependencias, y un día
+          # lento de PyPI fueron 15 minutos (acta 14). La clave sale de `uv.lock`.
+          prune-cache: false
+          # `prune-cache` no entra en la clave: sin un sufijo, la caché podada
+          # anterior seguía coincidiendo y nunca se guardaba una completa.
+          cache-suffix: completa
 
       - name: Instalar Python 3.12
         run: uv python install 3.12
