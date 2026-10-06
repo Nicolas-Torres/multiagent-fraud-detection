@@ -47,6 +47,9 @@ class DecisionRead(BaseModel):
     retrieval_index_version: str | None = None
     explanation_prompt_version: str | None = None
     threat_intel_version: str | None = None
+    arbiter_prompt_version: str | None = None
+    debate_pro_fraud_prompt_version: str | None = None
+    debate_pro_customer_prompt_version: str | None = None
     signals: list[SignalRead]
     citations_internal: list[InternalCitation]
     citations_external: list[ExternalCitation]

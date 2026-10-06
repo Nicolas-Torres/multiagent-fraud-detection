@@ -134,3 +134,21 @@ async def test_sin_perfil_el_snapshot_queda_nulo_no_ausente(catalogo):
     valores = _update_de_cases(sesion).compile().params
     assert "customer_snapshot" in valores
     assert valores["customer_snapshot"] is None
+
+
+async def test_los_sellos_del_arbitro_y_del_debate_llegan_a_la_decision(catalogo):
+    """ADR-0033: lo que los nodos sellan en el estado se guarda en `decisions`."""
+    sesion = _SesionFake()
+    estado = {
+        **_estado(),
+        "arbiter_prompt_version": "claude-sonnet-5:arbiter-verdict:3",
+        "debate_pro_fraud_prompt_version": "claude-sonnet-5:debate-pro-fraud:2",
+        "debate_pro_customer_prompt_version": None,
+    }
+
+    await persist_decision(estado, _runtime(catalogo, sesion))
+
+    [decision] = [o for o in sesion.agregados if type(o).__name__ == "Decision"]
+    assert decision.arbiter_prompt_version == "claude-sonnet-5:arbiter-verdict:3"
+    assert decision.debate_pro_fraud_prompt_version == "claude-sonnet-5:debate-pro-fraud:2"
+    assert decision.debate_pro_customer_prompt_version is None

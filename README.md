@@ -152,6 +152,12 @@ los otros, porque los cinco artefactos cambian por separado:
 | Con qué prompt se redactó | `explanation_prompt_version` | ningún modelo participó |
 | Con qué snapshot se consultó | `threat_intel_version` | no se consultó inteligencia externa |
 
+Además, cada salida de un LLM que queda en la decisión sella el modelo y el prompt
+que la produjo ([ADR-0033](docs/adr/0033-cada-texto-o-juicio-de-un-llm-que-se-guarda-lleva-su-version.md)):
+`arbiter_prompt_version` (el veredicto), `debate_pro_fraud_prompt_version` y
+`debate_pro_customer_prompt_version` (los argumentos del debate). `null` significa
+que ningún modelo la produjo: el árbitro degradó o el argumento salió del respaldo.
+
 Las cadenas son descriptivas y no identificadores opacos
 (`gemini-embedding-2:1536:doc:1`): el motivo de sellarlas es que alguien las lea.
 Por lo mismo, **el modelo no es variable de entorno** — uno configurable por
