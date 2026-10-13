@@ -148,4 +148,4 @@ un borrado de datos (incidente 0003) que sólo miró las cascadas de la base.
   desvíos declarados frente al enunciado.
 
 Al cerrar una etapa: acta en `docs/reviews/`, enmiendas al contrato, `CHANGELOG.md`,
-tabla de estado del README, y regenerar los diagramas.
+tabla de etapas de `docs/desarrollo.md`, y regenerar los diagramas.

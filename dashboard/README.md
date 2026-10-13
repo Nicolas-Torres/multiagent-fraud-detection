@@ -26,7 +26,7 @@ npm run dev          # servidor de desarrollo, proxy a la API local
 ```
 
 Requiere el backend corriendo aparte (ver el
-[README raíz](../README.md#puesta-en-marcha)) — este proyecto no trae su
+[README raíz](../README.md#correr-en-local)) — este proyecto no trae su
 propia base de datos ni sus propios proveedores.
 
 ## Tipos generados, no escritos a mano
@@ -37,7 +37,7 @@ npm run generate:graph  # topología del grafo compilado -> src/data/graph_topol
 ```
 
 Ambos se generan **contra el sistema real**, nunca se editan directamente —
-mismo principio que los diagramas del README raíz: lo que deriva no se
+mismo principio que los diagramas del proyecto ([`docs/desarrollo.md`](../docs/desarrollo.md#diagramas)): lo que deriva no se
 dibuja ni se tipa a mano.
 
 ## Verificación
