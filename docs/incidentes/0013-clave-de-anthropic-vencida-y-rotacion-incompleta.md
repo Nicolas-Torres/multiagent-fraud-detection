@@ -1,4 +1,4 @@
-# Incidente 0013 — clave de Anthropic revocada, y una rotación que no llegó a todos lados
+# Incidente 0013 — clave de Anthropic vencida, y una rotación que no llegó a todos lados
 
 **Fecha**: 2026-10-14 (primer error registrado) al 2026-10-15 (resuelto).
 **Detectado**: el 2026-10-15, en la evaluación del día 13 de la publicación en
@@ -18,11 +18,13 @@ devolvía `401 authentication_error: invalid x-api-key`.
 
 ## Causa raíz
 
-**La clave fue revocada.** La misma clave estaba en `.env` y en
+**La clave venció.** Se había creado con fecha de vencimiento en la consola de
+Anthropic, y nadie anotó esa fecha. La misma clave estaba en `.env` y en
 `infra/shared.secrets.tfvars`, y también fallaba contra `GET /v1/models`, así que
-no era un error de carga en una nube. La causa de la revocación no se determinó:
-la clave no aparece en el repo, en su historia ni en las alertas de secret
-scanning de GitHub. El último caso sano es del 11/10 a las 15:35 UTC.
+no era un error de carga en una nube. Antes de confirmar el vencimiento se
+descartó una filtración: la clave no aparece en el repo, en su historia ni en las
+alertas de secret scanning de GitHub. El último caso sano es del 11/10 a las
+15:35 UTC.
 
 **El sistema degradó como fue diseñado, y eso ocultó la caída.** El debate cayó a
 su respaldo y el árbitro escaló con el piso (ADR-0016): nunca aprobó de menos,
@@ -54,20 +56,22 @@ sellado (`claude-sonnet-5:arbiter-verdict:3`).
 
 ## Lo que queda
 
-- Los jobs de GCP siguen con la condición en error hasta el próximo deploy, que
-  los actualiza con `gcloud run jobs update`. Hasta entonces no conviene correr
-  `fetch-intel` a mano en GCP.
+- ~~Los jobs de GCP con la condición en error~~: los corrigió el deploy del
+  PR #81 (`sha-2a00ff4`), que los actualizó con `gcloud run jobs update`.
 - Los 4 casos del visitante y una corrida de verificación (`97ec38c0`) quedan en
   la cola HITL con un veredicto que no salió del árbitro. No se borran: borrar
   datos tiene sus propias consecuencias (incidentes 0003 y 0006).
-- La versión 2 del secreto en Secret Manager (2026-09-15) sigue habilitada y no
-  la maneja Terraform. Es una clave vieja; conviene destruirla.
+- ~~La versión 2 del secreto en Secret Manager~~ (2026-09-15, fuera de
+  Terraform): destruida el 2026-10-15.
 - En GCP, una instancia que estuviera caliente al rotar seguiría con la clave
   vieja hasta reciclarse. Esta vez no la había; el script no lo fuerza.
 
 ## Aprendizaje
 
-Una degradación bien diseñada protege la decisión, pero también puede esconder
+Una clave con vencimiento es un corte programado. Al crearla hay que anotar la
+fecha y agendar la rotación antes; si no, el corte llega sin aviso, como acá.
+
+Además, una degradación bien diseñada protege la decisión, pero también puede esconder
 una caída completa del proveedor. Que el árbitro escale todo es correcto como
 respuesta a un caso; como estado que dura días, es una alerta que nadie recibió.
 
