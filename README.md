@@ -165,7 +165,7 @@ debate corren en paralelo, por eso la latencia total es menor que la suma.
     ├── contrato_de_interfaz.md
     ├── adr/                  # 34 decisiones de diseño, con sus alternativas
     ├── evaluaciones/         # modelos candidatos y consistencia del árbitro
-    ├── incidentes/           # 12 incidentes de producción, con causa y arreglo
+    ├── incidentes/           # 13 incidentes de producción, con causa y arreglo
     ├── reviews/              # cierre de cada etapa
     └── diagrams/
 ```

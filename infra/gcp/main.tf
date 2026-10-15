@@ -69,6 +69,14 @@ resource "google_secret_manager_secret_version" "this" {
   for_each    = toset(local.secret_ids)
   secret      = google_secret_manager_secret.this[each.key].id
   secret_data = local.secret_values[each.key]
+
+  # Al rotar, `secret_data` fuerza un reemplazo. Por defecto Terraform destruye
+  # la versión vieja antes de crear la nueva, y en ese intervalo `latest` apunta
+  # a una versión DESTROYED: los jobs que se actualizan entonces fallan
+  # (incidente 0013). Crear antes de destruir deja siempre una versión válida.
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "google_secret_manager_secret_iam_member" "runtime_access" {

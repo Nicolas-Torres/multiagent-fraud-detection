@@ -216,6 +216,6 @@ Cada etapa cerró con un acta en [reviews/](reviews/), en orden.
 | Dashboard del analista (frontend) | ✅ |
 | CI, imagen y despliegue | ✅ |
 | Observabilidad: LangSmith por nodo, OpenTelemetry + Grafana local | ✅ |
-| Operación en producción: techos de uso y gasto, 12 incidentes documentados | ✅ |
+| Operación en producción: techos de uso y gasto, 13 incidentes documentados | ✅ |
 | Despliegue sin credenciales personales: OIDC y promoción por digest | ✅ |
 | Criterio sobre modelos: alternativas evaluadas y consistencia del árbitro | ✅ |
