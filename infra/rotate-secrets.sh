@@ -44,6 +44,17 @@ run_azure() {
     fi
     (cd "$ROOT/azure" && terraform apply "$plan")
     rm -f "$plan"
+    # Container Apps no reinicia las réplicas al cambiar un secreto: la que
+    # está corriendo (min_replicas = 1) sigue con el valor viejo hasta que se
+    # reinicia (incidente 0013). Los jobs no lo necesitan: leen el secreto al
+    # arrancar cada ejecución.
+    local revision
+    for revision in $(az containerapp revision list --name ca-fraud-detection-api \
+      --resource-group rg-fraud-detection --query "[?properties.active].name" -o tsv); do
+      az containerapp revision restart --name ca-fraud-detection-api \
+        --resource-group rg-fraud-detection --revision "$revision" -o none
+      echo "azure: revisión $revision reiniciada"
+    done
   fi
 }
 
